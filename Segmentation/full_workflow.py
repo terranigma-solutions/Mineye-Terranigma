@@ -60,25 +60,6 @@ def crop_by_rectangle(data, row_start, row_end, col_start, col_end):
     print(f"Cropped data shape: {cropped_data.shape}")
     return cropped_data
 
-def calculate_ndvi(nir_band, red_band):
-    """
-    Calculate NDVI from NIR and Red bands
-    NDVI = (NIR - Red) / (NIR + Red)
-    """
-    # Avoid division by zero
-    denominator = nir_band + red_band
-    denominator[denominator == 0] = 1e-6
-    
-    ndvi = (nir_band - red_band) / denominator
-    return ndvi
-
-def create_vegetation_mask(ndvi, threshold=0.2):
-    """
-    Create a binary mask to exclude vegetation
-    Returns True for non-vegetation pixels
-    """
-    return ndvi <= threshold
-
 def main():
     # Choose bands best suited for lithology
     bands = {
@@ -90,6 +71,9 @@ def main():
         "B12": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B12_60m.jp2",  # SWIR 2
         "TCI": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_TCI_60m.jp2"
     }
+
+    # bounds = (xmin, ymin, xmax, ymax)
+    bounds = (733891.6, 4168988.9, 756038.65, 4186614.52)  # in the same CRS as the image
 
     print("Step 1: Preparing data...")
     with rasterio.open(bands["B4"]) as ref:
@@ -105,75 +89,6 @@ def main():
         print(f"Image dimensions: {width}x{height} pixels")
         print(f"Resolution: {ref.res[0]}m x {ref.res[1]}m")
 
-    # Read and crop NIR and Red bands for NDVI calculation
-    with rasterio.open(bands["B8A"]) as src:
-        nir_data = src.read(1)
-        nir_data = crop_by_rectangle(nir_data, 226, 516, 565, 935)
-    
-    with rasterio.open(bands["B4"]) as src:
-        red_data = src.read(1)
-        red_data = crop_by_rectangle(red_data, 226, 516, 565, 935)
-
-    # Calculate NDVI and create vegetation mask
-    print("\nCalculating NDVI and creating vegetation mask...")
-    ndvi = calculate_ndvi(nir_data, red_data)
-    vegetation_mask = create_vegetation_mask(ndvi, threshold=0.2)
-    
-    # Save NDVI and vegetation mask as numpy arrays
-    np.save("ndvi.npy", ndvi)
-    np.save("vegetation_mask.npy", vegetation_mask)
-    print("NDVI and vegetation mask saved as numpy arrays")
-
-    # Save NDVI and vegetation mask as GeoTIFFs
-    with rasterio.open(bands["B4"]) as src:
-        # Calculate the transform for the cropped region
-        transform = src.transform * rasterio.Affine.translation(565, 226)
-        
-        # Create the output profile
-        profile = src.profile.copy()
-        profile.update({
-            'driver': 'GTiff',
-            'dtype': 'float32',
-            'count': 1,
-            'height': ndvi.shape[0],
-            'width': ndvi.shape[1],
-            'transform': transform,
-            'nodata': -9999
-        })
-
-        # Save NDVI as GeoTIFF
-        ndvi_path = "ndvi.tif"
-        with rasterio.open(ndvi_path, 'w', **profile) as dst:
-            dst.write(ndvi.astype(np.float32), 1)
-        print(f"NDVI saved as GeoTIFF: {ndvi_path}")
-
-        # Save vegetation mask as GeoTIFF
-        mask_profile = profile.copy()
-        mask_profile.update({
-            'dtype': 'uint8',
-            'nodata': None
-        })
-        mask_path = "vegetation_mask.tif"
-        with rasterio.open(mask_path, 'w', **mask_profile) as dst:
-            dst.write(vegetation_mask.astype(np.uint8), 1)
-        print(f"Vegetation mask saved as GeoTIFF: {mask_path}")
-
-    # Plot NDVI
-    plt.figure(figsize=(10, 10))
-    plt.imshow(ndvi, cmap='RdYlGn')
-    plt.colorbar(label='NDVI')
-    plt.title('NDVI')
-    plt.axis('off')
-    plt.savefig('ndvi.png', bbox_inches='tight', dpi=300)
-    plt.close()
-
-    # Plot vegetation mask
-    plt.figure(figsize=(10, 10))
-    plt.imshow(vegetation_mask, cmap='binary')
-    plt.title('Vegetation Mask (White = Non-vegetation)')
-    plt.axis('off')
-    plt.show()
-
     stack = []
 
     for name, path in bands.items():
@@ -187,14 +102,6 @@ def main():
     # Stack into (rows, cols, bands)
     img_stack = np.stack(stack, axis=-1).astype(np.float64)
     print(f"Image stack shape: {img_stack.shape}")
-
-    # Apply vegetation mask to the image stack
-    print("\nApplying vegetation mask to image stack...")
-    # Instead of using NaN, we'll use a very low value for masked pixels
-    # This ensures the pixels won't influence the segmentation
-    masked_value = -1.0
-    for i in range(img_stack.shape[2]):
-        img_stack[:, :, i] = np.where(vegetation_mask, img_stack[:, :, i], masked_value)
 
     # Save intermediate result
     np.save("sentinel2_bayseg_input.npy", img_stack)
@@ -215,7 +122,7 @@ def main():
 
     print("\nStep 2: Running segmentation...")
     # Initialize segmenter
-    n_classes = 4
+    n_classes = 6
     print(f"Running segmentation with {n_classes} classes...")
     start_time = time.time()
     seg = BaySeg(data=img_stack, n_labels=n_classes, beta_init=10)
