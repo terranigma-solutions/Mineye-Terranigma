@@ -119,10 +119,44 @@ def main():
     ndvi = calculate_ndvi(nir_data, red_data)
     vegetation_mask = create_vegetation_mask(ndvi, threshold=0.2)
     
-    # Save NDVI and vegetation mask
+    # Save NDVI and vegetation mask as numpy arrays
     np.save("ndvi.npy", ndvi)
     np.save("vegetation_mask.npy", vegetation_mask)
-    print("NDVI and vegetation mask saved")
+    print("NDVI and vegetation mask saved as numpy arrays")
+
+    # Save NDVI and vegetation mask as GeoTIFFs
+    with rasterio.open(bands["B4"]) as src:
+        # Calculate the transform for the cropped region
+        transform = src.transform * rasterio.Affine.translation(565, 226)
+        
+        # Create the output profile
+        profile = src.profile.copy()
+        profile.update({
+            'driver': 'GTiff',
+            'dtype': 'float32',
+            'count': 1,
+            'height': ndvi.shape[0],
+            'width': ndvi.shape[1],
+            'transform': transform,
+            'nodata': -9999
+        })
+
+        # Save NDVI as GeoTIFF
+        ndvi_path = "ndvi.tif"
+        with rasterio.open(ndvi_path, 'w', **profile) as dst:
+            dst.write(ndvi.astype(np.float32), 1)
+        print(f"NDVI saved as GeoTIFF: {ndvi_path}")
+
+        # Save vegetation mask as GeoTIFF
+        mask_profile = profile.copy()
+        mask_profile.update({
+            'dtype': 'uint8',
+            'nodata': None
+        })
+        mask_path = "vegetation_mask.tif"
+        with rasterio.open(mask_path, 'w', **mask_profile) as dst:
+            dst.write(vegetation_mask.astype(np.uint8), 1)
+        print(f"Vegetation mask saved as GeoTIFF: {mask_path}")
 
     # Plot NDVI
     plt.figure(figsize=(10, 10))
@@ -130,7 +164,8 @@ def main():
     plt.colorbar(label='NDVI')
     plt.title('NDVI')
     plt.axis('off')
-    plt.show()
+    plt.savefig('ndvi.png', bbox_inches='tight', dpi=300)
+    plt.close()
 
     # Plot vegetation mask
     plt.figure(figsize=(10, 10))
@@ -155,8 +190,11 @@ def main():
 
     # Apply vegetation mask to the image stack
     print("\nApplying vegetation mask to image stack...")
+    # Instead of using NaN, we'll use a very low value for masked pixels
+    # This ensures the pixels won't influence the segmentation
+    masked_value = -1.0
     for i in range(img_stack.shape[2]):
-        img_stack[:, :, i] = np.where(vegetation_mask, img_stack[:, :, i], np.nan)
+        img_stack[:, :, i] = np.where(vegetation_mask, img_stack[:, :, i], masked_value)
 
     # Save intermediate result
     np.save("sentinel2_bayseg_input.npy", img_stack)
