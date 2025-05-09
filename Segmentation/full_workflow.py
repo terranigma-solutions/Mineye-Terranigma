@@ -69,7 +69,9 @@ def main():
         "B8A": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B8A_60m.jp2",  # Narrow NIR
         "B11": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B11_60m.jp2",  # SWIR 1
         "B12": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B12_60m.jp2",  # SWIR 2
-        "TCI": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_TCI_60m.jp2"
+        # Not used for segmentation:
+        "TCI": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_TCI_60m.jp2",
+        "SCL": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_SCL_60m.jp2"  # Scene Classification Layer
     }
 
     # bounds = (xmin, ymin, xmax, ymax)
@@ -90,9 +92,17 @@ def main():
         print(f"Resolution: {ref.res[0]}m x {ref.res[1]}m")
 
     stack = []
+    soil_mask = None
+
+    # First, load and process the SCL layer to create a soil mask
+    with rasterio.open(bands["SCL"]) as src:
+        scl_data = src.read(1)
+        scl_data = crop_by_rectangle(scl_data, 226, 516, 565, 935)
+        # Create soil mask (SCL class 5 represents bare soil)
+        soil_mask = (scl_data == 5)
 
     for name, path in bands.items():
-        if name != "TCI":  # Skip TCI for the stack
+        if name not in ["TCI", "SCL"]:  # Skip TCI and SCL for the stack
             with rasterio.open(path) as src:
                 # Simply read the band data
                 band_data = src.read(1)
@@ -102,6 +112,13 @@ def main():
     # Stack into (rows, cols, bands)
     img_stack = np.stack(stack, axis=-1).astype(np.float64)
     print(f"Image stack shape: {img_stack.shape}")
+
+    # Apply soil mask to the image stack
+    # Create a 3D mask by repeating the soil mask for each band
+    soil_mask_3d = np.repeat(soil_mask[:, :, np.newaxis], img_stack.shape[2], axis=2)
+    img_stack = np.where(soil_mask_3d, img_stack, -1)
+    print(f"Number of soil pixels: {np.sum(soil_mask)}")
+    print(f"Percentage of soil pixels: {np.sum(soil_mask) / soil_mask.size * 100:.2f}%")
 
     # Save intermediate result
     np.save("sentinel2_bayseg_input.npy", img_stack)
