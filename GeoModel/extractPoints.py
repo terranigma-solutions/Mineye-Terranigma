@@ -4,10 +4,10 @@ import rasterio
 from shapely.geometry import LineString
 
 # ========== CONFIG ==========
-POLYGON_PATH   = r"C:\Users\maxha\OneDrive\Desktop\clippedGeology.gpkg"
+POLYGON_PATH   = r"C:\Users\maxha\OneDrive\Desktop\clippedGeologyFiltered.gpkg"
 CODE_FIELD     = "CODE_UNIO"
 DEM_PATH       = r"C:\Users\maxha\OneDrive\Desktop\Mineye\GIS\Tharsis\TerranigmaFiles\DEMs\AOI1_DEM_reprojected_30N.tif"
-POINT_SPACING  = 100
+POINT_SPACING  = 150
 OUTPUT_CSV     = r"C:\Users\maxha\OneDrive\Desktop\contact_points.csv"
 # ============================
 
@@ -116,14 +116,44 @@ def enforce_min_separation(points_gdf, min_dist):
 
 points_gdf = enforce_min_separation(points_gdf, POINT_SPACING / 2)
 
+# 8. Define your stratigraphic stack (in order)
+stack = [26, 29, 40, 65, 67, 76]
+pos = {code: i for i, code in enumerate(stack)}
+
+# Build the set of valid adjacent‐unit pairs (undirected)
+valid_pairs = {
+    tuple(sorted((stack[i], stack[i+1])))
+    for i in range(len(stack) - 1)
+}
+
+# Filter: keep only rows whose two formation codes form a valid pair
+points_gdf = points_gdf[
+    points_gdf.apply(
+        lambda r: tuple(sorted((r["formation_code"], r["nearest_formation_code"])))
+                  in valid_pairs,
+        axis=1
+    )
+].copy()
+
+def pick_younger(row):
+    c1 = row["formation_code"]
+    c2 = row["nearest_formation_code"]
+    # Only proceed if both codes are in our stack
+    if c1 in pos and c2 in pos:
+        # Compare their positions
+        return c1 if pos[c1] > pos[c2] else c2
+    return None
+
+points_gdf['formation'] = points_gdf.apply(pick_younger, axis=1)
+
 # 8. Export to CSV
 export_fields = [
     "X",
     "Y",
     "Z",
+    "formation",
     "formation_code",
     "nearest_formation_code",
-    "nearest_dist"    # the code of the nearest neighbor
 ]
 
 points_gdf[export_fields].to_csv(OUTPUT_CSV, index=False)
