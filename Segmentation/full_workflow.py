@@ -60,7 +60,36 @@ def crop_by_rectangle(data, row_start, row_end, col_start, col_end):
     print(f"Cropped data shape: {cropped_data.shape}")
     return cropped_data
 
+def apply_soil_mask(img_stack, scl_path, crop_rectangle):
+    """
+    Apply soil mask to the image stack using SCL layer
+    Args:
+        img_stack: numpy array of shape (rows, cols, bands)
+        scl_path: path to the SCL layer
+        crop_rectangle: tuple of (row_start, row_end, col_start, col_end)
+    Returns:
+        masked image stack with -1 for non-soil pixels
+    """
+    # Load and process the SCL layer to create a soil mask
+    with rasterio.open(scl_path) as src:
+        scl_data = src.read(1)
+        scl_data = crop_by_rectangle(scl_data, *crop_rectangle)
+        # Create soil mask (SCL class 5 represents bare soil)
+        soil_mask = (scl_data == 5)
+
+    # Apply soil mask to the image stack
+    soil_mask_3d = np.repeat(soil_mask[:, :, np.newaxis], img_stack.shape[2], axis=2)
+    masked_stack = np.where(soil_mask_3d, img_stack, -9999)
+    
+    print(f"Number of soil pixels: {np.sum(soil_mask)}")
+    print(f"Percentage of soil pixels: {np.sum(soil_mask) / soil_mask.size * 100:.2f}%")
+    
+    return masked_stack
+
 def main():
+    # Define the crop rectangle
+    crop_rectangle = (226, 516, 565, 935)  # (row_start, row_end, col_start, col_end)
+
     # Choose bands best suited for lithology
     bands = {
         "B4": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B04_60m.jp2",   # Red
@@ -92,33 +121,20 @@ def main():
         print(f"Resolution: {ref.res[0]}m x {ref.res[1]}m")
 
     stack = []
-    soil_mask = None
-
-    # First, load and process the SCL layer to create a soil mask
-    with rasterio.open(bands["SCL"]) as src:
-        scl_data = src.read(1)
-        scl_data = crop_by_rectangle(scl_data, 226, 516, 565, 935)
-        # Create soil mask (SCL class 5 represents bare soil)
-        soil_mask = (scl_data == 5)
-
     for name, path in bands.items():
         if name not in ["TCI", "SCL"]:  # Skip TCI and SCL for the stack
             with rasterio.open(path) as src:
                 # Simply read the band data
                 band_data = src.read(1)
-                band_data = crop_by_rectangle(band_data, 226, 516, 565, 935)
+                band_data = crop_by_rectangle(band_data, *crop_rectangle)
                 stack.append(band_data)
 
     # Stack into (rows, cols, bands)
     img_stack = np.stack(stack, axis=-1).astype(np.float64)
     print(f"Image stack shape: {img_stack.shape}")
 
-    # Apply soil mask to the image stack
-    # Create a 3D mask by repeating the soil mask for each band
-    soil_mask_3d = np.repeat(soil_mask[:, :, np.newaxis], img_stack.shape[2], axis=2)
-    img_stack = np.where(soil_mask_3d, img_stack, -1)
-    print(f"Number of soil pixels: {np.sum(soil_mask)}")
-    print(f"Percentage of soil pixels: {np.sum(soil_mask) / soil_mask.size * 100:.2f}%")
+    # Apply soil mask
+    img_stack = apply_soil_mask(img_stack, bands["SCL"], crop_rectangle)
 
     # Save intermediate result
     np.save("sentinel2_bayseg_input.npy", img_stack)
@@ -129,7 +145,7 @@ def main():
         if src.count == 3:  # If TCI has 3 bands
             tci_data = src.read()  # Read all bands
             tci_data = tci_data.transpose(1, 2, 0)  # Change to (rows, cols, bands)
-            tci_data = crop_by_rectangle(tci_data, 226, 516, 565, 935)
+            tci_data = crop_by_rectangle(tci_data, *crop_rectangle)
 
             plt.figure(figsize=(10, 10))
             plt.imshow(tci_data)
@@ -139,7 +155,7 @@ def main():
 
     print("\nStep 2: Running segmentation...")
     # Initialize segmenter
-    n_classes = 6
+    n_classes = 5
     print(f"Running segmentation with {n_classes} classes...")
     start_time = time.time()
     seg = BaySeg(data=img_stack, n_labels=n_classes, beta_init=10)
