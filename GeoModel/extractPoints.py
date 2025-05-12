@@ -7,7 +7,7 @@ from shapely.geometry import LineString
 POLYGON_PATH   = r"C:\Users\maxha\OneDrive\Desktop\clippedGeology.gpkg"
 CODE_FIELD     = "CODE_UNIO"
 DEM_PATH       = r"C:\Users\maxha\OneDrive\Desktop\Mineye\GIS\Tharsis\TerranigmaFiles\DEMs\AOI1_DEM_reprojected_30N.tif"
-POINT_SPACING  = 50
+POINT_SPACING  = 100
 OUTPUT_CSV     = r"C:\Users\maxha\OneDrive\Desktop\contact_points.csv"
 # ============================
 
@@ -45,7 +45,9 @@ for _, row in lines_gdf.iterrows():
         })
 
 points_gdf = gpd.GeoDataFrame(point_records, geometry="geometry", crs=lines_gdf.crs)
-points_gdf = points_gdf[~points_gdf["formation_code"].isin(["99", "5000"])].copy()
+points_gdf['formation_code'] = points_gdf['formation_code'].astype(int)
+points_gdf = points_gdf[~points_gdf['formation_code'].isin([99, 5000])].copy()
+
 
 
 # 5. Add z values from the DEM
@@ -58,60 +60,70 @@ with rasterio.open(DEM_PATH) as dem:
 points_gdf["Z"] = zs
 
 # 6. Find nearest neighbor with different code
-def append_nearest_code(points, code_field, max_distance):
-    """
-    For each point in points_gdf, find the nearest neighbor within max_distance
-    that has a different code_field value. Append two new columns:
-      - f'nearest_{code_field}': the neighbor's code_field value (or None)
-      - 'nearest_dist': the distance to that neighbor (or np.nan)
-    """
-    # Build spatial index
-    idx = points.sindex
+def append_nearest_code(points_gdf, code_field, max_distance):
+    idx = points_gdf.sindex
+    nearest_codes, nearest_dists = [], []
 
-    nearest_code = []
-    nearest_dist = []
+    for label, pt in points_gdf.geometry.items():
+        # get candidate *positions* from the spatial index
+        candidate_positions = list(idx.intersection(pt.buffer(max_distance).bounds))
+        candidate_positions = [pos for pos in candidate_positions if pos != label]
+        if not candidate_positions:
+            nearest_codes.append(None); nearest_dists.append(np.nan); continue
 
-    for i, point in enumerate(points.geometry):
-        # Candidates within bounding box of buffer
-        candidates = list(idx.intersection(point.buffer(max_distance).bounds))
-        # Exclude self
-        candidates = [j for j in candidates if j != i]
-        if not candidates:
-            nearest_code.append(None)
-            nearest_dist.append(np.nan)
-            continue
-
-        # Filter candidates by different code
-        my_code = points.at[i, code_field]
-        cand = points.iloc[candidates]
+        # slice by position, not label
+        cand = points_gdf.iloc[candidate_positions]
+        my_code = points_gdf.at[label, code_field]
         cand = cand[cand[code_field] != my_code]
         if cand.empty:
-            nearest_code.append(None)
-            nearest_dist.append(np.nan)
-            continue
+            nearest_codes.append(None); nearest_dists.append(np.nan); continue
 
-        # Compute distances and pick minimum
-        dists = cand.geometry.distance(point)
-        j = dists.idxmin()
-        nearest_code.append(points.at[j, code_field])
-        nearest_dist.append(dists[j])
+        # distances and pick
+        dists = cand.geometry.distance(pt).values
+        posmin = dists.argmin()
+        nearest_codes.append(cand.iloc[posmin][code_field])
+        nearest_dists.append(dists[posmin])
 
-    # Assign new columns
-    points[f'nearest_{code_field}'] = nearest_code
-    points['nearest_dist'] = nearest_dist
-    return points
-
-points_gdf = append_nearest_code(points_gdf, CODE_FIELD, POINT_SPACING)
+    points_gdf[f'nearest_{code_field}'] = nearest_codes
+    points_gdf['nearest_dist']         = nearest_dists
+    return points_gdf
 
 
-# 7. Export to CSV
+points_gdf = append_nearest_code(points_gdf, "formation_code", POINT_SPACING)
+# Filter out points with no nearest neighbor
+points_gdf = points_gdf[points_gdf[f"nearest_formation_code"].notnull()].copy()
+
+# 7. Filter out points which are closer than POINT_SPACING/2
+def enforce_min_separation(points_gdf, min_dist):
+    """
+    Returns a new GeoDataFrame containing a subset of points_gdf
+    such that no two points are closer than min_dist apart.
+    Greedy algorithm: iterates in index order, keeps a point
+    only if it’s ≥ min_dist from all previously kept points.
+    """
+    kept_idxs = []
+    kept_geoms = []
+
+    for row in points_gdf.itertuples():
+        pt = row.geometry
+        # check distance to all already kept points
+        too_close = any(pt.distance(other) < min_dist for other in kept_geoms)
+        if not too_close:
+            kept_idxs.append(row.Index)
+            kept_geoms.append(pt)
+
+    return points_gdf.loc[kept_idxs].copy()
+
+points_gdf = enforce_min_separation(points_gdf, POINT_SPACING / 2)
+
+# 8. Export to CSV
 export_fields = [
     "X",
     "Y",
     "Z",
-    CODE_FIELD,                     # the original polygon code at each point
-    f"nearest_{CODE_FIELD}",        # the code of the nearest neighbor
-    "nearest_dist"                  # the distance to that neighbor
+    "formation_code",
+    "nearest_formation_code",
+    "nearest_dist"    # the code of the nearest neighbor
 ]
 
 points_gdf[export_fields].to_csv(OUTPUT_CSV, index=False)
