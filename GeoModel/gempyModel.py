@@ -22,15 +22,13 @@ min_z = points_df['Z'].min()
 
 geo_model = gp.create_geomodel(
     project_name='AOI',
-    extent=[min_x, max_x, min_y, max_y, -2000, max_z],
+    extent=[min_x, max_x, min_y, max_y, -500, max_z],
     refinement=4,
     importer_helper=gp.data.ImporterHelper(
         path_to_orientations=path_to_orientations,
         path_to_surface_points=path_to_data
     )
 )
-
-print(geo_model.structural_frame)
 
 gpv.plot_2d(geo_model)
 
@@ -47,5 +45,11 @@ gp.map_stack_to_surfaces(
     }
 )
 
-structural_frame:gp.data.StructuralFrame = geo_model.structural_frame
+#print(geo_model.structural_frame)
+#structural_frame:gp.data.StructuralFrame = geo_model.structural_frame
+
+gp.compute_model(geo_model)
+gpv.plot_2d(geo_model, ve=6, cell_number=15)
+gpv.plot_2d(geo_model, show_value=True, show_lith=False, show_scalar=True, series_n=1, cell_number=15)
+gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=None)
 pass
