@@ -4,11 +4,20 @@ import rasterio
 from shapely.geometry import LineString
 
 # ========== CONFIG ==========
-POLYGON_PATH   = r"C:\Users\maxha\OneDrive\Desktop\clippedGeologyFiltered.gpkg"
+POLYGON_PATH   = r"C:\Users\maxha\OneDrive\Desktop\clippedGeologyExport.gpkg"
 CODE_FIELD     = "CODE_UNIO"
 DEM_PATH       = r"C:\Users\maxha\OneDrive\Desktop\Mineye\GIS\Tharsis\TerranigmaFiles\DEMs\AOI1_DEM_reprojected_30N.tif"
-POINT_SPACING  = 150
+POINT_SPACING  = 500
 OUTPUT_CSV     = r"C:\Users\maxha\OneDrive\Desktop\contact_points.csv"
+geologicalStack = [29, 40, 1, 51, 67, 76]
+idToNameDict = {
+    29: "Mid Devonian Siliciclastics",
+    40: "Upper Devonian Siliciclastics",
+    1: "Tournaisian Plutonites",
+    51: "Upper Carboniferous Volcanics",
+    67: "Visean Shales",
+    76: "Mid Carboniferous Shales"
+}
 # ============================
 
 # Read the intended layer and show its columns
@@ -117,20 +126,13 @@ def enforce_min_separation(points_gdf, min_dist):
 points_gdf = enforce_min_separation(points_gdf, POINT_SPACING / 2)
 
 # 8. Define your stratigraphic stack (in order)
-stack = [26, 29, 40, 65, 67, 76]
-pos = {code: i for i, code in enumerate(stack)}
+pos = {code: i for i, code in enumerate(geologicalStack)}
 
-# Build the set of valid adjacent‐unit pairs (undirected)
-valid_pairs = {
-    tuple(sorted((stack[i], stack[i+1])))
-    for i in range(len(stack) - 1)
-}
-
-# Filter: keep only rows whose two formation codes form a valid pair
+# Remove the valid_pairs filtering completely
+# Instead, just filter to ensure both formations are in the stack
 points_gdf = points_gdf[
     points_gdf.apply(
-        lambda r: tuple(sorted((r["formation_code"], r["nearest_formation_code"])))
-                  in valid_pairs,
+        lambda r: r["formation_code"] in pos and r["nearest_formation_code"] in pos,
         axis=1
     )
 ].copy()
@@ -138,22 +140,23 @@ points_gdf = points_gdf[
 def pick_younger(row):
     c1 = row["formation_code"]
     c2 = row["nearest_formation_code"]
-    # Only proceed if both codes are in our stack
     if c1 in pos and c2 in pos:
-        # Compare their positions
+        # Compare positions but return the formation CODE, not the position
         return c1 if pos[c1] > pos[c2] else c2
     return None
 
-points_gdf['formation'] = points_gdf.apply(pick_younger, axis=1)
+# Apply the pick_younger function to create the formation column
+points_gdf['formationId'] = points_gdf.apply(pick_younger, axis=1)
+points_gdf['formationName'] = points_gdf['formationId'].map(idToNameDict)
+
 
 # 8. Export to CSV
 export_fields = [
     "X",
     "Y",
     "Z",
-    "formation",
-    "formation_code",
-    "nearest_formation_code",
+    "formationId",
+    "formationName"
 ]
 
 points_gdf[export_fields].to_csv(OUTPUT_CSV, index=False)
