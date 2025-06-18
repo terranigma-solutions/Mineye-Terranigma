@@ -1,13 +1,20 @@
+import os
+
 import gempy as gp
+import matplotlib.pyplot as plt
 import pandas as pd
 import gempy_viewer as gpv
 
-# Load the data
+# -------------------------------
+# CONFIGURATION
+# -------------------------------
 path_to_data = r"C:\Users\maxha\OneDrive\Desktop\formationinputpoints.csv"
 path_to_orientations = r"C:\Users\maxha\OneDrive\Desktop\orientations.csv"
 path_to_topography = r"C:\Users\maxha\OneDrive\Desktop\topo.tif"
+path_to_topography_cleaned = r"C:\Users\maxha\OneDrive\Desktop\topo_cleaned.tif"
+invalid_below = -100  # Define what you consider invalid topography
 
-# First, let's look at what formations exist in your data
+
 points_df = pd.read_csv(path_to_data, encoding='latin1', engine='python')
 
 # min max values from the data
@@ -16,10 +23,7 @@ max_x = points_df['X'].max()
 min_y = points_df['Y'].min()
 max_y = points_df['Y'].max()
 max_z = points_df['Z'].max()
-
-# First, print the unique formation names in both files
-points_df = pd.read_csv(path_to_data)
-
+# -------------------------------
 
 geo_model = gp.create_geomodel(
     project_name='AOI',
@@ -64,13 +68,38 @@ gp.map_stack_to_surfaces(
     }
 )
 
-gpv.plot_2d(geo_model)
+def clean_topo_file(input_path: str, output_path: str, invalid_below: float = -100):
+    # Load, clean, and save cleaned topography TIFF
+    import rasterio
+    import numpy as np
 
-#print(geo_model.structural_frame)
+    with rasterio.open(input_path) as src:
+        profile = src.profile
+        data = src.read(1)
+        nodata = src.nodata
+
+    data_cleaned = np.where((data == nodata) | (data <= invalid_below), np.nan, data)
+
+    profile.update(nodata=np.nan)
+    with rasterio.open(output_path, "w", **profile) as dst:
+        dst.write(data_cleaned, 1)
+
+# -------------------------------
+# CLEAN TOPOGRAPHY IF NEEDED
+# -------------------------------
+if not os.path.exists(path_to_topography_cleaned):
+    clean_topo_file(path_to_topography, path_to_topography_cleaned)
+else:
+    print("Cleaned topography file already exists — skipping cleaning.")
+
 structural_frame:gp.data.StructuralFrame = geo_model.structural_frame
+gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=40, legend=False, show_data=True)
 
+foo
+
+geo_model.interpolation_options.kernel_options.range = 1.7
 gp.compute_model(geo_model)
-#gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=None, legend=False, show_data=False)
+gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=None, legend=False, show_data=False)
 
 gp.set_topography_from_file(grid=geo_model.grid, filepath=path_to_topography)
 
@@ -98,6 +127,7 @@ while i < 15:
     # Increment i to avoid infinite loop
     i += 1
 
+plt.show()
 #gpv.plot_2d(geo_model, show_value=True, show_lith=False, show_scalar=True, cell_number=15, legend=False)
 #gpv.plot_2d(geo_model, show_boundaries=False, show_data=False, direction="z", legend=False)
 pass
