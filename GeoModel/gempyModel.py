@@ -28,7 +28,7 @@ max_z = points_df['Z'].max()
 geo_model = gp.create_geomodel(
     project_name='AOI',
     extent=[min_x, max_x, min_y, max_y, -1000, max_z],
-    refinement=4,
+    refinement=2,
     importer_helper=gp.data.ImporterHelper(
         path_to_orientations=path_to_orientations,
         path_to_surface_points=path_to_data
@@ -93,15 +93,14 @@ else:
     print("Cleaned topography file already exists — skipping cleaning.")
 
 structural_frame:gp.data.StructuralFrame = geo_model.structural_frame
-gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=40, legend=False, show_data=True)
+gp.set_topography_from_file(grid=geo_model.grid, filepath=path_to_topography_cleaned)
+gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=20, legend=False, show_data=True)
 
-foo
-
-geo_model.interpolation_options.kernel_options.range = 1.7
+#geo_model.interpolation_options.kernel_options.range = 1.7
 gp.compute_model(geo_model)
 gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=None, legend=False, show_data=False)
 
-gp.set_topography_from_file(grid=geo_model.grid, filepath=path_to_topography)
+
 
 i = 0
 while i < 15:
