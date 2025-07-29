@@ -13,14 +13,14 @@ def clean_topo_file(input_path: str, output_path: str, invalid_below: float = -1
         data = src.read(1)
         nodata = src.nodata
 
-    data_cleaned = np.where((data == nodata) | (data <= invalid_below), np.nan, data)
+    data_cleaned = np.where(
+        (data == nodata) | (data <= invalid_below) | np.isnan(data),1,data)
 
-    profile.update(nodata=np.nan)
+    profile.update(nodata=1)
     with rasterio.open(output_path, "w", **profile) as dst:
         dst.write(data_cleaned, 1)
 
 def reduce_tif_resolution(input_path, output_path, scale_factor):
-
     # Add scale factor to output file name
     base, ext = os.path.splitext(output_path)
     output_path_sf = f"{base}_sf{scale_factor}{ext}"
