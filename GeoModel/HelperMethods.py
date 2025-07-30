@@ -81,3 +81,22 @@ def create_cross_section(geo_model, cross_section: int):
                         direction="x")
         # Increment i to avoid infinite loop
         i += 1
+
+def drop_lithologies(points_df, orientations_df, lithologies_to_drop):
+    points_df = points_df[~points_df['formation'].isin(lithologies_to_drop)]
+    orientations_df = orientations_df[~orientations_df['formation'].isin(lithologies_to_drop)]
+    points_df.to_csv('temp_points.csv', index=False)
+    orientations_df.to_csv('temp_orientations.csv', index=False)
+
+def color_lithology(structural_elements):
+        for element in structural_elements:
+            if element.name == "Mid Carboniferous Shales":
+                element.color = "#b2d9b2"  # light green
+            elif element.name == "Upper Carboniferous Volcanics":
+                element.color = "#ff8000"  # orange
+            elif element.name == "Visean Shales":
+                element.color = "#b200b2"  # purple
+            elif element.name == "Tournaisian Plutonites":
+                element.color = "#e37ecd"  # pink
+            elif element.name == "Upper Devonian Siliciclastics":
+                element.color = "#d9b280"  # light brown
