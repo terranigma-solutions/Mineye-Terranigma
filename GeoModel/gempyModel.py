@@ -2,17 +2,19 @@ import os
 import threading
 import gempy as gp
 import pandas as pd
-import gempy_viewer as gpv
 import GeoModel.HelperMethods
 
 # -------------------------------
 # CONFIGURATION
 # -------------------------------
-path_to_data = r"C:\Users\maxha\OneDrive\Desktop\formationinputpoints_reduced.csv"
-path_to_orientations = r"C:\Users\maxha\OneDrive\Desktop\orientations_reduced.csv"
-path_to_topography = r"C:\Users\maxha\OneDrive\Desktop\topo.tif"
-path_to_topography_cleaned = r"C:\Users\maxha\OneDrive\Desktop\topo_cleaned.tif"
-path_to_topography_reduced = r"C:\Users\maxha\OneDrive\Desktop\topo_reduced.tif"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(BASE_DIR, '..', 'Data', 'Tharsis AOI 1')
+
+path_to_data = os.path.join(data_dir, 'formationinputpoints_reduced.csv')
+path_to_orientations = os.path.join(data_dir, 'orientations_reduced.csv')
+path_to_topography = os.path.join(data_dir, 'topo.tif')
+path_to_topography_cleaned = os.path.join(data_dir, 'topo_cleaned.tif')
+path_to_topography_reduced = os.path.join(data_dir, 'topo_reduced.tif')
 
 invalid_below = -100  # Define what we consider invalid topography
 model_depth = -500  # Define the depth of the model
