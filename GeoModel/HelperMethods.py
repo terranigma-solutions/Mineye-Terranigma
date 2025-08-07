@@ -88,6 +88,10 @@ def drop_lithologies(points_df, orientations_df, lithologies_to_drop):
     points_df.to_csv('temp_points.csv', index=False)
     orientations_df.to_csv('temp_orientations.csv', index=False)
 
+def plot_3d_async(geo_model):
+    gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=10, legend=False, show_data=True,
+                show_topography=True, transformed_data=False)
+
 def color_lithology(structural_elements):
         for element in structural_elements:
             if element.name == "Mid Carboniferous Shales":
