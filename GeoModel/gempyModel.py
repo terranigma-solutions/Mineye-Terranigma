@@ -1,8 +1,9 @@
 import os
+import threading
 import gempy as gp
 import pandas as pd
 import gempy_viewer as gpv
-import GeoModel.HelperMethods as helper
+import GeoModel.HelperMethods
 
 # -------------------------------
 # CONFIGURATION
@@ -17,7 +18,7 @@ invalid_below = -100  # Define what we consider invalid topography
 model_depth = -500  # Define the depth of the model
 topo_reduction_factor = 0.1  # Define the factor by which to reduce the topography resolution
 
-trigger_create_cross_section = False # Set to True if you want to create a cross section
+trigger_create_cross_section = True # Set to True if you want to create a cross section
 trigger_drop_lithologies = False  # Set to True if you want to drop certain lithologies
 
 lithologies_to_drop = [
@@ -29,17 +30,24 @@ points_df = pd.read_csv(path_to_data, encoding='latin1', engine='python')
 orientations_df = pd.read_csv(path_to_orientations, encoding='latin1', engine='python')
 
 # min max values from the data
-min_x = points_df['X'].min()
-max_x = points_df['X'].max()
-min_y = points_df['Y'].min()
-max_y = points_df['Y'].max()
+top_right = (-678192, 4549947)
+bottom_right = (-677518, 4529455)
+bottom_left = (-706792, 4528453)
+top_left = (-707522, 4548927)
+
+# Define the bounding box of the area of interest
+min_x = min(top_left[0], bottom_left[0])
+max_x = max(top_right[0], bottom_right[0])
+min_y = min(bottom_left[1], bottom_right[1])
+max_y = max(top_left[1], top_right[1])
 max_z = points_df['Z'].max()
+
 
 # -------------------------------
 # CLEAN AND PREPROCESS DATA
 # -------------------------------
-helper.clean_topo_file(path_to_topography, path_to_topography_cleaned)
-helper.reduce_tif_resolution(
+GeoModel.HelperMethods.clean_topo_file(path_to_topography, path_to_topography_cleaned)
+GeoModel.HelperMethods.reduce_tif_resolution(
     input_path=path_to_topography_cleaned,
     output_path=path_to_topography_reduced,
     scale_factor=topo_reduction_factor  # Adjust scale factor as needed
@@ -49,7 +57,7 @@ base, ext = os.path.splitext(path_to_topography_reduced)
 path_to_topography_reduced = f"{base}_sf{topo_reduction_factor}{ext}"
 
 if trigger_drop_lithologies:
-    helper.drop_lithologies(points_df, orientations_df, lithologies_to_drop)
+    GeoModel.HelperMethods.drop_lithologies(points_df, orientations_df, lithologies_to_drop)
 
 # -------------------------------
 # MODEL CREATION
@@ -58,7 +66,7 @@ if trigger_drop_lithologies:
 geo_model = gp.create_geomodel(
     project_name='AOI',
     extent=[min_x, max_x, max_y, min_y, model_depth, max_z],
-    refinement=4,
+    refinement=6,
     importer_helper=gp.data.ImporterHelper(
         path_to_orientations="temp_orientations.csv",
         path_to_surface_points="temp_points.csv",
@@ -71,12 +79,11 @@ gp.map_stack_to_surfaces(
         #"Strat_Series2": ("Visean Shales", "Mid Carboniferous Shales"),
         #"Strat_Series2": ("Upper Carboniferous Volcanics", "Visean Shales"),
         #"Strat_Series2": "Tournaisian Plutonites",
-        "Strat_Series1": ("Upper Devonian Siliciclastics", "Visean Shales", "Mid Carboniferous Shales")
+        "Strat_Series1": ( "Mid Carboniferous Shales", "Visean Shales", "Upper Devonian Siliciclastics")
     }
-
 )
 
-helper.color_lithology(geo_model.structural_frame.structural_elements)
+GeoModel.HelperMethods.color_lithology(geo_model.structural_frame.structural_elements)
 gp.set_topography_from_file(grid=geo_model.grid, filepath=path_to_topography_reduced)
 gempy_model = gp.compute_model(geo_model)
 
@@ -84,9 +91,9 @@ gempy_model = gp.compute_model(geo_model)
 # PLOTTING
 # -------------------------------
 
-gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=10, legend=False, show_data=True, show_topography=True, transformed_data=False)
+threading.Thread(target=GeoModel.HelperMethods.plot_3d_async, args=(geo_model,)).start()
 if trigger_create_cross_section:
-    helper.create_cross_section(geo_model, cross_section=5)
+    GeoModel.HelperMethods.create_cross_section(geo_model, cross_section=5)
 
 pass
 # -------------------------------
