@@ -2,7 +2,7 @@ import os
 import threading
 import gempy as gp
 import pandas as pd
-import GeoModel.HelperMethods
+import HelperMethods
 
 # -------------------------------
 # CONFIGURATION
@@ -48,8 +48,8 @@ max_z = points_df['Z'].max()
 # -------------------------------
 # CLEAN AND PREPROCESS DATA
 # -------------------------------
-GeoModel.HelperMethods.clean_topo_file(path_to_topography, path_to_topography_cleaned)
-GeoModel.HelperMethods.reduce_tif_resolution(
+HelperMethods.clean_topo_file(path_to_topography, path_to_topography_cleaned)
+HelperMethods.reduce_tif_resolution(
     input_path=path_to_topography_cleaned,
     output_path=path_to_topography_reduced,
     scale_factor=topo_reduction_factor  # Adjust scale factor as needed
@@ -59,7 +59,7 @@ base, ext = os.path.splitext(path_to_topography_reduced)
 path_to_topography_reduced = f"{base}_sf{topo_reduction_factor}{ext}"
 
 if trigger_drop_lithologies:
-    GeoModel.HelperMethods.drop_lithologies(points_df, orientations_df, lithologies_to_drop)
+    HelperMethods.drop_lithologies(points_df, orientations_df, lithologies_to_drop)
 
 # -------------------------------
 # MODEL CREATION
@@ -70,8 +70,8 @@ geo_model = gp.create_geomodel(
     extent=[min_x, max_x, max_y, min_y, model_depth, max_z],
     refinement=6,
     importer_helper=gp.data.ImporterHelper(
-        path_to_orientations="temp_orientations.csv",
-        path_to_surface_points="temp_points.csv",
+        path_to_orientations=os.path.join(BASE_DIR, "temp_orientations.csv"),
+        path_to_surface_points=os.path.join(BASE_DIR, "temp_points.csv"),
     )
 )
 
@@ -85,7 +85,7 @@ gp.map_stack_to_surfaces(
     }
 )
 
-GeoModel.HelperMethods.color_lithology(geo_model.structural_frame.structural_elements)
+HelperMethods.color_lithology(geo_model.structural_frame.structural_elements)
 gp.set_topography_from_file(grid=geo_model.grid, filepath=path_to_topography_reduced)
 gempy_model = gp.compute_model(geo_model)
 
@@ -93,9 +93,9 @@ gempy_model = gp.compute_model(geo_model)
 # PLOTTING
 # -------------------------------
 
-threading.Thread(target=GeoModel.HelperMethods.plot_3d_async, args=(geo_model,)).start()
+threading.Thread(target=HelperMethods.plot_3d_async, args=(geo_model,)).start()
 if trigger_create_cross_section:
-    GeoModel.HelperMethods.create_cross_section(geo_model, cross_section=5)
+    HelperMethods.create_cross_section(geo_model, cross_section=5)
 
 pass
 # -------------------------------
