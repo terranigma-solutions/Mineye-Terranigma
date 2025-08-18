@@ -5,7 +5,7 @@ import os
 from rasterio.windows import from_bounds
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-from bayseg import BaySeg
+from bayseg.bayseg import BaySeg
 from bayseg.bayseg import labels_map, compute_labels_prob, compute_ie
 import time
 
@@ -88,7 +88,13 @@ def apply_soil_mask(img_stack, scl_path, crop_rectangle):
 
 def main():
     # Define the crop rectangle
-    crop_rectangle = (226, 516, 565, 935)  # (row_start, row_end, col_start, col_end)
+    crop_rectangle = (246, 500, 554, 954)  # (row_start, row_end, col_start, col_end) the width and height needs to be even
+
+    # Segmentation parameters
+    n_classes = 4
+    beta_init = 30
+    n_iterations = 400
+    beta_jump_length = 0.1
 
     # Choose bands best suited for lithology
     bands = {
@@ -155,13 +161,12 @@ def main():
 
     print("\nStep 2: Running segmentation...")
     # Initialize segmenter
-    n_classes = 5
     print(f"Running segmentation with {n_classes} classes...")
     start_time = time.time()
-    seg = BaySeg(data=img_stack, n_labels=n_classes, beta_init=10)
+    seg = BaySeg(data=img_stack, n_labels=n_classes, beta_init=beta_init)
 
     # Fit the model and get the labels
-    seg.fit(n=200, beta_jump_length=0.1)
+    seg.fit(n=n_iterations, beta_jump_length=beta_jump_length)
     
     # Get the final labels (MAP estimate)
     final_labels = labels_map(seg.labels)
@@ -175,16 +180,15 @@ def main():
     print(f"Segmentation completed in {time.time() - start_time:.2f} seconds")
 
     # Save results as numpy arrays
-    np.save(f"bayseg_lithology_labels_n{n_classes}.npy", final_labels)
-    np.save(f"bayseg_entropy_n{n_classes}.npy", entropy)
-    print(f"Results saved to bayseg_lithology_labels_n{n_classes}.npy and bayseg_entropy_n{n_classes}.npy")
+    np.save(f"bayseg_lithology_labels_n{n_classes}_beta{beta_jump_length}.npy", final_labels)
+    np.save(f"bayseg_entropy_n{n_classes}_beta{beta_jump_length}.npy", entropy)
+    print(f"Results saved to bayseg_lithology_labels_n{n_classes}_beta{beta_jump_length}.npy and bayseg_entropy_n{n_classes}_beta{beta_jump_length}.npy")
 
     # Export as georeferenced GeoTIFF
     # Get the transform for the cropped region
     with rasterio.open(bands["B4"]) as src:
-        # Calculate the transform for the cropped region
-        # The crop window was: rows 226:516, cols 565:935
-        transform = src.transform * rasterio.Affine.translation(565, 226)
+        # Calculate the transform for the cropped region using the actual crop rectangle
+        transform = src.transform * rasterio.Affine.translation(crop_rectangle[2], crop_rectangle[0])
         
         # Create the output profile
         profile = src.profile.copy()
@@ -199,7 +203,7 @@ def main():
         })
 
         # Save the segmentation result as a GeoTIFF
-        output_path = f"segmentation_result_n{n_classes}.tif"
+        output_path = f"segmentation_result_n{n_classes}_beta{beta_jump_length}.tif"
         with rasterio.open(output_path, 'w', **profile) as dst:
             dst.write(final_labels.astype(np.uint8), 1)
         print(f"Georeferenced segmentation results saved to {output_path}")
@@ -210,7 +214,7 @@ def main():
             'dtype': 'float32',
             'nodata': -9999
         })
-        entropy_path = f"segmentation_entropy_n{n_classes}.tif"
+        entropy_path = f"segmentation_entropy_n{n_classes}_beta{beta_jump_length}.tif"
         with rasterio.open(entropy_path, 'w', **entropy_profile) as dst:
             dst.write(entropy.astype(np.float32), 1)
         print(f"Georeferenced entropy results saved to {entropy_path}")
