@@ -20,15 +20,12 @@ def crop_to_bounds(src, bounds, transform):
         transform: Affine transform of the raster (usually src.transform).
 
     Returns:
-        data: np.ndarray of shape (bands, rows, cols) for the cropped area.
-        out_transform: Affine transform for the cropped data.
-        window: rasterio.windows.Window used for the read.
+        data: np.ndarray for the cropped area (same return type as crop_by_rectangle).
 
     Raises:
         ValueError: If there is no overlap between the requested bounds and the raster.
     """
     # Local imports to avoid changing module-level imports
-    from math import floor, ceil
     from rasterio.windows import from_bounds as win_from_bounds, transform as win_transform, Window
 
     # Unpack and normalize user-provided bounds
@@ -62,17 +59,15 @@ def crop_to_bounds(src, bounds, transform):
     if window.width <= 0 or window.height <= 0:
         raise ValueError("Computed crop window is empty after clipping to raster bounds.")
 
-    # Read the data using the window
+    # Read the data using the window; keep as numpy array output to match crop_by_rectangle
     data = src.read(window=window)
-
-    # Compute the new transform for the cropped data
-    out_transform = win_transform(window, transform)
 
     # Optional: helpful debug print
     print(f"Crop window -> rows {int(window.row_off)}:{int(window.row_off + window.height)}, "
           f"cols {int(window.col_off)}:{int(window.col_off + window.width)}")
 
-    return data, out_transform, window
+    # Return only the cropped data to match crop_by_rectangle's return type (numpy array)
+    return data
 
 def crop_by_rectangle(data, row_start, row_end, col_start, col_end):
     """
@@ -99,20 +94,22 @@ def crop_by_rectangle(data, row_start, row_end, col_start, col_end):
     print(f"Cropped data shape: {cropped_data.shape}")
     return cropped_data
 
-def apply_soil_mask(img_stack, scl_path, crop_rectangle):
+def apply_soil_mask(img_stack, scl_path, bounds):
     """
     Apply soil mask to the image stack using SCL layer
     Args:
         img_stack: numpy array of shape (rows, cols, bands)
         scl_path: path to the SCL layer
-        crop_rectangle: tuple of (row_start, row_end, col_start, col_end)
+        bounds: tuple of (xmin, ymin, xmax, ymax)
     Returns:
         masked image stack with -1 for non-soil pixels
     """
     # Load and process the SCL layer to create a soil mask
     with rasterio.open(scl_path) as src:
-        scl_data = src.read(1)
-        scl_data = crop_by_rectangle(scl_data, *crop_rectangle)
+        scl_data = crop_to_bounds(src, bounds, src.transform)
+        # Ensure 2D SCL array
+        if scl_data.ndim == 3 and scl_data.shape[0] == 1:
+            scl_data = scl_data[0]
         # Create soil mask (SCL class 5 represents bare soil)
         soil_mask = (scl_data == 5)
 
@@ -126,9 +123,6 @@ def apply_soil_mask(img_stack, scl_path, crop_rectangle):
     return masked_stack
 
 def main():
-    # Define the crop rectangle
-    crop_rectangle = (246, 500, 554, 954)  # (row_start, row_end, col_start, col_end) the width and height needs to be even
-
     # Segmentation parameters
     n_classes = 4
     beta_init = 30
@@ -169,9 +163,10 @@ def main():
     for name, path in bands.items():
         if name not in ["TCI", "SCL"]:  # Skip TCI and SCL for the stack
             with rasterio.open(path) as src:
-                # Simply read the band data
-                band_data = src.read(1)
-                band_data = crop_by_rectangle(band_data, *crop_rectangle)
+                band_data = crop_to_bounds(src, bounds, src.transform)
+                # Ensure 2D per-band array
+                if band_data.ndim == 3 and band_data.shape[0] == 1:
+                    band_data = band_data[0]
                 stack.append(band_data)
 
     # Stack into (rows, cols, bands)
@@ -179,7 +174,7 @@ def main():
     print(f"Image stack shape: {img_stack.shape}")
 
     # Apply soil mask
-    img_stack = apply_soil_mask(img_stack, bands["SCL"], crop_rectangle)
+    img_stack = apply_soil_mask(img_stack, bands["SCL"], bounds)
 
     # Save intermediate result
     np.save("sentinel2_bayseg_input.npy", img_stack)
@@ -187,10 +182,9 @@ def main():
 
     # Plot TCI for reference
     with rasterio.open(bands["TCI"]) as src:
-        if src.count == 3:  # If TCI has 3 bands
-            tci_data = src.read()  # Read all bands
+        if src.count >= 3:  # If TCI has 3 bands
+            tci_data = crop_to_bounds(src, bounds, src.transform)  # (bands, rows, cols)
             tci_data = tci_data.transpose(1, 2, 0)  # Change to (rows, cols, bands)
-            tci_data = crop_by_rectangle(tci_data, *crop_rectangle)
 
             plt.figure(figsize=(10, 10))
             plt.imshow(tci_data)
@@ -224,10 +218,15 @@ def main():
     print(f"Results saved to bayseg_lithology_labels_n{n_classes}_beta{beta_jump_length}.npy and bayseg_entropy_n{n_classes}_beta{beta_jump_length}.npy")
 
     # Export as georeferenced GeoTIFF
-    # Get the transform for the cropped region
+    # Get the transform for the cropped region based on bounds
     with rasterio.open(bands["B4"]) as src:
-        # Calculate the transform for the cropped region using the actual crop rectangle
-        transform = src.transform * rasterio.Affine.translation(crop_rectangle[2], crop_rectangle[0])
+        from rasterio.windows import from_bounds as win_from_bounds, Window, transform as win_transform
+        # Recompute the same window used by crop_to_bounds
+        window = win_from_bounds(bounds[0], bounds[1], bounds[2], bounds[3], transform=src.transform)
+        window = window.round_offsets(op='floor').round_shape(op='ceil')
+        raster_window = Window(col_off=0, row_off=0, width=src.width, height=src.height)
+        window = window.intersection(raster_window)
+        transform = win_transform(window, src.transform)
         
         # Create the output profile
         profile = src.profile.copy()
