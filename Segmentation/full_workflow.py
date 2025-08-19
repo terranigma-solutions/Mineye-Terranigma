@@ -1,3 +1,4 @@
+
 import rasterio
 from rasterio.enums import Resampling
 import numpy as np
@@ -11,29 +12,67 @@ import time
 
 def crop_to_bounds(src, bounds, transform):
     """
-    Crop an image to specified geographic bounds
-    bounds: tuple of (xmin, ymin, xmax, ymax) in the same CRS as the image
+    Crop an image to specified geographic bounds.
+
+    Args:
+        src: An open rasterio dataset (used to read and to access size/bounds).
+        bounds: Tuple (xmin, ymin, xmax, ymax) in the same CRS as the image.
+        transform: Affine transform of the raster (usually src.transform).
+
+    Returns:
+        data: np.ndarray of shape (bands, rows, cols) for the cropped area.
+        out_transform: Affine transform for the cropped data.
+        window: rasterio.windows.Window used for the read.
+
+    Raises:
+        ValueError: If there is no overlap between the requested bounds and the raster.
     """
-    # Convert bounds to pixel coordinates
-    row_start, col_start = ~transform * (bounds[0], bounds[3])
-    row_stop, col_stop = ~transform * (bounds[2], bounds[1])
-    
-    # Convert to integers and ensure they're within bounds
-    row_start, col_start = int(row_start), int(col_start)
-    row_stop, col_stop = int(row_stop), int(col_stop)
-    
-    # Ensure we don't go out of bounds
-    row_start = max(0, row_start)
-    col_start = max(0, col_start)
-    row_stop = min(src.height, row_stop)
-    col_stop = min(src.width, col_stop)
-    
-    print(f"Crop window: rows {row_start}:{row_stop}, cols {col_start}:{col_stop}")
-    
+    # Local imports to avoid changing module-level imports
+    from math import floor, ceil
+    from rasterio.windows import from_bounds as win_from_bounds, transform as win_transform, Window
+
+    # Unpack and normalize user-provided bounds
+    xmin, ymin, xmax, ymax = bounds
+    if xmin > xmax:
+        xmin, xmax = xmax, xmin
+    if ymin > ymax:
+        ymin, ymax = ymax, ymin
+
+    # Intersect requested bounds with raster bounds to avoid out-of-range windows
+    r_left, r_bottom, r_right, r_top = src.bounds
+    ix_left = max(xmin, r_left)
+    ix_right = min(xmax, r_right)
+    ix_bottom = max(ymin, r_bottom)
+    ix_top = min(ymax, r_top)
+
+    if not (ix_left < ix_right and ix_bottom < ix_top):
+        raise ValueError("Requested bounds do not overlap the raster.")
+
+    # Compute a pixel window from the intersected bounds
+    window = win_from_bounds(ix_left, ix_bottom, ix_right, ix_top, transform=transform)
+
+    # Round to pixel boundaries: floor the offsets and ceil the shape to cover the full area
+    # This avoids losing edge pixels due to float rounding.
+    window = window.round_offsets(op='floor').round_shape(op='ceil')
+
+    # Ensure the window is within the raster dimensions
+    raster_window = Window(col_off=0, row_off=0, width=src.width, height=src.height)
+    window = window.intersection(raster_window)
+
+    if window.width <= 0 or window.height <= 0:
+        raise ValueError("Computed crop window is empty after clipping to raster bounds.")
+
     # Read the data using the window
-    data = src.read(1, window=((row_start, row_stop), (col_start, col_stop)))
-    print(f"Cropped data shape: {data.shape}")
-    return data
+    data = src.read(window=window)
+
+    # Compute the new transform for the cropped data
+    out_transform = win_transform(window, transform)
+
+    # Optional: helpful debug print
+    print(f"Crop window -> rows {int(window.row_off)}:{int(window.row_off + window.height)}, "
+          f"cols {int(window.col_off)}:{int(window.col_off + window.width)}")
+
+    return data, out_transform, window
 
 def crop_by_rectangle(data, row_start, row_end, col_start, col_end):
     """
@@ -226,4 +265,4 @@ def main():
     seg.plot_acc_ratios()
 
 if __name__ == "__main__":
-    main() 
+    main()
