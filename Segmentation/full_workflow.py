@@ -59,6 +59,33 @@ def crop_to_bounds(src, bounds, transform):
     if window.width <= 0 or window.height <= 0:
         raise ValueError("Computed crop window is empty after clipping to raster bounds.")
 
+    # Enforce even window dimensions by expanding by one pixel if needed
+    # Adjust width (columns)
+    if int(round(window.width)) % 2 == 1:
+        # Prefer expanding to the right if possible
+        if window.col_off + window.width < src.width:
+            window = Window(col_off=window.col_off, row_off=window.row_off,
+                            width=window.width + 1, height=window.height)
+        # Otherwise, expand to the left if possible
+        elif window.col_off > 0:
+            window = Window(col_off=window.col_off - 1, row_off=window.row_off,
+                            width=window.width + 1, height=window.height)
+        # Clip to raster bounds just in case
+        window = window.intersection(raster_window)
+
+    # Adjust height (rows)
+    if int(round(window.height)) % 2 == 1:
+        # Prefer expanding downward if possible
+        if window.row_off + window.height < src.height:
+            window = Window(col_off=window.col_off, row_off=window.row_off,
+                            width=window.width, height=window.height + 1)
+        # Otherwise, expand upward if possible
+        elif window.row_off > 0:
+            window = Window(col_off=window.col_off, row_off=window.row_off - 1,
+                            width=window.width, height=window.height + 1)
+        # Clip to raster bounds just in case
+        window = window.intersection(raster_window)
+
     # Read the data using the window; keep as numpy array output to match crop_by_rectangle
     data = src.read(window=window)
 
@@ -226,6 +253,26 @@ def main():
         window = window.round_offsets(op='floor').round_shape(op='ceil')
         raster_window = Window(col_off=0, row_off=0, width=src.width, height=src.height)
         window = window.intersection(raster_window)
+
+        # Enforce even window dimensions to match crop_to_bounds behavior
+        if int(round(window.width)) % 2 == 1:
+            if window.col_off + window.width < src.width:
+                window = Window(col_off=window.col_off, row_off=window.row_off,
+                                width=window.width + 1, height=window.height)
+            elif window.col_off > 0:
+                window = Window(col_off=window.col_off - 1, row_off=window.row_off,
+                                width=window.width + 1, height=window.height)
+            window = window.intersection(raster_window)
+
+        if int(round(window.height)) % 2 == 1:
+            if window.row_off + window.height < src.height:
+                window = Window(col_off=window.col_off, row_off=window.row_off,
+                                width=window.width, height=window.height + 1)
+            elif window.row_off > 0:
+                window = Window(col_off=window.col_off, row_off=window.row_off - 1,
+                                width=window.width, height=window.height + 1)
+            window = window.intersection(raster_window)
+
         transform = win_transform(window, src.transform)
         
         # Create the output profile
