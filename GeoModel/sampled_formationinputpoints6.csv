@@ -1,0 +1,85 @@
+X,Y,Z,formation_id,formation
+-691980.0154,4543461.256,198.17201,40,Upper Devonian Siliciclastics
+-691492.5053,4543836.454,209.73502,40,Upper Devonian Siliciclastics
+-690980.3922,4543732.939,231.684,40,Upper Devonian Siliciclastics
+-690552.0793,4532841.007,161.70801,40,Upper Devonian Siliciclastics
+-689956.0096,4532835.229,159.08301,40,Upper Devonian Siliciclastics
+-688972.782,4532617.343,155.52402,40,Upper Devonian Siliciclastics
+-688464.3794,4532495.684,155.50601,40,Upper Devonian Siliciclastics
+-688185.628,4533138.497,152.488,40,Upper Devonian Siliciclastics
+-687096.9525,4533162.179,107.198006,40,Upper Devonian Siliciclastics
+-686105.5515,4533271.03,202.774,40,Upper Devonian Siliciclastics
+-692643.7334,4543228.151,224.25201,40,Upper Devonian Siliciclastics
+-704449.2663,4530437.708,357.99902,67,Visean Shales
+-704939.6708,4530522.235,344.596,67,Visean Shales
+-703428.4701,4530697.017,365.9175,67,Visean Shales
+-703879.8463,4530777.386,345.768,67,Visean Shales
+-704366.273,4530886.239,328.976,67,Visean Shales
+-704816.3053,4531095.302,318.276,67,Visean Shales
+-702601.0043,4530793.719,363.62802,67,Visean Shales
+-697313.0973,4530973.659,304.63202,67,Visean Shales
+-697812.1124,4530947.922,360.88,67,Visean Shales
+-699759.6756,4530704.723,416.212,67,Visean Shales
+-700256.3951,4530726.321,396.73602,67,Visean Shales
+-700670.622,4529743.336,359.34702,67,Visean Shales
+-701138.3779,4529591.339,384.89603,67,Visean Shales
+-705318.4635,4530909.656,309.66,67,Visean Shales
+-683954.2147,4547973.498,383.03802,1,Tournaisian Plutonites
+-683986.3606,4529297.965,293.588,1,Tournaisian Plutonites
+-692149.3129,4531545.556,263.58002,1,Tournaisian Plutonites
+-700077.2211,4544308.012,295.30103,1,Tournaisian Plutonites
+-706503.1075,4538666.88,416.385,1,Tournaisian Plutonites
+-692092.9617,4541362.318,205.604,1,Tournaisian Plutonites
+-679251.6282,4540412.328,268.766,1,Tournaisian Plutonites
+-703848.8778,4537799.106,330.984,51,Upper Carboniferous Volcanics
+-702331.4269,4536709.276,267.004,51,Upper Carboniferous Volcanics
+-694833.3878,4531125.784,229.48901,51,Upper Carboniferous Volcanics
+-696319.3789,4531001.525,265.476,51,Upper Carboniferous Volcanics
+-698308.0448,4530888.095,379.24002,51,Upper Carboniferous Volcanics
+-700746.827,4530650.589,350.855,51,Upper Carboniferous Volcanics
+-702239.652,4530673.533,338.642,51,Upper Carboniferous Volcanics
+-706486.3588,4536644.742,397.61526,51,Upper Carboniferous Volcanics
+-706447.3818,4548781.148,361.96002,51,Upper Carboniferous Volcanics
+-700469.227,4545513.144,396.68802,51,Upper Carboniferous Volcanics
+-702384.551,4548338.36,338.83603,51,Upper Carboniferous Volcanics
+-701111.8401,4548706.013,372.01202,51,Upper Carboniferous Volcanics
+-699803.3061,4548936.633,304.31,51,Upper Carboniferous Volcanics
+-692260.0452,4530244.574,202.524,51,Upper Carboniferous Volcanics
+-696661.3903,4529686.898,268.288,51,Upper Carboniferous Volcanics
+-698830.9828,4528912.425,289.13602,51,Upper Carboniferous Volcanics
+-703766.3733,4548056.667,393.048,51,Upper Carboniferous Volcanics
+-707496.7607,4548042.601,408.74802,76,Mid Carboniferous Shales
+-707067.5464,4548208.701,414.06403,76,Mid Carboniferous Shales
+-706581.3439,4548102.438,401.252,76,Mid Carboniferous Shales
+-706714.4854,4548513.893,355.48,76,Mid Carboniferous Shales
+-705958.6401,4548689.011,351.38,76,Mid Carboniferous Shales
+-705608.8944,4548592.445,361.398,76,Mid Carboniferous Shales
+-705359.028,4548251.517,362.66452,76,Mid Carboniferous Shales
+-705003.2863,4548046.755,380.756,76,Mid Carboniferous Shales
+-704264.9469,4548075.133,446.704,76,Mid Carboniferous Shales
+-705536.3713,4549001.729,330.828,76,Mid Carboniferous Shales
+-705193.0995,4548665.209,359.27603,76,Mid Carboniferous Shales
+-704388.0,4548761.0,424.0,1,Upper Carboniferous Volcanics
+-702784.0,4548667.0,417.0,2,Upper Carboniferous Volcanics
+-701587.0,4548986.0,415.0,3,Upper Carboniferous Volcanics
+-700196.0,4549062.0,368.0,4,Upper Carboniferous Volcanics
+-705633.0,4529553.0,309.0,5,Upper Carboniferous Volcanics
+-703786.0,4530306.0,372.0,6,Upper Carboniferous Volcanics
+-701928.0,4529213.0,299.0,7,Upper Carboniferous Volcanics
+-699932.0,4530083.0,399.0,8,Upper Carboniferous Volcanics
+-697469.0,4530115.0,337.0,9,Upper Carboniferous Volcanics
+-695144.0,4530816.0,254.0,10,Upper Carboniferous Volcanics
+-706207.0,4546897.0,456.0,11,Tournaisian Plutonites
+-705998.0,4543672.0,353.0,12,Tournaisian Plutonites
+-703401.0,4542038.0,372.0,13,Tournaisian Plutonites
+-704532.0,4539023.0,304.0,14,Tournaisian Plutonites
+-699548.0,4541703.0,259.0,15,Tournaisian Plutonites
+-694019.0,4540824.0,379.0,16,Tournaisian Plutonites
+-688700.0,4539274.0,356.0,17,Tournaisian Plutonites
+-696951.0,4539107.0,452.0,18,Tournaisian Plutonites
+-697831.0,4535589.0,277.0,19,Tournaisian Plutonites
+-693684.0,4533536.0,317.0,20,Tournaisian Plutonites
+-703066.0,4532782.0,441.0,21,Tournaisian Plutonites
+-697956.0,4531861.0,370.0,22,Tournaisian Plutonites
+-692972.0,4529851.0,258.0,23,Tournaisian Plutonites
+-687611.0,4529599.0,278.0,24,Tournaisian Plutonites
