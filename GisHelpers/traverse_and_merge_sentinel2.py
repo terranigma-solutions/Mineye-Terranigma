@@ -111,9 +111,9 @@ def traverse_sentinel2_data(root_path):
     print(f"Found {len(safe_dirs)} .SAFE directories:")
     print("-" * 40)
     
-    # Dictionaries to store band:filename mappings
-    bands_20m = {}  # band_name: filename
-    bands_60m = {}  # band_name: filename
+    # Dictionaries to store band:list_of_file_paths mappings
+    bands_20m = {}  # band_name: list of full file paths
+    bands_60m = {}  # band_name: list of full file paths
     
     for safe_dir in sorted(safe_dirs):
         print(f"\nProcessing: {safe_dir.name}")
@@ -163,10 +163,14 @@ def traverse_sentinel2_data(root_path):
                         
                         if band_name and resolution:
                             if resolution == '20m':
-                                bands_20m[band_name] = jp2_file.name
+                                if band_name not in bands_20m:
+                                    bands_20m[band_name] = []
+                                bands_20m[band_name].append(str(jp2_file))
                                 print(f"        -> Added to 20m dict: {band_name} -> {jp2_file.name}")
                             elif resolution == '60m':
-                                bands_60m[band_name] = jp2_file.name
+                                if band_name not in bands_60m:
+                                    bands_60m[band_name] = []
+                                bands_60m[band_name].append(str(jp2_file))
                                 print(f"        -> Added to 60m dict: {band_name} -> {jp2_file.name}")
                         else:
                             print(f"        -> Could not extract band/resolution info from {jp2_file.name}")
@@ -184,10 +188,14 @@ def traverse_sentinel2_data(root_path):
                     
                     if band_name and resolution:
                         if resolution == '20m':
-                            bands_20m[band_name] = jp2_file.name
+                            if band_name not in bands_20m:
+                                bands_20m[band_name] = []
+                            bands_20m[band_name].append(str(jp2_file))
                             print(f"        -> Added to 20m dict: {band_name} -> {jp2_file.name}")
                         elif resolution == '60m':
-                            bands_60m[band_name] = jp2_file.name
+                            if band_name not in bands_60m:
+                                bands_60m[band_name] = []
+                            bands_60m[band_name].append(str(jp2_file))
                             print(f"        -> Added to 60m dict: {band_name} -> {jp2_file.name}")
                     else:
                         print(f"        -> Could not extract band/resolution info from {jp2_file.name}")
@@ -200,14 +208,20 @@ def traverse_sentinel2_data(root_path):
     if bands_20m:
         print("\n20m Resolution Band Dictionary:")
         print("-" * 40)
-        for band, filename in sorted(bands_20m.items()):
-            print(f"  {band}: {filename}")
+        for band, file_list in sorted(bands_20m.items()):
+            print(f"  {band}: {len(file_list)} files")
+            for file_path in file_list:
+                filename = Path(file_path).name
+                print(f"    - {filename}")
     
     if bands_60m:
         print("\n60m Resolution Band Dictionary:")
         print("-" * 40)
-        for band, filename in sorted(bands_60m.items()):
-            print(f"  {band}: {filename}")
+        for band, file_list in sorted(bands_60m.items()):
+            print(f"  {band}: {len(file_list)} files")
+            for file_path in file_list:
+                filename = Path(file_path).name
+                print(f"    - {filename}")
     
     return bands_20m, bands_60m
 
@@ -242,28 +256,11 @@ def merge_sentinel_bands(root_path, bands_20m, bands_60m, output_dir="combined")
         res_output_dir.mkdir(exist_ok=True)
         
         # Process each band
-        for band_name, filename_pattern in bands_dict.items():
+        for band_name, file_paths_list in bands_dict.items():
             print(f"  Processing band {band_name}...")
             
-            # Find all files matching this band across all .SAFE directories
-            band_files = []
-            safe_dirs = list(root_path.glob("*.SAFE"))
-            
-            for safe_dir in safe_dirs:
-                # Look for files matching the band pattern
-                granule_dirs = list((safe_dir / "GRANULE").glob("*"))
-                for granule_dir in granule_dirs:
-                    img_data_dir = granule_dir / "IMG_DATA"
-                    
-                    # Check resolution directories
-                    res_dir = img_data_dir / f"R{resolution}"
-                    if res_dir.exists():
-                        matching_files = list(res_dir.glob(f"*{band_name}*{resolution}.jp2"))
-                        band_files.extend(matching_files)
-                    else:
-                        # Check directly in IMG_DATA
-                        matching_files = list(img_data_dir.glob(f"*{band_name}*{resolution}.jp2"))
-                        band_files.extend(matching_files)
+            # Use the file paths directly from our collected data
+            band_files = [Path(file_path) for file_path in file_paths_list]
             
             if not band_files:
                 print(f"    Warning: No files found for band {band_name}")
