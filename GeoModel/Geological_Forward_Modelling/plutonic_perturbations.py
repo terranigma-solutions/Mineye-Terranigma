@@ -1,23 +1,3 @@
-# Loop over all combinations of level_of_sampling and methods_of_assigning_dip_angles
-import numpy as np
-import matplotlib.pyplot as plt
-
-import pandas as pd
-import geopandas as gpd
-
-from mpl_toolkits.mplot3d import Axes3D
-
-import gempy as gp
-import gempy_viewer as gpv
-import gempy_engine
-
-from gempy_engine.core.data.stack_relation_type import StackRelationType
-import HelperMethods
-
-import threading
-import pickle
-import os
-
 def plutonic_perturbations(level_of_sampling_points, level_of_sampling_orientations, 
                        section_dict,
                        plutonite_orientations_df, plutonite_points_df,
@@ -38,7 +18,7 @@ def plutonic_perturbations(level_of_sampling_points, level_of_sampling_orientati
     - None (saves the images and stores the geological models in organized folders)
     """
     
-    methods_of_assigning_dip_angles = {"purely random": 1, "mildly random": 2, "little random": 3} # how do we assign dip angles to measurement points
+    methods_of_assigning_dip_angles = {"purely random": 1, "mildly random": 2, "little random": 3} # controlling randomness of dip angles
 
     for sampling in level_of_sampling_points:
         for orientations in level_of_sampling_orientations:
@@ -229,3 +209,4 @@ def plutonic_perturbations(level_of_sampling_points, level_of_sampling_orientati
 
     # gpv.plot_section_traces(plutonite_geo_model)
     # print("\nAll perturbation results have been saved to organized subfolders!")
+    print("Function plutonic_perturbations executed (function body commented out).")
