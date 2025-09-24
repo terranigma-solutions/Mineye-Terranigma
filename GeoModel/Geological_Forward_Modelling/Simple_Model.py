@@ -5,23 +5,27 @@ import os
 import HelperMethods
 import gempy as gp
 import gempy_viewer as gpv
-import gdal as gpd
+import geopandas as gpd
 
 # ========== CONFIG ==========
 BASE_DIR = os.getcwd()
 data_dir = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'Data', 'Input_Data'))
 geomodel_dir = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'Data', 'Output_Data'))
-
-# Fix the variable name and load the plutonite outline
 gis_map_info = os.path.join(data_dir, 'Stratigraphic_Data', 'QGIS', 'plutonite_outline.gpkg')
 points_df = pd.read_csv(os.path.join(geomodel_dir, 'Simple-Models', 'contact_points.csv'))
 topography_path = os.path.join(data_dir, 'Topographic_Data', 'topo_reduced_sf0.1.tif')
+
+tmp_dir = os.path.join(BASE_DIR, 'temp_inputs'); os.makedirs(tmp_dir, exist_ok=True)
+mod_or_path = os.path.join(tmp_dir, 'orientations_mod.csv')
+mod_pts_path = os.path.join(tmp_dir, 'points_mod.csv')
 
 trigger_map_with_data_plot = False
 trigger_geological_map_plot = False
 trigger_create_cross_section = False
 trigger_2d_plot = False
 trigger_3d_plot = False
+
+trigger_recreate_data = False
 
 min_x = -709521
 max_x = -675558
@@ -33,9 +37,6 @@ simplification_level = 0.9  # 0=no simplification, 1=maximum simplification
 dip_values = 10
 azimuth_values = 0
 
-# Generate orientations from contact points
-orientations_df = HelperMethods.generate_orientations_from_points(points_df, default_dip=dip_values, default_azimuth=azimuth_values, use_default_azimuth=False)
-
 # Set the extent of the model
 extent=[min_x, max_x, min_y, max_y, model_depth, max_z]  # Fixed Y coordinate order
 
@@ -44,60 +45,68 @@ nx = ny = nz = 64
 resolution = [nx, ny, nz]
 
 # ========== DATA CLEANING ==========
-# Remove boundary artifacts first
-orientations_df, points_df = HelperMethods.remove_boundary_artifacts(
-    points_df, orientations_df, boundary_tolerance=800)
+if trigger_recreate_data:
+    # Generate orientations from contact points
+    orientations_df = HelperMethods.generate_orientations_from_points(points_df, default_dip=dip_values, default_azimuth=azimuth_values, use_default_azimuth=False)
+    orientations_df, points_df = HelperMethods.remove_boundary_artifacts(
+        points_df, orientations_df, boundary_tolerance=800)
 
-# Apply simplification after cleaning - no formation filtering needed since there's only one formation
-_, points_df = HelperMethods.simplify_formation_data(
-    orientations_df, points_df, 34, simplification_level)
+    # Apply simplification after cleaning - no formation filtering needed since there's only one formation
+    _, points_df = HelperMethods.simplify_formation_data(
+        orientations_df, points_df, 34, simplification_level)
 
 # ========== MANIPULATE DATA MANUALLY ==========
-# Ensure an 'id' column exists for per-id edits
-if 'id' not in orientations_df.columns:
-    orientations_df['id'] = np.arange(len(orientations_df))
+    # Ensure an 'id' column exists for per-id edits
+    if 'id' not in orientations_df.columns:
+        orientations_df['id'] = np.arange(len(orientations_df))
 
-# Ensure contact points also have an 'id' column for plotting
-if 'id' not in points_df.columns:
-    points_df['id'] = np.arange(len(points_df))
+    # Ensure contact points also have an 'id' column for plotting
+    if 'id' not in points_df.columns:
+        points_df['id'] = np.arange(len(points_df))
 
-# Optional: add manual orientations at specific contact point IDs
-manual_orientations_at_points = [
-    11, 19
-    # Example: 5, 12, 18  # Add orientations at these contact point IDs
-]
-manual_orientation_flip_azimuth = True  # Set to True to flip azimuth by 180° for manually added orientations
+    # Optional: add manual orientations at specific contact point IDs
+    manual_orientations_at_points = [
+        11, 19
+        # Example: 5, 12, 18  # Add orientations at these contact point IDs
+    ]
+    manual_orientation_flip_azimuth = True  # Set to True to flip azimuth by 180° for manually added orientations
 
-# Add manual orientations if specified
-if manual_orientations_at_points:
-    orientations_df = HelperMethods.add_manual_orientations_at_points(
-        orientations_df, points_df, manual_orientations_at_points, dip_values, manual_orientation_flip_azimuth
-    )
+    # Add manual orientations if specified
+    if manual_orientations_at_points:
+        orientations_df = HelperMethods.add_manual_orientations_at_points(
+            orientations_df, points_df, manual_orientations_at_points, dip_values, manual_orientation_flip_azimuth
+        )
 
-# Optional: specify adjustments by orientation id (leave dicts empty to skip)
-azimuth_flip_by_id = {
-    0: True, 1: True, 2: True, 3: True, 4: True, 5: False, 6: False
-    # Example: 3: True, 7: True  # True = flip by 180°
-}
-manual_dip_by_id = {
-    # Example: 3: 60, 7: 30  # degrees, will be clipped to [0, 90]
-}
+    # Optional: specify adjustments by orientation id (leave dicts empty to skip)
+    azimuth_flip_by_id = {
+        0: True, 1: True, 2: True, 3: True, 4: True, 5: False, 6: False
+        # Example: 3: True, 7: True  # True = flip by 180°
+    }
+    manual_dip_by_id = {
+        # Example: 3: 60, 7: 30  # degrees, will be clipped to [0, 90]
+    }
 
-# Apply azimuth flips by id (180°)
-for oid, flip in (azimuth_flip_by_id or {}).items():
-    if not flip:
-        continue
-    mask = orientations_df['id'] == oid
-    orientations_df.loc[mask, 'azimuth'] = (orientations_df.loc[mask, 'azimuth'] + 180) % 360
+    # Apply azimuth flips by id (180°)
+    for oid, flip in (azimuth_flip_by_id or {}).items():
+        if not flip:
+            continue
+        mask = orientations_df['id'] == oid
+        orientations_df.loc[mask, 'azimuth'] = (orientations_df.loc[mask, 'azimuth'] + 180) % 360
 
-# Apply dip overrides by id
-for oid, dip in (manual_dip_by_id or {}).items():
-    mask = orientations_df['id'] == oid
-    try:
-        dip_val = float(dip)
-    except (TypeError, ValueError):
-        continue
-    orientations_df.loc[mask, 'dip'] = np.clip(dip_val, 0, 90)
+    # Apply dip overrides by id
+    for oid, dip in (manual_dip_by_id or {}).items():
+        mask = orientations_df['id'] == oid
+        try:
+            dip_val = float(dip)
+        except (TypeError, ValueError):
+            continue
+        orientations_df.loc[mask, 'dip'] = np.clip(dip_val, 0, 90)
+
+# ========== SAVE TEMP FILES ==========
+    orientations_df.to_csv(mod_or_path, index=False)
+    points_df.to_csv(mod_pts_path, index=False)
+else:
+    orientations_df = pd.read_csv(mod_or_path)
 
 # ========== PLOT DATA ==========
 if trigger_map_with_data_plot:
@@ -157,16 +166,6 @@ if trigger_map_with_data_plot:
     ax.set_title(f'Data Simplification (level={simplification_level})')
     ax.legend(); ax.grid(True, alpha=0.3); ax.set_xlabel('X Coordinate'); ax.set_ylabel('Y Coordinate')
     plt.tight_layout(); plt.show()
-
-
-# ========== SAVE TEMP FILES ==========
-tmp_dir = os.path.join(BASE_DIR, 'temp_inputs'); os.makedirs(tmp_dir, exist_ok=True)
-mod_or_path = os.path.join(tmp_dir, 'orientations_mod.csv')
-mod_pts_path = os.path.join(tmp_dir, 'points_mod.csv')
-# Drop helper-only columns like 'id' before exporting for GemPy
-orientations_export = orientations_df.drop(columns=['id'], errors='ignore')
-orientations_export.to_csv(mod_or_path, index=False)
-points_df.to_csv(mod_pts_path, index=False)
 
 # ========== BUILD GEMPY MODEL ==========
 simple_geo_model = gp.create_geomodel(
