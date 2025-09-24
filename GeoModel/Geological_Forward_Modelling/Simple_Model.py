@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import os
+import pickle
 import HelperMethods
 import gempy as gp
 import gempy_viewer as gpv
@@ -18,14 +19,16 @@ points_df = pd.read_csv(os.path.join(geomodel_dir, 'Simple-Models', 'contact_poi
 topography_path = os.path.join(data_dir, 'Topographic_Data', 'topo_reduced_sf0.1.tif')
 
 tmp_dir = os.path.join(forward_model_folder, "temp_inputs")
+pickle_model_path = os.path.join(tmp_dir, 'simple_geo_model.pkl')
 mod_or_path = os.path.join(tmp_dir, 'orientations_mod.csv')
 mod_pts_path = os.path.join(tmp_dir, 'points_mod.csv')
 
 trigger_map_with_data_plot = False
 trigger_geological_map_plot = False
 trigger_create_cross_section = False
-trigger_2d_plot = True
+trigger_2d_plot = False
 trigger_3d_plot = False
+save_pickled_model = True
 
 trigger_recreate_data = False
 
@@ -190,6 +193,10 @@ gp.map_stack_to_surfaces(
 
 gp.set_topography_from_file(grid=simple_geo_model.grid, filepath=topography_path)
 geo_model = gp.compute_model(simple_geo_model)
+
+if save_pickled_model:
+    with open(pickle_model_path, 'wb') as f:
+        pickle.dump(simple_geo_model, f)
 
 #========== PLOT RESULTS ==========
 if trigger_geological_map_plot:
