@@ -6,88 +6,73 @@ from skimage.transform import resize
 from sklearn.cluster import KMeans
 import pandas as pd
 
-# Generate orientations on the fly - we'll create these from the contact points
-def generate_orientations_from_points(points_df, default_dip=45, default_azimuth=90):
-    """Generate orientation points from contact points with proper dip direction (normal to boundary)"""
+def generate_orientations_from_points(points_df, default_dip, default_azimuth, use_default_azimuth=False):
+    """Generate orientation points from contact points (purely geometric nearest neighbors)."""
     orientations_data = []
 
-    # Calculate global centroid as the center of the plutonite body
-    global_centroid_x = points_df['X'].mean()
-    global_centroid_y = points_df['Y'].mean()
+    # Sample about 10 points across the dataset (every n-th point)
+    step = max(1, len(points_df) // 10)
+    sample_indices = np.arange(0, len(points_df), step)
 
-    # Use a subset of contact points as orientation locations
-    sample_indices = np.arange(0, len(points_df), max(1, len(points_df) // 10))  # Take every nth point
+    X_all = points_df['X'].to_numpy()
+    Y_all = points_df['Y'].to_numpy()
+    idx_all = points_df.index.to_numpy()
 
-    for idx in sample_indices:
-        current_point = points_df.iloc[idx]
+    for iloc_idx in sample_indices:
+        current_point = points_df.iloc[iloc_idx]
         current_x, current_y = current_point['X'], current_point['Y']
 
-        # Find nearby points to calculate local tangent direction
-        distances = np.sqrt((points_df['X'] - current_x)**2 + (points_df['Y'] - current_y)**2)
-        nearby_radius = 1500
-        nearby_mask = (distances <= nearby_radius) & (distances > 0)
-        nearby_points = points_df[nearby_mask]
-
-        if len(nearby_points) >= 2:
-            # Get the two closest points to define the local line direction
-            nearby_distances = distances[nearby_mask].values
-            sorted_indices = np.argsort(nearby_distances)
-            closest_points = nearby_points.iloc[sorted_indices[:2]]
-
-            if len(closest_points) >= 2:
-                # Calculate strike direction as the line connecting the two closest points
-                p1 = closest_points.iloc[0]
-                p2 = closest_points.iloc[1]
-
-                # Strike vector (along the boundary line)
-                strike_x = p2['X'] - p1['X']
-                strike_y = p2['Y'] - p1['Y']
-
-                # Normalize strike vector
-                strike_length = np.sqrt(strike_x**2 + strike_y**2)
-                if strike_length > 0:
-                    strike_x /= strike_length
-                    strike_y /= strike_length
-
-                # Dip direction is perpendicular to strike (rotate 90 degrees)
-                dip_x = -strike_y  # Rotate strike by 90 degrees clockwise
-                dip_y = strike_x
-
-                # Check which direction points toward interior (global centroid)
-                to_centroid_x = global_centroid_x - current_x
-                to_centroid_y = global_centroid_y - current_y
-
-                # Use dot product to determine if we need to flip the dip direction
-                dot_product = dip_x * to_centroid_x + dip_y * to_centroid_y
-                if dot_product < 0:
-                    # Flip to point inward
-                    dip_x = -dip_x
-                    dip_y = -dip_y
-            else:
-                # Fallback if we don't have enough points
-                dip_x = global_centroid_x - current_x
-                dip_y = global_centroid_y - current_y
+        if use_default_azimuth:
+            azimuth = default_azimuth
         else:
-            # Fallback: point toward global centroid
-            dip_x = global_centroid_x - current_x
-            dip_y = global_centroid_y - current_y
+            # Compute squared distances to all points (exclude self)
+            dx = X_all - current_x
+            dy = Y_all - current_y
+            d2 = dx*dx + dy*dy
 
-        # Calculate dip azimuth (direction perpendicular to boundary, pointing inward)
-        dip_azimuth = np.degrees(np.arctan2(dip_x, dip_y))
+            # Exclude self by setting its distance to +inf
+            self_abs_index = points_df.index[iloc_idx]
+            self_pos = np.where(idx_all == self_abs_index)[0][0]
+            d2[self_pos] = np.inf
 
-        # Ensure azimuth is between 0 and 360 degrees
-        if dip_azimuth < 0:
-            dip_azimuth += 360
+            # Take two nearest neighbors (if available)
+            if len(points_df) >= 3:
+                nn_pos = np.argpartition(d2, 2)[:2]
+                p1x, p1y = X_all[nn_pos[0]], Y_all[nn_pos[0]]
+                p2x, p2y = X_all[nn_pos[1]], Y_all[nn_pos[1]]
+
+                # Strike vector (along the line between the two neighbors)
+                strike_x = p2x - p1x
+                strike_y = p2y - p1y
+
+                # Normalize
+                strike_len = np.hypot(strike_x, strike_y)
+                if strike_len > 0:
+                    strike_x /= strike_len
+                    strike_y /= strike_len
+
+                    # Dip = strike rotated 90° clockwise
+                    dip_x = -strike_y
+                    dip_y = strike_x
+
+                    # Azimuth of dip (0–360°)
+                    azimuth = np.degrees(np.arctan2(dip_x, dip_y))
+                    if azimuth < 0:
+                        azimuth += 360
+                else:
+                    azimuth = default_azimuth
+            else:
+                azimuth = default_azimuth
 
         orientations_data.append({
             'X': current_x,
             'Y': current_y,
-            'Z': current_point['Z'],
-            'azimuth': dip_azimuth,  # Dip direction (perpendicular to boundary, inward)
+            'Z': current_point.get('Z', np.nan),
+            'azimuth': azimuth,
             'dip': default_dip,
             'polarity': 1,
-            'formation': current_point['formation'],
-            'formation_id': current_point['formation_id']
+            'formation': current_point.get('formation', None),
+            'formation_id': current_point.get('formation_id', None),
         })
 
     return pd.DataFrame(orientations_data)
@@ -275,3 +260,110 @@ def remove_boundary_artifacts(points_df, orientations_df, boundary_tolerance=500
     result_points = pd.concat(cleaned_points, ignore_index=True) if cleaned_points else pd.DataFrame()
 
     return result_orientations, result_points
+
+def add_manual_orientations_at_points(orientations_df, points_df, point_ids_to_add, default_dip=45, flip_azimuth=False):
+    """
+    Add manual orientations at specific contact point IDs.
+
+    Parameters:
+    - orientations_df: existing orientations DataFrame
+    - points_df: contact points DataFrame (must have 'id' column)
+    - point_ids_to_add: list of point IDs where orientations should be added
+    - default_dip: dip value for new orientations
+    - flip_azimuth: if True, flip calculated azimuth by 180°
+
+    Returns:
+    - Updated orientations_df with new orientations added
+    """
+    if 'id' not in points_df.columns:
+        raise ValueError("points_df must have an 'id' column")
+
+    new_orientations = []
+
+    # Get all point coordinates for distance calculations
+    X_all = points_df['X'].to_numpy()
+    Y_all = points_df['Y'].to_numpy()
+    id_all = points_df['id'].to_numpy()
+
+    for target_id in point_ids_to_add:
+        # Find the target point
+        target_mask = points_df['id'] == target_id
+        if not target_mask.any():
+            print(f"Warning: Point ID {target_id} not found in points_df")
+            continue
+
+        target_point = points_df[target_mask].iloc[0]
+        current_x, current_y = target_point['X'], target_point['Y']
+
+        # Compute squared distances to all other points (exclude self)
+        dx = X_all - current_x
+        dy = Y_all - current_y
+        d2 = dx*dx + dy*dy
+
+        # Exclude self by setting its distance to +inf
+        self_pos = np.where(id_all == target_id)[0][0]
+        d2[self_pos] = np.inf
+
+        # Take two nearest neighbors (if available)
+        if len(points_df) >= 3:
+            nn_pos = np.argpartition(d2, 2)[:2]
+            p1x, p1y = X_all[nn_pos[0]], Y_all[nn_pos[0]]
+            p2x, p2y = X_all[nn_pos[1]], Y_all[nn_pos[1]]
+
+            # Strike vector (along the line between the two neighbors)
+            strike_x = p2x - p1x
+            strike_y = p2y - p1y
+
+            # Normalize
+            strike_len = np.hypot(strike_x, strike_y)
+            if strike_len > 0:
+                strike_x /= strike_len
+                strike_y /= strike_len
+
+                # Dip = strike rotated 90° clockwise
+                dip_x = -strike_y
+                dip_y = strike_x
+
+                # Azimuth of dip (0–360°)
+                azimuth = np.degrees(np.arctan2(dip_x, dip_y))
+                if azimuth < 0:
+                    azimuth += 360
+
+                # Optionally flip azimuth by 180°
+                if flip_azimuth:
+                    azimuth = (azimuth + 180) % 360
+            else:
+                azimuth = 0  # default azimuth if no valid strike vector
+        else:
+            azimuth = 0  # default azimuth if insufficient points
+
+        # Create new orientation entry
+        new_orientation = {
+            'X': current_x,
+            'Y': current_y,
+            'Z': target_point.get('Z', np.nan),
+            'azimuth': azimuth,
+            'dip': default_dip,
+            'polarity': 1,
+            'formation': target_point.get('formation', None),
+            'formation_id': target_point.get('formation_id', None),
+        }
+
+        new_orientations.append(new_orientation)
+
+    if new_orientations:
+        # Convert new orientations to DataFrame
+        new_orientations_df = pd.DataFrame(new_orientations)
+
+        # Add to existing orientations
+        updated_orientations = pd.concat([orientations_df, new_orientations_df], ignore_index=True)
+
+        # Reassign sequential IDs to the combined dataset (preserve existing logic)
+        if 'id' in updated_orientations.columns:
+            updated_orientations['id'] = np.arange(len(updated_orientations))
+        else:
+            updated_orientations['id'] = np.arange(len(updated_orientations))
+
+        return updated_orientations
+    else:
+        return orientations_df
