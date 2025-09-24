@@ -4,6 +4,7 @@ import numpy as np
 import rasterio
 from skimage.transform import resize
 from sklearn.cluster import KMeans
+import pandas as pd
 
 def simplify_formation_data(orientations, points, formation_id, simp_level):
     if simp_level == 0:
@@ -141,3 +142,50 @@ def color_lithology(structural_elements):
                 element.color = "#e37ecd"  # pink
             elif element.name == "Upper Devonian Siliciclastics":
                 element.color = "#d9b280"  # light brown
+
+def remove_boundary_artifacts(points_df, orientations_df, boundary_tolerance=500):
+    """Remove points and orientations that are near mapping boundaries"""
+    cleaned_points = []
+    cleaned_orientations = []
+
+    for fid in points_df['formation_id'].unique():
+        formation_points = points_df[points_df['formation_id'] == fid].copy()
+        formation_orientations = orientations_df[orientations_df['formation_id'] == fid].copy()
+
+        if len(formation_points) == 0:
+            cleaned_points.append(formation_points)
+            cleaned_orientations.append(formation_orientations)
+            continue
+
+        # Get bounding box for both points and orientations combined
+        all_x = pd.concat([formation_points['X'], formation_orientations['X']])
+        all_y = pd.concat([formation_points['Y'], formation_orientations['Y']])
+        x_min, x_max = all_x.min(), all_x.max()
+        y_min, y_max = all_y.min(), all_y.max()
+
+        # Simply remove all points/orientations within boundary tolerance
+        points_mask = (
+            (formation_points['X'] - x_min > boundary_tolerance) &
+            (x_max - formation_points['X'] > boundary_tolerance) &
+            (formation_points['Y'] - y_min > boundary_tolerance) &
+            (y_max - formation_points['Y'] > boundary_tolerance)
+        )
+
+        orientations_mask = (
+            (formation_orientations['X'] - x_min > boundary_tolerance) &
+            (x_max - formation_orientations['X'] > boundary_tolerance) &
+            (formation_orientations['Y'] - y_min > boundary_tolerance) &
+            (y_max - formation_orientations['Y'] > boundary_tolerance)
+        )
+
+        # Keep only interior points and orientations
+        formation_points_clean = formation_points[points_mask]
+        formation_orientations_clean = formation_orientations[orientations_mask]
+
+        cleaned_points.append(formation_points_clean)
+        cleaned_orientations.append(formation_orientations_clean)
+
+    result_orientations = pd.concat(cleaned_orientations, ignore_index=True) if cleaned_orientations else pd.DataFrame()
+    result_points = pd.concat(cleaned_points, ignore_index=True) if cleaned_points else pd.DataFrame()
+
+    return result_orientations, result_points
