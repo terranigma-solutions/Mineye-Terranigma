@@ -3,7 +3,44 @@ import gempy_viewer as gpv
 import numpy as np
 import rasterio
 from skimage.transform import resize
-#import liquid_earth_sdk.api.le_api as le_api
+from sklearn.cluster import KMeans
+
+def simplify_formation_data(orientations, points, formation_id, simp_level):
+    if simp_level == 0:
+        return orientations, points
+
+    orient_data = orientations[orientations['formation_id'] == formation_id]
+    points_data = points[points['formation_id'] == formation_id]
+
+    # Determine number of points to keep based on simplification level
+    n_orient_keep = max(1, int(len(orient_data) * (1 - simp_level)))
+    n_points_keep = max(3, int(len(points_data) * (1 - simp_level)))
+
+    # Use KMeans to select representative orientations
+    if len(orient_data) > n_orient_keep:
+        coords = orient_data[['X', 'Y']].values
+        kmeans = KMeans(n_clusters=n_orient_keep, random_state=42)
+        clusters = kmeans.fit_predict(coords)
+        orient_indices = []
+        for i in range(n_orient_keep):
+            cluster_points = orient_data.iloc[clusters == i]
+            centroid_idx = cluster_points.index[0]  # Take first point in cluster
+            orient_indices.append(centroid_idx)
+        orient_data = orient_data.loc[orient_indices]
+
+    # Select boundary points for contact points (keep convex hull-like points)
+    if len(points_data) > n_points_keep:
+        coords = points_data[['X', 'Y']].values
+        center = coords.mean(axis=0)
+        # Calculate angles from center to select points around perimeter
+        angles = np.arctan2(coords[:, 1] - center[1], coords[:, 0] - center[0])
+        sorted_indices = np.argsort(angles)
+        # Select evenly spaced points around the perimeter
+        step = len(sorted_indices) // n_points_keep
+        selected_indices = sorted_indices[::step][:n_points_keep]
+        points_data = points_data.iloc[selected_indices]
+
+    return orient_data, points_data
 
 def clean_topo_file(input_path: str, output_path: str, invalid_below: float = -100):
     # Load, clean, and save cleaned topography TIFF
