@@ -6,6 +6,92 @@ from skimage.transform import resize
 from sklearn.cluster import KMeans
 import pandas as pd
 
+# Generate orientations on the fly - we'll create these from the contact points
+def generate_orientations_from_points(points_df, default_dip=45, default_azimuth=90):
+    """Generate orientation points from contact points with proper dip direction (normal to boundary)"""
+    orientations_data = []
+
+    # Calculate global centroid as the center of the plutonite body
+    global_centroid_x = points_df['X'].mean()
+    global_centroid_y = points_df['Y'].mean()
+
+    # Use a subset of contact points as orientation locations
+    sample_indices = np.arange(0, len(points_df), max(1, len(points_df) // 10))  # Take every nth point
+
+    for idx in sample_indices:
+        current_point = points_df.iloc[idx]
+        current_x, current_y = current_point['X'], current_point['Y']
+
+        # Find nearby points to calculate local tangent direction
+        distances = np.sqrt((points_df['X'] - current_x)**2 + (points_df['Y'] - current_y)**2)
+        nearby_radius = 1500
+        nearby_mask = (distances <= nearby_radius) & (distances > 0)
+        nearby_points = points_df[nearby_mask]
+
+        if len(nearby_points) >= 2:
+            # Get the two closest points to define the local line direction
+            nearby_distances = distances[nearby_mask].values
+            sorted_indices = np.argsort(nearby_distances)
+            closest_points = nearby_points.iloc[sorted_indices[:2]]
+
+            if len(closest_points) >= 2:
+                # Calculate strike direction as the line connecting the two closest points
+                p1 = closest_points.iloc[0]
+                p2 = closest_points.iloc[1]
+
+                # Strike vector (along the boundary line)
+                strike_x = p2['X'] - p1['X']
+                strike_y = p2['Y'] - p1['Y']
+
+                # Normalize strike vector
+                strike_length = np.sqrt(strike_x**2 + strike_y**2)
+                if strike_length > 0:
+                    strike_x /= strike_length
+                    strike_y /= strike_length
+
+                # Dip direction is perpendicular to strike (rotate 90 degrees)
+                dip_x = -strike_y  # Rotate strike by 90 degrees clockwise
+                dip_y = strike_x
+
+                # Check which direction points toward interior (global centroid)
+                to_centroid_x = global_centroid_x - current_x
+                to_centroid_y = global_centroid_y - current_y
+
+                # Use dot product to determine if we need to flip the dip direction
+                dot_product = dip_x * to_centroid_x + dip_y * to_centroid_y
+                if dot_product < 0:
+                    # Flip to point inward
+                    dip_x = -dip_x
+                    dip_y = -dip_y
+            else:
+                # Fallback if we don't have enough points
+                dip_x = global_centroid_x - current_x
+                dip_y = global_centroid_y - current_y
+        else:
+            # Fallback: point toward global centroid
+            dip_x = global_centroid_x - current_x
+            dip_y = global_centroid_y - current_y
+
+        # Calculate dip azimuth (direction perpendicular to boundary, pointing inward)
+        dip_azimuth = np.degrees(np.arctan2(dip_x, dip_y))
+
+        # Ensure azimuth is between 0 and 360 degrees
+        if dip_azimuth < 0:
+            dip_azimuth += 360
+
+        orientations_data.append({
+            'X': current_x,
+            'Y': current_y,
+            'Z': current_point['Z'],
+            'azimuth': dip_azimuth,  # Dip direction (perpendicular to boundary, inward)
+            'dip': default_dip,
+            'polarity': 1,
+            'formation': current_point['formation'],
+            'formation_id': current_point['formation_id']
+        })
+
+    return pd.DataFrame(orientations_data)
+
 def simplify_formation_data(orientations, points, formation_id, simp_level):
     if simp_level == 0:
         return orientations, points
