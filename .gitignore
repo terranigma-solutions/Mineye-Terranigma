@@ -260,3 +260,6 @@ http-client.private.env.json
 
 # GIS auxiliary files
 *.xml
+
+
+Data/Output_Data/Simple-Models/temp_inputs/
