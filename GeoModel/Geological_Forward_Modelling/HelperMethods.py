@@ -156,16 +156,6 @@ def reduce_tif_resolution(input_path, output_path, scale_factor):
         with rasterio.open(output_path_sf, "w", **profile) as dst:
             dst.write(data_resampled, 1)
 
-
-def push_model_to_local_server(gempy_model, le_api):
-    unstructured_data = gempy_model.raw_arrays.meshes_to_subsurface()
-    le_api.upload_mesh_to_new_space(
-        space_name="[TEMP] Test python api",
-        data=unstructured_data,
-        file_name="ROI1",
-        token=os.environ.get("APIKEY")
-    )
-
 def create_cross_section(geo_model, cross_section: int):
     i = 0
     while i < cross_section:
@@ -200,19 +190,6 @@ def drop_lithologies(points_df, orientations_df, lithologies_to_drop):
 def plot_3d_async(geo_model):
     gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=10, legend=False, show_data=True,
                 show_topography=True, transformed_data=False)
-
-def color_lithology(structural_elements):
-        for element in structural_elements:
-            if element.name == "Mid Carboniferous Shales":
-                element.color = "#b2d9b2"  # light green
-            elif element.name == "Upper Carboniferous Volcanics":
-                element.color = "#ff8000"  # orange
-            elif element.name == "Visean Shales":
-                element.color = "#b200b2"  # purple
-            elif element.name == "Tournaisian Plutonites":
-                element.color = "#e37ecd"  # pink
-            elif element.name == "Upper Devonian Siliciclastics":
-                element.color = "#d9b280"  # light brown
 
 def remove_boundary_artifacts(points_df, orientations_df, boundary_tolerance=500):
     """Remove points and orientations that are near mapping boundaries"""
