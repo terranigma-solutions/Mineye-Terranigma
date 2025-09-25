@@ -14,11 +14,14 @@ data_dir = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'Data', 'Input_Dat
 geomodel_dir = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'Data', 'Output_Data'))
 forward_model_folder = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'GeoModel', 'Geological_Forward_Modelling'))
 
+# Move temp_inputs under the Simple-Models output directory
+tmp_dir = os.path.join(geomodel_dir, 'Simple-Models', 'temp_inputs')
+os.makedirs(tmp_dir, exist_ok=True)
+
 gis_map_info = os.path.join(data_dir, 'Stratigraphic_Data', 'QGIS', 'plutonite_outline.gpkg')
 points_df = pd.read_csv(os.path.join(geomodel_dir, 'Simple-Models', 'contact_points.csv'))
 topography_path = os.path.join(data_dir, 'Topographic_Data', 'topo_reduced_sf0.1.tif')
 
-tmp_dir = os.path.join(forward_model_folder, "temp_inputs")
 pickle_model_path = os.path.join(tmp_dir, 'simple_geo_model.pkl')
 mod_or_path = os.path.join(tmp_dir, 'orientations_mod.csv')
 mod_pts_path = os.path.join(tmp_dir, 'points_mod.csv')
@@ -27,8 +30,8 @@ trigger_map_with_data_plot = False
 trigger_geological_map_plot = False
 trigger_create_cross_section = False
 trigger_2d_plot = False
-trigger_3d_plot = False
-save_pickled_model = True
+trigger_3d_plot = True
+save_pickled_model = False
 
 trigger_recreate_data = False
 
