@@ -689,159 +689,159 @@ Percentiles:
     print(f"{'='*60}")
 
 
-def create_example_model():
-    """Create a simple example for testing the magnetic forward modeling."""
+# def create_example_model():
+#     """Create a simple example for testing the magnetic forward modeling."""
     
-    print("Creating example 3D susceptibility model...")
+#     print("Creating example 3D susceptibility model...")
     
-    # Create a simple 3D grid (10x10x10 voxels)
-    nx, ny, nz = 20, 20, 15
+#     # Create a simple 3D grid (10x10x10 voxels)
+#     nx, ny, nz = 20, 20, 15
     
-    # Model extent
-    x_min, x_max = -1000, 1000
-    y_min, y_max = -1000, 1000
-    z_min, z_max = -750, 250
+#     # Model extent
+#     x_min, x_max = -1000, 1000
+#     y_min, y_max = -1000, 1000
+#     z_min, z_max = -750, 250
     
-    # Create voxel centers
-    x = np.linspace(x_min, x_max, nx)
-    y = np.linspace(y_min, y_max, ny)
-    z = np.linspace(z_min, z_max, nz)
+#     # Create voxel centers
+#     x = np.linspace(x_min, x_max, nx)
+#     y = np.linspace(y_min, y_max, ny)
+#     z = np.linspace(z_min, z_max, nz)
     
-    X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
-    voxel_centers = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
+#     X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+#     voxel_centers = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
     
-    # Voxel sizes
-    dx = (x_max - x_min) / nx
-    dy = (y_max - y_min) / ny
-    dz = (z_max - z_min) / nz
-    voxel_sizes = np.array([dx, dy, dz])
+#     # Voxel sizes
+#     dx = (x_max - x_min) / nx
+#     dy = (y_max - y_min) / ny
+#     dz = (z_max - z_min) / nz
+#     voxel_sizes = np.array([dx, dy, dz])
     
-    # Create susceptibility model (higher susceptibility in center)
-    susceptibility_3d = np.zeros((nx, ny, nz))
+#     # Create susceptibility model (higher susceptibility in center)
+#     susceptibility_3d = np.zeros((nx, ny, nz))
     
-    # Add a high-susceptibility body in the center
-    center_x, center_y, center_z = nx//2, ny//2, nz//2
-    size = 5
-    susceptibility_3d[center_x-size:center_x+size, 
-                     center_y-size:center_y+size, 
-                     center_z-size:center_z+size] = 0.1  # High susceptibility
+#     # Add a high-susceptibility body in the center
+#     center_x, center_y, center_z = nx//2, ny//2, nz//2
+#     size = 5
+#     susceptibility_3d[center_x-size:center_x+size, 
+#                      center_y-size:center_y+size, 
+#                      center_z-size:center_z+size] = 0.1  # High susceptibility
     
-    # Background susceptibility
-    susceptibility_3d[susceptibility_3d == 0] = 0.001  # Low background
+#     # Background susceptibility
+#     susceptibility_3d[susceptibility_3d == 0] = 0.001  # Low background
     
-    # Create measurement points (survey grid at surface)
-    survey_x = np.linspace(x_min + 200, x_max - 200, 15)
-    survey_y = np.linspace(y_min + 200, y_max - 200, 15)
-    survey_z = z_max + 100  # 100m above surface
+#     # Create measurement points (survey grid at surface)
+#     survey_x = np.linspace(x_min + 200, x_max - 200, 15)
+#     survey_y = np.linspace(y_min + 200, y_max - 200, 15)
+#     survey_z = z_max + 100  # 100m above surface
     
-    SX, SY = np.meshgrid(survey_x, survey_y)
-    measurement_points = np.column_stack([SX.ravel(), SY.ravel(), 
-                                        np.full(SX.size, survey_z)])
+#     SX, SY = np.meshgrid(survey_x, survey_y)
+#     measurement_points = np.column_stack([SX.ravel(), SY.ravel(), 
+#                                         np.full(SX.size, survey_z)])
     
-    return susceptibility_3d, voxel_centers, voxel_sizes, measurement_points
+#     return susceptibility_3d, voxel_centers, voxel_sizes, measurement_points
 
 
-def main():
-    """Main function demonstrating the magnetic forward modeling workflow."""
+# def main():
+#     """Main function demonstrating the magnetic forward modeling workflow."""
     
-    print("=" * 60)
-    print("NumPy-based Magnetic Forward Modeling")
-    print("=" * 60)
+#     print("=" * 60)
+#     print("NumPy-based Magnetic Forward Modeling")
+#     print("=" * 60)
     
-    # Create example model
-    susceptibility_3d, voxel_centers, voxel_sizes, measurement_points = create_example_model()
+#     # Create example model
+#     susceptibility_3d, voxel_centers, voxel_sizes, measurement_points = create_example_model()
     
-    # Save example susceptibility model
-    susceptibility_file = "example_susceptibility_model.npy"
-    np.save(susceptibility_file, susceptibility_3d)
-    print(f"Example susceptibility model saved to {susceptibility_file}")
+#     # Save example susceptibility model
+#     susceptibility_file = "example_susceptibility_model.npy"
+#     np.save(susceptibility_file, susceptibility_3d)
+#     print(f"Example susceptibility model saved to {susceptibility_file}")
     
-    # Test both with and without distance cutoff
-    cutoff_distances = [None, 5000.0]  # None = all voxels, 5000m = 5km cutoff
+#     # Test both with and without distance cutoff
+#     cutoff_distances = [None, 5000.0]  # None = all voxels, 5000m = 5km cutoff
     
-    for cutoff in cutoff_distances:
-        print(f"\n" + "=" * 50)
-        if cutoff is None:
-            print("TESTING: All voxels (no distance cutoff)")
-        else:
-            print(f"TESTING: Distance cutoff = {cutoff/1000:.1f} km")
-        print("=" * 50)
+#     for cutoff in cutoff_distances:
+#         print(f"\n" + "=" * 50)
+#         if cutoff is None:
+#             print("TESTING: All voxels (no distance cutoff)")
+#         else:
+#             print(f"TESTING: Distance cutoff = {cutoff/1000:.1f} km")
+#         print("=" * 50)
         
-        # Initialize magnetic forward modeling engine
-        mag_engine = NumpyMagneticsForwardModeling(dtype='float64', cutoff_distance=cutoff)
+#         # Initialize magnetic forward modeling engine
+#         mag_engine = NumpyMagneticsForwardModeling(dtype='float64', cutoff_distance=cutoff)
         
-        # Set magnetic field parameters (example for mid-latitudes)
-        mag_engine.set_magnetic_parameters(
-            B_ext=50e-6,  # 50 µT
-            incl=60.0,    # 60° inclination
-            decl=1.0      # 1° declination
-        )
+#         # Set magnetic field parameters (example for mid-latitudes)
+#         mag_engine.set_magnetic_parameters(
+#             B_ext=50e-6,  # 50 µT
+#             incl=60.0,    # 60° inclination
+#             decl=1.0      # 1° declination
+#         )
         
-        # Process the model
-        try:
-            output_suffix = "_no_cutoff" if cutoff is None else f"_{int(cutoff/1000)}km_cutoff"
-            output_file = f"magnetic_anomaly_results{output_suffix}.npy"
+#         # Process the model
+#         try:
+#             output_suffix = "_no_cutoff" if cutoff is None else f"_{int(cutoff/1000)}km_cutoff"
+#             output_file = f"magnetic_anomaly_results{output_suffix}.npy"
             
-            start_time = time.time()
-            magnetic_anomaly = mag_engine.load_and_process_model(
-                susceptibility_file=susceptibility_file,
-                voxel_centers=voxel_centers,
-                voxel_sizes=voxel_sizes,
-                measurement_points=measurement_points,
-                output_file=output_file
-            )
-            total_time = time.time() - start_time
+#             start_time = time.time()
+#             magnetic_anomaly = mag_engine.load_and_process_model(
+#                 susceptibility_file=susceptibility_file,
+#                 voxel_centers=voxel_centers,
+#                 voxel_sizes=voxel_sizes,
+#                 measurement_points=measurement_points,
+#                 output_file=output_file
+#             )
+#             total_time = time.time() - start_time
             
-            # Display results
-            print(f"\nRESULTS SUMMARY:")
-            print(f"Number of measurement points: {len(magnetic_anomaly)}")
-            print(f"Magnetic anomaly range: {np.min(magnetic_anomaly):.2f} to {np.max(magnetic_anomaly):.2f} nT")
-            print(f"Mean anomaly: {np.mean(magnetic_anomaly):.2f} nT")
-            print(f"Standard deviation: {np.std(magnetic_anomaly):.2f} nT")
-            print(f"Total computation time: {total_time:.2f} seconds")
+#             # Display results
+#             print(f"\nRESULTS SUMMARY:")
+#             print(f"Number of measurement points: {len(magnetic_anomaly)}")
+#             print(f"Magnetic anomaly range: {np.min(magnetic_anomaly):.2f} to {np.max(magnetic_anomaly):.2f} nT")
+#             print(f"Mean anomaly: {np.mean(magnetic_anomaly):.2f} nT")
+#             print(f"Standard deviation: {np.std(magnetic_anomaly):.2f} nT")
+#             print(f"Total computation time: {total_time:.2f} seconds")
             
-            # Visualize results
-            cutoff_label = "no_cutoff" if cutoff is None else f"{int(cutoff/1000)}km_cutoff"
-            figure_title = f"Magnetic Forward Modeling Results ({cutoff_label})"
-            save_filename = f"magnetic_results_{cutoff_label}.png"
+#             # Visualize results
+#             cutoff_label = "no_cutoff" if cutoff is None else f"{int(cutoff/1000)}km_cutoff"
+#             figure_title = f"Magnetic Forward Modeling Results ({cutoff_label})"
+#             save_filename = f"magnetic_results_{cutoff_label}.png"
             
-            visualize_magnetic_results(
-                magnetic_anomaly=magnetic_anomaly,
-                measurement_points=measurement_points,
-                title=figure_title,
-                save_figure=save_filename
-            )
+#             visualize_magnetic_results(
+#                 magnetic_anomaly=magnetic_anomaly,
+#                 measurement_points=measurement_points,
+#                 title=figure_title,
+#                 save_figure=save_filename
+#             )
             
-            if cutoff is None:
-                baseline_time = total_time
-                baseline_anomaly = magnetic_anomaly.copy()
-            else:
-                speedup = baseline_time / total_time if total_time > 0 else float('inf')
-                max_diff = np.max(np.abs(magnetic_anomaly - baseline_anomaly))
-                rms_diff = np.sqrt(np.mean((magnetic_anomaly - baseline_anomaly)**2))
+#             if cutoff is None:
+#                 baseline_time = total_time
+#                 baseline_anomaly = magnetic_anomaly.copy()
+#             else:
+#                 speedup = baseline_time / total_time if total_time > 0 else float('inf')
+#                 max_diff = np.max(np.abs(magnetic_anomaly - baseline_anomaly))
+#                 rms_diff = np.sqrt(np.mean((magnetic_anomaly - baseline_anomaly)**2))
                 
-                print(f"Speedup factor: {speedup:.1f}x")
-                print(f"Max difference from baseline: {max_diff:.2f} nT")
-                print(f"RMS difference from baseline: {rms_diff:.2f} nT")
-                print(f"Relative RMS error: {100*rms_diff/np.std(baseline_anomaly):.2f}%")
+#                 print(f"Speedup factor: {speedup:.1f}x")
+#                 print(f"Max difference from baseline: {max_diff:.2f} nT")
+#                 print(f"RMS difference from baseline: {rms_diff:.2f} nT")
+#                 print(f"Relative RMS error: {100*rms_diff/np.std(baseline_anomaly):.2f}%")
             
-        except Exception as e:
-            print(f"Error during processing: {e}")
-            continue
+#         except Exception as e:
+#             print(f"Error during processing: {e}")
+#             continue
     
-    print(f"\n" + "=" * 60)
-    print("SUMMARY:")
-    print("✅ Magnetic forward modeling completed successfully!")
-    print("📊 Both full computation and distance cutoff methods tested")
-    print("🚀 Distance cutoff provides significant speedup with minimal accuracy loss")
-    print("=" * 60)
+#     print(f"\n" + "=" * 60)
+#     print("SUMMARY:")
+#     print("✅ Magnetic forward modeling completed successfully!")
+#     print("📊 Both full computation and distance cutoff methods tested")
+#     print("🚀 Distance cutoff provides significant speedup with minimal accuracy loss")
+#     print("=" * 60)
     
-    return True
+#     return True
 
 
-if __name__ == "__main__":
-    success = main()
-    if success:
-        print("\n✅ Script completed successfully!")
-    else:
-        print("\n❌ Script failed!")
+# if __name__ == "__main__":
+#     success = main()
+#     if success:
+#         print("\n✅ Script completed successfully!")
+#     else:
+#         print("\n❌ Script failed!")
