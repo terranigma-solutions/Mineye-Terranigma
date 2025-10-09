@@ -23,6 +23,15 @@ def plutonic_perturbations(level_of_sampling_points, level_of_sampling_orientati
     - level_of_sampling_points: List or array of sampling levels for contact points (e.g., [0.9, 0.8, 0.7])
     - level_of_sampling_orientations: List or array of sampling levels for orientation points (e.g., [0.9, 0.8, 0.7])
     - section_dict: Dictionary defining cross sections with their start and end coordinates and resolution
+    - plutonite_orientations_df_path: Path to the CSV file containing the original orientation points
+    - plutonite_points_df_path: Path to the CSV file containing the original contact points
+    - topography_path: Path to the topography file
+    - main_results_folder: Path to the main folder where results will be stored
+    - dip_angle_mean: Dictionary with mean dip angles for different plutonites
+    - dip_angle_std: Dictionary with standard deviations for dip angles for different randomness levels
+    - dip_angle_bounds: Dictionary with lower and upper bounds for dip angles
+    - extent: Tuple defining the model extent (xmin, xmax, ymin, ymax, zmin, zmax)
+    - resolution: Tuple defining the model resolution (nx, ny, nz)
     Returns:
     - None (saves the images and stores the geological models in organized folders)
     """
