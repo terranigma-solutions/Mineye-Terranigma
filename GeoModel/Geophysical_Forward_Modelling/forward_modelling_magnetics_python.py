@@ -456,7 +456,7 @@ class NumpyMagneticsForwardModeling:
 def visualize_magnetic_results(magnetic_anomaly: np.ndarray, 
                               measurement_points: np.ndarray,
                               title: str = "Magnetic Anomaly Results",
-                              save_figure: Optional[str] = None) -> None:
+                              ) -> None:
     """
     Visualize magnetic anomaly results in a comprehensive single figure.
     
@@ -464,7 +464,6 @@ def visualize_magnetic_results(magnetic_anomaly: np.ndarray,
         magnetic_anomaly: Computed magnetic anomaly values [n_measurements]
         measurement_points: Measurement locations [n_measurements, 3]
         title: Title for the figure
-        save_figure: Optional filename to save the figure
     """
     # Extract coordinates
     x_coords = measurement_points[:, 0]
@@ -496,7 +495,7 @@ def visualize_magnetic_results(magnetic_anomaly: np.ndarray,
             
             # Create 4-panel layout
             # Panel 1: Magnetic anomaly map
-            ax1 = plt.subplot(2, 3, 1)
+            ax1 = plt.subplot(2, 2, 1)
             extent = (np.min(x_coords)/1000, np.max(x_coords)/1000,
                      np.min(y_coords)/1000, np.max(y_coords)/1000)
             im1 = ax1.imshow(anomaly_2d, extent=extent,
@@ -509,7 +508,7 @@ def visualize_magnetic_results(magnetic_anomaly: np.ndarray,
             ax1.set_aspect('equal')
             
             # Panel 2: Contour plot
-            ax2 = plt.subplot(2, 3, 2)
+            ax2 = plt.subplot(2, 2, 2)
             contour = ax2.contourf(X_grid/1000, Y_grid/1000, anomaly_2d, levels=15, cmap='RdYlBu_r')
             contour_lines = ax2.contour(X_grid/1000, Y_grid/1000, anomaly_2d, levels=8, 
                                       colors='black', alpha=0.5, linewidths=0.5)
@@ -523,26 +522,6 @@ def visualize_magnetic_results(magnetic_anomaly: np.ndarray,
             ax2.set_title('Contour Map with Measurement Points')
             ax2.set_aspect('equal')
             
-            # Panel 3: Cross-section profiles
-            ax3 = plt.subplot(2, 3, 3)
-            mid_row = grid_y // 2
-            mid_col = grid_x // 2
-            
-            # E-W profile (constant Y)
-            ax3.plot(X_mesh/1000, anomaly_2d[mid_row, :], 'b-', linewidth=2, marker='o',
-                    markersize=4, label=f'E-W Profile (Y={Y_mesh[mid_row]/1000:.1f} km)')
-            
-            # N-S profile (constant X)
-            ax3.plot(Y_mesh/1000, anomaly_2d[:, mid_col], 'r-', linewidth=2, marker='s',
-                    markersize=4, label=f'N-S Profile (X={X_mesh[mid_col]/1000:.1f} km)')
-            
-            ax3.axhline(0, color='gray', linestyle='--', alpha=0.5)
-            ax3.set_xlabel('Distance (km)')
-            ax3.set_ylabel('Magnetic Anomaly (nT)')
-            ax3.set_title('Cross-Section Profiles')
-            ax3.grid(True, alpha=0.3)
-            ax3.legend(fontsize=9)
-            
         except ValueError:
             # Fallback if reshape fails
             is_regular_grid = False
@@ -550,7 +529,7 @@ def visualize_magnetic_results(magnetic_anomaly: np.ndarray,
     if not is_regular_grid:
         # Irregular grid or fallback - create scatter plots
         # Panel 1: Scatter plot of anomaly values
-        ax1 = plt.subplot(2, 3, 1)
+        ax1 = plt.subplot(2, 2, 1)
         scatter = ax1.scatter(x_coords/1000, y_coords/1000, c=magnetic_anomaly, 
                             cmap='RdYlBu_r', s=50, edgecolors='black', linewidths=0.5)
         cbar1 = plt.colorbar(scatter, ax=ax1, shrink=0.8)
@@ -562,7 +541,7 @@ def visualize_magnetic_results(magnetic_anomaly: np.ndarray,
         
         # Panel 2: 3D scatter plot
         try:
-            ax2 = plt.subplot(2, 3, 2, projection='3d')
+            ax2 = plt.subplot(2, 2, 2, projection='3d')
             scatter3d = ax2.scatter(x_coords/1000, y_coords/1000, magnetic_anomaly,
                                   c=magnetic_anomaly, cmap='RdYlBu_r')
             ax2.set_xlabel('X (km)')
@@ -571,7 +550,7 @@ def visualize_magnetic_results(magnetic_anomaly: np.ndarray,
             ax2.set_title('3D Anomaly Distribution')
         except Exception:
             # Fallback to 2D if 3D plotting fails
-            ax2 = plt.subplot(2, 3, 2)
+            ax2 = plt.subplot(2, 2, 2)
             scatter2d = ax2.scatter(x_coords/1000, y_coords/1000, c=magnetic_anomaly, 
                                   cmap='RdYlBu_r', s=30, edgecolors='black', linewidths=0.5)
             ax2.set_xlabel('X (km)')
@@ -579,18 +558,9 @@ def visualize_magnetic_results(magnetic_anomaly: np.ndarray,
             ax2.set_title('2D Anomaly Distribution')
             plt.colorbar(scatter2d, ax=ax2, shrink=0.8)
         
-        # Panel 3: Line plot if points can be sorted
-        ax3 = plt.subplot(2, 3, 3)
-        sorted_indices = np.argsort(np.sqrt(x_coords**2 + y_coords**2))
-        distances = np.sqrt(x_coords**2 + y_coords**2)[sorted_indices] / 1000
-        ax3.plot(distances, magnetic_anomaly[sorted_indices], 'b-', linewidth=2, marker='o', markersize=4)
-        ax3.set_xlabel('Distance from Origin (km)')
-        ax3.set_ylabel('Magnetic Anomaly (nT)')
-        ax3.set_title('Radial Profile')
-        ax3.grid(True, alpha=0.3)
     
     # Panel 4: Histogram (always included)
-    ax4 = plt.subplot(2, 3, 4)
+    ax4 = plt.subplot(2, 2, 4)
     n_bins = min(20, len(magnetic_anomaly) // 3)
     ax4.hist(magnetic_anomaly, bins=n_bins, alpha=0.7, color='skyblue', 
             edgecolor='black', linewidth=0.5)
@@ -609,239 +579,7 @@ def visualize_magnetic_results(magnetic_anomaly: np.ndarray,
                label=f'±1σ: {std_val:.1f} nT')
     ax4.legend(fontsize=9)
     
-    # Panel 5: Statistical summary
-    ax5 = plt.subplot(2, 3, 5)
-    ax5.axis('off')
-    
-    # Calculate statistics
-    stats_text = f"""
-STATISTICAL SUMMARY
-
-Number of points: {len(magnetic_anomaly)}
-Survey elevation: {np.mean(z_coords):.0f} m
-
-Magnetic Anomaly Statistics:
-  Minimum: {np.min(magnetic_anomaly):.2f} nT
-  Maximum: {np.max(magnetic_anomaly):.2f} nT
-  Mean: {mean_val:.2f} nT
-  Std Dev: {std_val:.2f} nT
-  Peak-to-peak: {np.max(magnetic_anomaly) - np.min(magnetic_anomaly):.2f} nT
-  
-Survey Area:
-  X extent: {(np.max(x_coords) - np.min(x_coords))/1000:.1f} km
-  Y extent: {(np.max(y_coords) - np.min(y_coords))/1000:.1f} km
-  
-Percentiles:
-  P10: {np.percentile(magnetic_anomaly, 10):.2f} nT
-  P25: {np.percentile(magnetic_anomaly, 25):.2f} nT
-  P50: {np.percentile(magnetic_anomaly, 50):.2f} nT
-  P75: {np.percentile(magnetic_anomaly, 75):.2f} nT
-  P90: {np.percentile(magnetic_anomaly, 90):.2f} nT
-    """
-    
-    ax5.text(0.05, 0.95, stats_text, transform=ax5.transAxes, fontsize=10,
-            verticalalignment='top', fontfamily='monospace',
-            bbox=dict(boxstyle='round,pad=0.5', facecolor='lightgray', alpha=0.8))
-    
-    # Panel 6: Survey geometry
-    ax6 = plt.subplot(2, 3, 6)
-    # Plot measurement points colored by elevation if varying
-    if len(np.unique(z_coords)) > 1:
-        scatter_geo = ax6.scatter(x_coords/1000, y_coords/1000, c=z_coords, 
-                                cmap='terrain', s=30, edgecolors='black', linewidths=0.3)
-        cbar_geo = plt.colorbar(scatter_geo, ax=ax6, shrink=0.8)
-        cbar_geo.set_label('Elevation (m)', fontsize=10)
-        ax6.set_title('Survey Geometry (Elevation)')
-    else:
-        ax6.scatter(x_coords/1000, y_coords/1000, c='red', s=30, 
-                   edgecolors='black', linewidths=0.3)
-        ax6.set_title(f'Survey Geometry (Elev: {z_coords[0]:.0f} m)')
-    
-    ax6.set_xlabel('X Coordinate (km)')
-    ax6.set_ylabel('Y Coordinate (km)')
-    ax6.set_aspect('equal')
-    ax6.grid(True, alpha=0.3)
-    
-    # Add measurement point numbers if not too many
-    if len(measurement_points) <= 50:
-        for i, (x, y) in enumerate(zip(x_coords/1000, y_coords/1000)):
-            ax6.annotate(str(i+1), (x, y), xytext=(2, 2), textcoords='offset points',
-                        fontsize=6, alpha=0.7)
-    
     plt.tight_layout()
     
-    # Save figure if requested
-    if save_figure:
-        plt.savefig(save_figure, dpi=300, bbox_inches='tight')
-        print(f"Figure saved to {save_figure}")
     
     plt.show()
-    
-    # Print summary
-    print(f"\n{'='*60}")
-    print("VISUALIZATION SUMMARY")
-    print(f"{'='*60}")
-    print(f"Figure type: {'Regular grid' if is_regular_grid else 'Irregular/scatter'}")
-    print(f"Measurement points: {len(magnetic_anomaly)}")
-    print(f"Anomaly range: {np.min(magnetic_anomaly):.2f} to {np.max(magnetic_anomaly):.2f} nT")
-    print(f"Survey area: {(np.max(x_coords) - np.min(x_coords))/1000:.1f} × {(np.max(y_coords) - np.min(y_coords))/1000:.1f} km")
-    print(f"✅ Comprehensive magnetic anomaly visualization complete!")
-    print(f"{'='*60}")
-
-
-# def create_example_model():
-#     """Create a simple example for testing the magnetic forward modeling."""
-    
-#     print("Creating example 3D susceptibility model...")
-    
-#     # Create a simple 3D grid (10x10x10 voxels)
-#     nx, ny, nz = 20, 20, 15
-    
-#     # Model extent
-#     x_min, x_max = -1000, 1000
-#     y_min, y_max = -1000, 1000
-#     z_min, z_max = -750, 250
-    
-#     # Create voxel centers
-#     x = np.linspace(x_min, x_max, nx)
-#     y = np.linspace(y_min, y_max, ny)
-#     z = np.linspace(z_min, z_max, nz)
-    
-#     X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
-#     voxel_centers = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
-    
-#     # Voxel sizes
-#     dx = (x_max - x_min) / nx
-#     dy = (y_max - y_min) / ny
-#     dz = (z_max - z_min) / nz
-#     voxel_sizes = np.array([dx, dy, dz])
-    
-#     # Create susceptibility model (higher susceptibility in center)
-#     susceptibility_3d = np.zeros((nx, ny, nz))
-    
-#     # Add a high-susceptibility body in the center
-#     center_x, center_y, center_z = nx//2, ny//2, nz//2
-#     size = 5
-#     susceptibility_3d[center_x-size:center_x+size, 
-#                      center_y-size:center_y+size, 
-#                      center_z-size:center_z+size] = 0.1  # High susceptibility
-    
-#     # Background susceptibility
-#     susceptibility_3d[susceptibility_3d == 0] = 0.001  # Low background
-    
-#     # Create measurement points (survey grid at surface)
-#     survey_x = np.linspace(x_min + 200, x_max - 200, 15)
-#     survey_y = np.linspace(y_min + 200, y_max - 200, 15)
-#     survey_z = z_max + 100  # 100m above surface
-    
-#     SX, SY = np.meshgrid(survey_x, survey_y)
-#     measurement_points = np.column_stack([SX.ravel(), SY.ravel(), 
-#                                         np.full(SX.size, survey_z)])
-    
-#     return susceptibility_3d, voxel_centers, voxel_sizes, measurement_points
-
-
-# def main():
-#     """Main function demonstrating the magnetic forward modeling workflow."""
-    
-#     print("=" * 60)
-#     print("NumPy-based Magnetic Forward Modeling")
-#     print("=" * 60)
-    
-#     # Create example model
-#     susceptibility_3d, voxel_centers, voxel_sizes, measurement_points = create_example_model()
-    
-#     # Save example susceptibility model
-#     susceptibility_file = "example_susceptibility_model.npy"
-#     np.save(susceptibility_file, susceptibility_3d)
-#     print(f"Example susceptibility model saved to {susceptibility_file}")
-    
-#     # Test both with and without distance cutoff
-#     cutoff_distances = [None, 5000.0]  # None = all voxels, 5000m = 5km cutoff
-    
-#     for cutoff in cutoff_distances:
-#         print(f"\n" + "=" * 50)
-#         if cutoff is None:
-#             print("TESTING: All voxels (no distance cutoff)")
-#         else:
-#             print(f"TESTING: Distance cutoff = {cutoff/1000:.1f} km")
-#         print("=" * 50)
-        
-#         # Initialize magnetic forward modeling engine
-#         mag_engine = NumpyMagneticsForwardModeling(dtype='float64', cutoff_distance=cutoff)
-        
-#         # Set magnetic field parameters (example for mid-latitudes)
-#         mag_engine.set_magnetic_parameters(
-#             B_ext=50e-6,  # 50 µT
-#             incl=60.0,    # 60° inclination
-#             decl=1.0      # 1° declination
-#         )
-        
-#         # Process the model
-#         try:
-#             output_suffix = "_no_cutoff" if cutoff is None else f"_{int(cutoff/1000)}km_cutoff"
-#             output_file = f"magnetic_anomaly_results{output_suffix}.npy"
-            
-#             start_time = time.time()
-#             magnetic_anomaly = mag_engine.load_and_process_model(
-#                 susceptibility_file=susceptibility_file,
-#                 voxel_centers=voxel_centers,
-#                 voxel_sizes=voxel_sizes,
-#                 measurement_points=measurement_points,
-#                 output_file=output_file
-#             )
-#             total_time = time.time() - start_time
-            
-#             # Display results
-#             print(f"\nRESULTS SUMMARY:")
-#             print(f"Number of measurement points: {len(magnetic_anomaly)}")
-#             print(f"Magnetic anomaly range: {np.min(magnetic_anomaly):.2f} to {np.max(magnetic_anomaly):.2f} nT")
-#             print(f"Mean anomaly: {np.mean(magnetic_anomaly):.2f} nT")
-#             print(f"Standard deviation: {np.std(magnetic_anomaly):.2f} nT")
-#             print(f"Total computation time: {total_time:.2f} seconds")
-            
-#             # Visualize results
-#             cutoff_label = "no_cutoff" if cutoff is None else f"{int(cutoff/1000)}km_cutoff"
-#             figure_title = f"Magnetic Forward Modeling Results ({cutoff_label})"
-#             save_filename = f"magnetic_results_{cutoff_label}.png"
-            
-#             visualize_magnetic_results(
-#                 magnetic_anomaly=magnetic_anomaly,
-#                 measurement_points=measurement_points,
-#                 title=figure_title,
-#                 save_figure=save_filename
-#             )
-            
-#             if cutoff is None:
-#                 baseline_time = total_time
-#                 baseline_anomaly = magnetic_anomaly.copy()
-#             else:
-#                 speedup = baseline_time / total_time if total_time > 0 else float('inf')
-#                 max_diff = np.max(np.abs(magnetic_anomaly - baseline_anomaly))
-#                 rms_diff = np.sqrt(np.mean((magnetic_anomaly - baseline_anomaly)**2))
-                
-#                 print(f"Speedup factor: {speedup:.1f}x")
-#                 print(f"Max difference from baseline: {max_diff:.2f} nT")
-#                 print(f"RMS difference from baseline: {rms_diff:.2f} nT")
-#                 print(f"Relative RMS error: {100*rms_diff/np.std(baseline_anomaly):.2f}%")
-            
-#         except Exception as e:
-#             print(f"Error during processing: {e}")
-#             continue
-    
-#     print(f"\n" + "=" * 60)
-#     print("SUMMARY:")
-#     print("✅ Magnetic forward modeling completed successfully!")
-#     print("📊 Both full computation and distance cutoff methods tested")
-#     print("🚀 Distance cutoff provides significant speedup with minimal accuracy loss")
-#     print("=" * 60)
-    
-#     return True
-
-
-# if __name__ == "__main__":
-#     success = main()
-#     if success:
-#         print("\n✅ Script completed successfully!")
-#     else:
-#         print("\n❌ Script failed!")
