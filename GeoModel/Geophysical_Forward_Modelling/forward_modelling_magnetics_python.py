@@ -1,10 +1,3 @@
-# Assignment:
-# Look at geophysics.py, interpolator.py, aesara_graph_pro.py. I want you to consider all the code that has to do with magnetic forward modelling.
-# This includes class MagneticsPreprocessing(CenteredGrid) from geophysics.py, def compute_forward_magnetics from aesara_graph_pro.py, class InterpolatorMagnetics from interpolator.py.
-# Create a script that uses numpy instead of aesara to compute the magnetic anomaly for a given 3D susceptibility model.
-# The script should load a 3D susceptibility model from a .npy file, compute the magnetic anomaly using numpy, and save the result to a new .npy file.
-# The script should be efficient and able to handle large 3D models.
-
 import numpy as np
 import time
 from typing import Tuple, Optional, Union
