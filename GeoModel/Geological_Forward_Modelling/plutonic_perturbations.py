@@ -6,8 +6,6 @@ import gempy as gp
 import gempy_viewer as gpv
 import matplotlib.pyplot as plt
 
-from GeoModel.Old_Scripts.gempyModel import BASE_DIR
-
 def plutonic_perturbations(level_of_sampling_points, level_of_sampling_orientations, 
                        section_dict,
                        plutonite_orientations_df_path, plutonite_points_df_path,
@@ -35,16 +33,12 @@ def plutonic_perturbations(level_of_sampling_points, level_of_sampling_orientati
     - dip_angle_bounds: Dictionary with lower and upper bounds for dip angles
     - extent: Tuple defining the model extent (xmin, xmax, ymin, ymax, zmin, zmax)
     - resolution: Tuple defining the model resolution (nx, ny, nz)
+    - forward_modelling: Boolean option to turn on or off the forward modelling step after creating a Gempy model.
     Returns:
     - None (saves the images and stores the geological models in organized folders)
     """
 
-    # parent_dir = os.path.abspath(os.path.join(BASE_DIR, '..'))
-    # if parent_dir not in sys.path:
-    #     sys.path.append(parent_dir)
-    
-    # from Geophysical_Forward_Modelling.forward_modelling_gravity import Forward_Modelling_Gravity
-    # from Geophysical_Forward_Modelling.forward_modelling_magnetics_python import NumpyMagneticsForwardModeling
+
 
 
     # Create subfolder structure for all combinations to store the results later
@@ -266,9 +260,6 @@ def plutonic_perturbations(level_of_sampling_points, level_of_sampling_orientati
 
 
 # DO FORWARD MODELLING AND CALCULATE MISFIT GEOPHYSICS AND CALCULATE MISFIT GEOLOGY
-                # from Geophysical_Forward_Modelling.forward_modelling_gravity import Forward_Modelling_Gravity
-                # from Geophysical_Forward_Modelling.forward_modelling_magnetics_python import NumpyMagneticsForwardModeling
-
 
 # SAVE THE MODEL
 
