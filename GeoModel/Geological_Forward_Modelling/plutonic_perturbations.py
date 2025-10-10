@@ -1,9 +1,12 @@
+import sys
 import pandas as pd
 import numpy as np
 import os
 import gempy as gp
 import gempy_viewer as gpv
 import matplotlib.pyplot as plt
+
+from GeoModel.Old_Scripts.gempyModel import BASE_DIR
 
 def plutonic_perturbations(level_of_sampling_points, level_of_sampling_orientations, 
                        section_dict,
@@ -35,6 +38,14 @@ def plutonic_perturbations(level_of_sampling_points, level_of_sampling_orientati
     Returns:
     - None (saves the images and stores the geological models in organized folders)
     """
+
+    # parent_dir = os.path.abspath(os.path.join(BASE_DIR, '..'))
+    # if parent_dir not in sys.path:
+    #     sys.path.append(parent_dir)
+    
+    # from Geophysical_Forward_Modelling.forward_modelling_gravity import Forward_Modelling_Gravity
+    # from Geophysical_Forward_Modelling.forward_modelling_magnetics_python import NumpyMagneticsForwardModeling
+
 
     # Create subfolder structure for all combinations to store the results later
     for sampling in level_of_sampling_points:
@@ -255,6 +266,9 @@ def plutonic_perturbations(level_of_sampling_points, level_of_sampling_orientati
 
 
 # DO FORWARD MODELLING AND CALCULATE MISFIT GEOPHYSICS AND CALCULATE MISFIT GEOLOGY
+                # from Geophysical_Forward_Modelling.forward_modelling_gravity import Forward_Modelling_Gravity
+                # from Geophysical_Forward_Modelling.forward_modelling_magnetics_python import NumpyMagneticsForwardModeling
+
 
 # SAVE THE MODEL
 
