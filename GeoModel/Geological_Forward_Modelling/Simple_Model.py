@@ -1,14 +1,11 @@
-from io import BufferedWriter
-
-import matplotlib.pyplot as plt
+import pickle
 import pandas as pd
 import numpy as np
 import os
-import pickle
 import HelperMethods
+import Plotter
 import gempy as gp
 import gempy_viewer as gpv
-import geopandas as gpd
 
 # ========== CONFIG ==========
 BASE_DIR = os.getcwd()
@@ -87,13 +84,11 @@ if trigger_recreate_data:
         11, 19
         # Example: 5, 12, 18  # Add orientations at these contact point IDs
     ]
-    manual_orientation_flip_azimuth = True  # Set to True to flip azimuth by 180° for manually added orientations
 
     # Add manual orientations if specified
     if manual_orientations_at_points:
         orientations_df = HelperMethods.add_manual_orientations_at_points(
-            orientations_df, points_df, manual_orientations_at_points, dip_values, manual_orientation_flip_azimuth
-        )
+            orientations_df, points_df, manual_orientations_at_points, dip_values)
 
     # Optional: specify adjustments by orientation id (leave dicts empty to skip)
     azimuth_flip_by_id = {
@@ -123,6 +118,7 @@ if trigger_recreate_data:
 # ========== SAVE TEMP FILES ==========
     orientations_df.to_csv(mod_or_path, index=False)
     points_df.to_csv(mod_pts_path, index=False)
+
 else:
     # Load modified (reduced) data instead of using original full points
     orientations_df = pd.read_csv(mod_or_path)
@@ -136,111 +132,10 @@ else:
 
 # ========== PLOT DATA ==========
 if trigger_map_with_data_plot:
-    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    Plotter.plot_initial_data_on_map()
 
-    # --- Add plutonite geological map as background (combined figure) ---
-    if os.path.exists(gis_map_info):
-        try:
-            plutonite_gdf = gpd.read_file(gis_map_info)
-            plutonite_color = (125/255, 159/255, 183/255)  # RGB(125,159,183)
-            plutonite_gdf.plot(
-                ax=ax,
-                facecolor=plutonite_color,
-                edgecolor='white',  # subtle outline for contrast
-                alpha=0.95,
-                linewidth=0.6,
-                zorder=0
-            )
-        except Exception as e:
-            print(f"Warning: Could not plot plutonite map: {e}")
 
-    if show_original_full_points:
-        ax.scatter(original_points['X'], original_points['Y'], c='gray', s=16, alpha=0.35, marker='x', label='Original Points')
-        original_orientations = HelperMethods.generate_orientations_from_points(original_points, default_dip=45, default_azimuth=90)
-        ax.scatter(original_orientations['X'], original_orientations['Y'], c='gray', s=20, alpha=0.25, label='Original Orientations')
-
-    # Plot ONLY the reduced/cleaned points (current working dataset)
-    ax.scatter(points_df['X'], points_df['Y'], c='darkred', s=42, alpha=0.9, marker='x', label='Reduced Contact Points', zorder=5)
-
-    # Orientation arrows from current orientations_df
-    arrow_length = 1000
-    azimuth_rad = np.deg2rad(orientations_df['azimuth'])
-    dx = np.sin(azimuth_rad) * arrow_length
-    dy = np.cos(azimuth_rad) * arrow_length
-    ax.quiver(orientations_df['X'], orientations_df['Y'], dx, dy,
-              angles='xy', scale_units='xy', scale=1, color='navy', width=0.0028, headwidth=3, headlength=4, zorder=6, label='Orientations')
-
-    # Orientation IDs
-    for _, row in orientations_df.iterrows():
-        ax.text(row['X'] - 300, row['Y'] + 300, f"ID:{int(row['id'])}",
-                color='red', fontsize=8, fontweight='bold',
-                bbox=dict(boxstyle="round,pad=0.22", facecolor='white', alpha=0.85, edgecolor='red'),
-                zorder=7)
-
-    # Dip labels (optional)
-    if show_dip_labels:
-        for _, row in orientations_df.iterrows():
-            azimuth_rad = np.deg2rad(row['azimuth'])
-            perpendicular_offset = 600
-            text_x = row['X'] + 0.5 * arrow_length * np.sin(azimuth_rad) - perpendicular_offset * np.cos(azimuth_rad)
-            text_y = row['Y'] + 0.5 * arrow_length * np.cos(azimuth_rad) + perpendicular_offset * np.sin(azimuth_rad)
-            ax.text(text_x, text_y, f"{row['dip']:.0f}°", color='navy', fontsize=9, ha='center', va='center', fontweight='bold', zorder=7,
-                    bbox=dict(boxstyle='round,pad=0.15', facecolor='white', alpha=0.65, edgecolor='navy'))
-
-    # Contact point IDs
-    for _, row in points_df.iterrows():
-        if 'id' in points_df.columns:
-            ax.text(row['X'] - 300, row['Y'] + 300, f"ID:{int(row['id'])}",
-                    color='darkred', fontsize=8, fontweight='bold',
-                    bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8, edgecolor='darkred'),
-                    zorder=7)
-
-    # === Beautify ===
-    # Build dynamic title including reduction level and point counts
-    try:
-        reduction_pct = simplification_level * 100
-        title_suffix = f"Reduction Level: {reduction_pct:.0f}% | Points: {len(points_df)}/{len(original_points)}"
-    except Exception:
-        title_suffix = f"Reduction Level: {simplification_level}"
-    ax.set_title(f'Reduced Geological Input Data (Contacts & Orientations) – {title_suffix}', fontsize=14, fontweight='bold', pad=12)
-    # Remove axis label names but keep ticks/gridlines
-    ax.set_xlabel('')
-    ax.set_ylabel('')
-
-    ax.set_aspect('equal')
-    ax.grid(False)
-
-    # Slim legend
-    leg = ax.legend(frameon=True, fontsize=9, loc='upper right')
-    if leg:
-        leg.get_frame().set_alpha(0.85)
-        leg.get_frame().set_facecolor('white')
-        leg.get_frame().set_edgecolor('#444444')
-
-    # Add scalebar (lower right)
-    if show_scalebar:
-        try:
-            xmin, xmax = ax.get_xlim(); ymin, ymax = ax.get_ylim()
-            sb_len = scalebar_length
-            # Place with 2% padding
-            x_pad = 0.02 * (xmax - xmin)
-            y_pad = 0.02 * (ymax - ymin)
-            x_start = xmax - sb_len - x_pad
-            x_end = xmax - x_pad
-            y_bar = ymin + y_pad + 0.01 * (ymax - ymin)
-            ax.plot([x_start, x_end], [y_bar, y_bar], color='k', linewidth=3, solid_capstyle='butt', zorder=10)
-            ax.plot([x_start, x_start], [y_bar - 0.004*(ymax-ymin), y_bar + 0.004*(ymax-ymin)], color='k', linewidth=2, zorder=10)
-            ax.plot([x_end, x_end], [y_bar - 0.004*(ymax-ymin), y_bar + 0.004*(ymax-ymin)], color='k', linewidth=2, zorder=10)
-            label_txt = f"{int(sb_len/1000)} km" if sb_len >= 1000 else f"{int(sb_len)} m"
-            ax.text((x_start + x_end)/2, y_bar + 0.012*(ymax-ymin), label_txt,
-                    ha='center', va='bottom', fontsize=9, fontweight='bold', color='k', zorder=11,
-                    bbox=dict(boxstyle='round,pad=0.15', facecolor='white', edgecolor='k', alpha=0.8))
-        except Exception as e:
-            print(f"Scalebar failed: {e}")
-
-    plt.tight_layout(); plt.show()
-
-# ========== BUILD GEMPY MODEL (==========
+# ========== BUILD GEMPY MODEL ==========
 simple_geo_model = gp.create_geomodel(
     project_name='simple_model',
     extent=extent,
@@ -278,7 +173,7 @@ if trigger_2d_plot:
     )
 
 if trigger_create_cross_section:
-    HelperMethods.create_cross_section(simple_geo_model, cross_section=5)
+    Plotter.create_cross_section(simple_geo_model, cross_section=5)
 
 if trigger_3d_plot:
     gpv.plot_3d(simple_geo_model, section_names=['topography'], show_topography=True, ve=12)

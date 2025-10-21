@@ -1,6 +1,5 @@
 import numpy as np
 import gempy as gp
-import gempy_viewer as gpv
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import os
@@ -24,7 +23,7 @@ density_sedimentary_host = 2.3  # kg/m³
 gravity_resolution = 20  # Number of gravity measurement points per axis
 
 # Measurement grid options
-use_actual_measurement_locations = False  # True: use gravity device locations, False: use regular grid
+use_actual_measurement_locations = True  # True: use gravity device locations, False: use regular grid
 
 # Normalization options
 normalize_data = True  # Enable/disable normalization
@@ -43,16 +42,6 @@ with open(pickle_model_path, 'rb') as f:
 # Load gravity data
 gravity_data = gpd.read_file(os.path.join(geophysical_dir, 'cleaned_gravity_data.geojson'))
 observed_gravity = gravity_data['VALU_BOU267'].values # in mGal
-
-# p = gpv.plot_2d(
-#     geo_model,
-#     section_names=['topography'],   # this triggers the top-down geological map
-#     show_topography=True,
-#     show_lith=True,
-#     show_boundaries=True,
-#     show_data=True,
-#     legend=False
-# )
 
 # ========== CREATE MEASUREMENT GRID ==========
 extent = geo_model.grid.regular_grid.extent
