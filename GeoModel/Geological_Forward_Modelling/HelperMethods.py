@@ -1,5 +1,4 @@
 import os
-import gempy_viewer as gpv
 import numpy as np
 import rasterio
 from skimage.transform import resize
@@ -156,35 +155,6 @@ def reduce_tif_resolution(input_path, output_path, scale_factor):
         with rasterio.open(output_path_sf, "w", **profile) as dst:
             dst.write(data_resampled, 1)
 
-def create_cross_section(geo_model, cross_section: int):
-    i = 0
-    while i < cross_section:
-        if i % 2 == 0:
-            gpv.plot_2d(geo_model, ve=6,
-                        cell_number=i,
-                        show_topography=True,
-                        legend=True,
-                        show_data=False,
-                        direction="y")
-        # Increment i to avoid infinite loop
-        i += 1
-
-    i = 0
-    while i < cross_section:
-        if i % 2 == 0:
-            gpv.plot_2d(geo_model, ve=6,
-                        cell_number=i,
-                        show_topography=True,
-                        legend=True,
-                        show_data=False,
-                        direction="x")
-        # Increment i to avoid infinite loop
-        i += 1
-
-def plot_3d_async(geo_model):
-    gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=10, legend=False, show_data=True,
-                show_topography=True, transformed_data=False)
-
 def remove_boundary_artifacts(points_df, orientations_df, boundary_tolerance=500):
     """Remove points and orientations that are near mapping boundaries"""
     cleaned_points = []
@@ -232,7 +202,7 @@ def remove_boundary_artifacts(points_df, orientations_df, boundary_tolerance=500
 
     return result_orientations, result_points
 
-def add_manual_orientations_at_points(orientations_df, points_df, point_ids_to_add, default_dip=45, flip_azimuth=False):
+def add_manual_orientations_at_points(orientations_df, points_df, point_ids_to_add, default_dip=45):
     """
     Add manual orientations at specific contact point IDs.
 
