@@ -61,6 +61,7 @@ resolution = [nx, ny, nz]
 
 # ========== DATA CLEANING ==========
 if trigger_recreate_data:
+    # TODO: This should be its own function with its own test
     # Generate orientations from contact points
     orientations_df = HelperMethods.generate_orientations_from_points(points_df, default_dip=dip_values, default_azimuth=azimuth_values, use_default_azimuth=False)
     orientations_df, points_df = HelperMethods.remove_boundary_artifacts(
