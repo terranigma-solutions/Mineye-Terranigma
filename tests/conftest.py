@@ -1,3 +1,6 @@
+import dotenv
+dotenv.load_dotenv()
+
 import os
 import pytest
 import gempy as gp
@@ -13,6 +16,19 @@ def base_dir():
 def geomodel_dir(base_dir):
     """Directory containing geomodel data."""
     return os.path.abspath(os.path.join(base_dir, 'examples', 'Data', 'Output_Data'))
+
+
+@pytest.fixture(scope="session")
+def data_dir(base_dir):
+    """Directory containing geomodel data."""
+    return os.path.abspath(os.path.join(base_dir, 'examples', 'Data', 'Input_Data'))
+
+
+# topography_path = os.path.join(data_dir, 'Topographic_Data', 'topo_reduced_sf0.1.tif')
+@pytest.fixture(scope="session")
+def topography_dir(data_dir):
+    """Directory containing topographic data."""
+    return os.path.join(data_dir, 'Topographic_Data')
 
 
 @pytest.fixture(scope="session")
