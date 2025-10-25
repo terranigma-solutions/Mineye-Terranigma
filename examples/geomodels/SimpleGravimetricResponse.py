@@ -7,10 +7,10 @@ import pickle
 
 # ========== CONFIG ==========
 BASE_DIR = os.getcwd()
-data_dir = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'Data', 'Input_Data'))
-geomodel_dir = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'Data', 'Output_Data'))
+data_dir = os.path.abspath(os.path.join(BASE_DIR, '..', 'Data', 'Input_Data'))
+geomodel_dir = os.path.abspath(os.path.join(BASE_DIR, '..', 'Data', 'Output_Data'))
 geophysical_dir = os.path.join(data_dir, 'Geophysical_Cleaned_Data')
-forward_model_folder = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'GeoModel', 'Geological_Forward_Modelling'))
+forward_model_folder = os.path.abspath(os.path.join(BASE_DIR, '..',  'GeoModel', 'Geological_Forward_Modelling'))
 
 temp_inputs_dir = os.path.join(geomodel_dir, 'Simple-Models', 'temp_inputs')
 pickle_model_path = os.path.join(temp_inputs_dir, 'simple_geo_model.pkl')

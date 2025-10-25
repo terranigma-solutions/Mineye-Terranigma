@@ -202,7 +202,8 @@ def remove_boundary_artifacts(points_df, orientations_df, boundary_tolerance=500
 
     return result_orientations, result_points
 
-def add_manual_orientations_at_points(orientations_df, points_df, point_ids_to_add, default_dip=45):
+def add_manual_orientations_at_points(orientations_df, points_df, 
+                                      point_ids_to_add, default_dip=45, flip_azimuth=True):
     """
     Add manual orientations at specific contact point IDs.
 

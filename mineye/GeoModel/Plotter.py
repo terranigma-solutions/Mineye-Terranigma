@@ -1,10 +1,11 @@
 import gempy_viewer as gpv
 import matplotlib.pyplot as plt
 import geopandas as gpd
-import HelperMethods
 import os
 import numpy as np
 import pandas as pd
+
+from mineye.GeoModel import HelperMethods
 
 
 def create_cross_section(geo_model, cross_section: int):
