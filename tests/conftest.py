@@ -38,6 +38,12 @@ def tmp_dir(geomodel_dir):
 
 
 @pytest.fixture(scope="session")
+def geophysical_dir(data_dir):
+    """Directory containing geophysical data."""
+    return os.path.join(data_dir, 'Geophysical_Cleaned_Data')
+
+
+@pytest.fixture(scope="session")
 def model_paths(tmp_dir):
     """Paths to orientation and points CSV files."""
     return {
