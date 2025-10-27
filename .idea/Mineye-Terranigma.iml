@@ -4,6 +4,8 @@
     <content url="file://$MODULE_DIR$" />
     <orderEntry type="jdk" jdkName="Python 3.13 (2025)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="gempy_engine" />
+    <orderEntry type="module" module-name="gempy" />
   </component>
   <component name="PackageRequirementsSettings">
     <option name="removeUnused" value="true" />

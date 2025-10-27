@@ -2,16 +2,16 @@ import pickle
 import pandas as pd
 import numpy as np
 import os
-import HelperMethods
-import Plotter
 import gempy as gp
 import gempy_viewer as gpv
 
+from mineye.GeoModel import HelperMethods, Plotter
+
 # ========== CONFIG ==========
 BASE_DIR = os.getcwd()
-data_dir = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'Data', 'Input_Data'))
-geomodel_dir = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'Data', 'Output_Data'))
-forward_model_folder = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'GeoModel', 'Geological_Forward_Modelling'))
+data_dir = os.path.abspath(os.path.join(BASE_DIR, '..', 'Data', 'Input_Data'))
+geomodel_dir = os.path.abspath(os.path.join(BASE_DIR, '..',  'Data', 'Output_Data'))
+forward_model_folder = os.path.abspath(os.path.join(BASE_DIR, '..',  'GeoModel', 'Geological_Forward_Modelling'))
 
 gis_map_info = os.path.join(data_dir, 'Stratigraphic_Data', 'QGIS', 'plutonite_outline.gpkg')
 points_df = pd.read_csv(os.path.join(geomodel_dir, 'Simple-Models', 'contact_points.csv'))
@@ -40,7 +40,7 @@ trigger_2d_plot = True
 trigger_3d_plot = False
 
 save_pickled_model = False
-trigger_recreate_data = False
+trigger_recreate_data = True
 
 min_x = -709521
 max_x = -675558
@@ -61,6 +61,7 @@ resolution = [nx, ny, nz]
 
 # ========== DATA CLEANING ==========
 if trigger_recreate_data:
+    # TODO: This should be its own function with its own test
     # Generate orientations from contact points
     orientations_df = HelperMethods.generate_orientations_from_points(points_df, default_dip=dip_values, default_azimuth=azimuth_values, use_default_azimuth=False)
     orientations_df, points_df = HelperMethods.remove_boundary_artifacts(
@@ -131,7 +132,7 @@ else:
         points_df['id'] = np.arange(len(points_df))
 
 # ========== PLOT DATA ==========
-if trigger_map_with_data_plot:
+if trigger_map_with_data_plot and False: # ! @Max this is broken
     Plotter.plot_initial_data_on_map()
 
 
