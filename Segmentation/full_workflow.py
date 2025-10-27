@@ -1,3 +1,4 @@
+
 import rasterio
 from rasterio.enums import Resampling
 import numpy as np
@@ -11,28 +12,88 @@ import time
 
 def crop_to_bounds(src, bounds, transform):
     """
-    Crop an image to specified geographic bounds
-    bounds: tuple of (xmin, ymin, xmax, ymax) in the same CRS as the image
+    Crop an image to specified geographic bounds.
+
+    Args:
+        src: An open rasterio dataset (used to read and to access size/bounds).
+        bounds: Tuple (xmin, ymin, xmax, ymax) in the same CRS as the image.
+        transform: Affine transform of the raster (usually src.transform).
+
+    Returns:
+        data: np.ndarray for the cropped area (same return type as crop_by_rectangle).
+
+    Raises:
+        ValueError: If there is no overlap between the requested bounds and the raster.
     """
-    # Convert bounds to pixel coordinates
-    row_start, col_start = ~transform * (bounds[0], bounds[3])
-    row_stop, col_stop = ~transform * (bounds[2], bounds[1])
-    
-    # Convert to integers and ensure they're within bounds
-    row_start, col_start = int(row_start), int(col_start)
-    row_stop, col_stop = int(row_stop), int(col_stop)
-    
-    # Ensure we don't go out of bounds
-    row_start = max(0, row_start)
-    col_start = max(0, col_start)
-    row_stop = min(src.height, row_stop)
-    col_stop = min(src.width, col_stop)
-    
-    print(f"Crop window: rows {row_start}:{row_stop}, cols {col_start}:{col_stop}")
-    
-    # Read the data using the window
-    data = src.read(1, window=((row_start, row_stop), (col_start, col_stop)))
-    print(f"Cropped data shape: {data.shape}")
+    # Local imports to avoid changing module-level imports
+    from rasterio.windows import from_bounds as win_from_bounds, transform as win_transform, Window
+
+    # Unpack and normalize user-provided bounds
+    xmin, ymin, xmax, ymax = bounds
+    if xmin > xmax:
+        xmin, xmax = xmax, xmin
+    if ymin > ymax:
+        ymin, ymax = ymax, ymin
+
+    # Intersect requested bounds with raster bounds to avoid out-of-range windows
+    r_left, r_bottom, r_right, r_top = src.bounds
+    ix_left = max(xmin, r_left)
+    ix_right = min(xmax, r_right)
+    ix_bottom = max(ymin, r_bottom)
+    ix_top = min(ymax, r_top)
+
+    if not (ix_left < ix_right and ix_bottom < ix_top):
+        raise ValueError("Requested bounds do not overlap the raster.")
+
+    # Compute a pixel window from the intersected bounds
+    window = win_from_bounds(ix_left, ix_bottom, ix_right, ix_top, transform=transform)
+
+    # Round to pixel boundaries: floor the offsets and ceil the shape to cover the full area
+    # This avoids losing edge pixels due to float rounding.
+    window = window.round_offsets(op='floor').round_shape(op='ceil')
+
+    # Ensure the window is within the raster dimensions
+    raster_window = Window(col_off=0, row_off=0, width=src.width, height=src.height)
+    window = window.intersection(raster_window)
+
+    if window.width <= 0 or window.height <= 0:
+        raise ValueError("Computed crop window is empty after clipping to raster bounds.")
+
+    # Enforce even window dimensions by expanding by one pixel if needed
+    # Adjust width (columns)
+    if int(round(window.width)) % 2 == 1:
+        # Prefer expanding to the right if possible
+        if window.col_off + window.width < src.width:
+            window = Window(col_off=window.col_off, row_off=window.row_off,
+                            width=window.width + 1, height=window.height)
+        # Otherwise, expand to the left if possible
+        elif window.col_off > 0:
+            window = Window(col_off=window.col_off - 1, row_off=window.row_off,
+                            width=window.width + 1, height=window.height)
+        # Clip to raster bounds just in case
+        window = window.intersection(raster_window)
+
+    # Adjust height (rows)
+    if int(round(window.height)) % 2 == 1:
+        # Prefer expanding downward if possible
+        if window.row_off + window.height < src.height:
+            window = Window(col_off=window.col_off, row_off=window.row_off,
+                            width=window.width, height=window.height + 1)
+        # Otherwise, expand upward if possible
+        elif window.row_off > 0:
+            window = Window(col_off=window.col_off, row_off=window.row_off - 1,
+                            width=window.width, height=window.height + 1)
+        # Clip to raster bounds just in case
+        window = window.intersection(raster_window)
+
+    # Read the data using the window; keep as numpy array output to match crop_by_rectangle
+    data = src.read(window=window)
+
+    # Optional: helpful debug print
+    print(f"Crop window -> rows {int(window.row_off)}:{int(window.row_off + window.height)}, "
+          f"cols {int(window.col_off)}:{int(window.col_off + window.width)}")
+
+    # Return only the cropped data to match crop_by_rectangle's return type (numpy array)
     return data
 
 def crop_by_rectangle(data, row_start, row_end, col_start, col_end):
@@ -60,20 +121,22 @@ def crop_by_rectangle(data, row_start, row_end, col_start, col_end):
     print(f"Cropped data shape: {cropped_data.shape}")
     return cropped_data
 
-def apply_soil_mask(img_stack, scl_path, crop_rectangle):
+def apply_soil_mask(img_stack, scl_path, bounds):
     """
     Apply soil mask to the image stack using SCL layer
     Args:
         img_stack: numpy array of shape (rows, cols, bands)
         scl_path: path to the SCL layer
-        crop_rectangle: tuple of (row_start, row_end, col_start, col_end)
+        bounds: tuple of (xmin, ymin, xmax, ymax)
     Returns:
         masked image stack with -1 for non-soil pixels
     """
     # Load and process the SCL layer to create a soil mask
     with rasterio.open(scl_path) as src:
-        scl_data = src.read(1)
-        scl_data = crop_by_rectangle(scl_data, *crop_rectangle)
+        scl_data = crop_to_bounds(src, bounds, src.transform)
+        # Ensure 2D SCL array
+        if scl_data.ndim == 3 and scl_data.shape[0] == 1:
+            scl_data = scl_data[0]
         # Create soil mask (SCL class 5 represents bare soil)
         soil_mask = (scl_data == 5)
 
@@ -86,39 +149,52 @@ def apply_soil_mask(img_stack, scl_path, crop_rectangle):
     
     return masked_stack
 
-def main():
-    # Define the crop rectangle
-    crop_rectangle = (246, 500, 554, 954)  # (row_start, row_end, col_start, col_end) the width and height needs to be even
+import argparse
 
-    # Segmentation parameters
-    n_classes = 4
-    beta_init = 30
-    n_iterations = 400
-    beta_jump_length = 0.1
 
-    # Choose bands best suited for lithology
-    bands = {
-        "B4": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B04_60m.jp2",   # Red
-        "B6": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B06_60m.jp2",   # Red Edge 2
-        "B7": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B07_60m.jp2",   # Red Edge 3
-        "B8A": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B8A_60m.jp2",  # Narrow NIR
-        "B11": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B11_60m.jp2",  # SWIR 1
-        "B12": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B12_60m.jp2",  # SWIR 2
-        # Not used for segmentation:
-        "TCI": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_TCI_60m.jp2",
-        "SCL": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_SCL_60m.jp2"  # Scene Classification Layer
-    }
+def run_workflow(bands: dict,
+                 bounds: tuple,
+                 n_classes: int = 4,
+                 beta_init: float = 30.0,
+                 n_iterations: int = 400,
+                 beta_jump_length: float = 0.1,
+                 use_soil_mask: bool = True,
+                 save_npy: bool = True,
+                 plot_tci: bool = True,
+                 ref_band: str = None,
+                 output_prefix: str = "segmentation"):
+    """
+    Generalized segmentation workflow.
 
-    # bounds = (xmin, ymin, xmax, ymax)
-    bounds = (733891.6, 4168988.9, 756038.65, 4186614.52)  # in the same CRS as the image
+    Args:
+        bands: dict mapping band names to file paths. May include optional keys 'SCL' and 'TCI'.
+        bounds: (xmin, ymin, xmax, ymax) in the image CRS.
+        n_classes: number of segmentation classes (labels).
+        beta_init: initial beta for BaySeg.
+        n_iterations: number of MCMC iterations.
+        beta_jump_length: jump length for beta tuning.
+        use_soil_mask: whether to apply SCL-based soil mask (needs bands['SCL']).
+        save_npy: whether to save intermediate input and results as .npy files.
+        plot_tci: whether to plot TCI if available in bands.
+        ref_band: band name to use as georeferencing reference; if None, use 'B4' if present, else first band.
+        output_prefix: prefix for output files (GeoTIFF and NPY outputs).
+    """
+    # Choose a reference band for metadata/geotransform
+    band_keys = [k for k in bands.keys() if k not in ("TCI", "SCL")]
+    if not band_keys:
+        raise ValueError("No spectral bands provided in 'bands' (excluding TCI/SCL).")
+    if ref_band is None:
+        ref_band = "B4" if "B4" in bands else band_keys[0]
+    if ref_band not in bands:
+        raise ValueError(f"ref_band '{ref_band}' not found in provided bands.")
 
     print("Step 1: Preparing data...")
-    with rasterio.open(bands["B4"]) as ref:
+    with rasterio.open(bands[ref_band]) as ref:
         profile = ref.profile
         height, width = ref.height, ref.width
         crs = ref.crs
         transform = ref.transform
-        
+
         # Print CRS information
         print("\nCoordinate Reference System Information:")
         print(f"CRS: {crs}")
@@ -126,38 +202,51 @@ def main():
         print(f"Image dimensions: {width}x{height} pixels")
         print(f"Resolution: {ref.res[0]}m x {ref.res[1]}m")
 
+    # Build stack from provided bands (exclude TCI and SCL)
     stack = []
     for name, path in bands.items():
-        if name not in ["TCI", "SCL"]:  # Skip TCI and SCL for the stack
-            with rasterio.open(path) as src:
-                # Simply read the band data
-                band_data = src.read(1)
-                band_data = crop_by_rectangle(band_data, *crop_rectangle)
-                stack.append(band_data)
+        if name in ("TCI", "SCL"):
+            continue
+        with rasterio.open(path) as src:
+            band_data = crop_to_bounds(src, bounds, src.transform)
+            # Ensure 2D per-band array
+            if band_data.ndim == 3 and band_data.shape[0] == 1:
+                band_data = band_data[0]
+            stack.append(band_data)
 
     # Stack into (rows, cols, bands)
     img_stack = np.stack(stack, axis=-1).astype(np.float64)
     print(f"Image stack shape: {img_stack.shape}")
 
-    # Apply soil mask
-    img_stack = apply_soil_mask(img_stack, bands["SCL"], crop_rectangle)
+    # Apply soil mask if requested and SCL available
+    if use_soil_mask:
+        scl_path = bands.get("SCL", None)
+        if scl_path is None:
+            print("[WARN] Soil mask requested but 'SCL' path not provided. Skipping soil mask.")
+        else:
+            img_stack = apply_soil_mask(img_stack, scl_path, bounds)
 
     # Save intermediate result
-    np.save("sentinel2_bayseg_input.npy", img_stack)
-    print("Intermediate data saved to sentinel2_bayseg_input.npy")
+    if save_npy:
+        np.save(f"{output_prefix}_input.npy", img_stack)
+        print(f"Intermediate data saved to {output_prefix}_input.npy")
 
-    # Plot TCI for reference
-    with rasterio.open(bands["TCI"]) as src:
-        if src.count == 3:  # If TCI has 3 bands
-            tci_data = src.read()  # Read all bands
-            tci_data = tci_data.transpose(1, 2, 0)  # Change to (rows, cols, bands)
-            tci_data = crop_by_rectangle(tci_data, *crop_rectangle)
+    # Plot TCI for reference if available and requested
+    if plot_tci and ("TCI" in bands):
+        with rasterio.open(bands["TCI"]) as src:
+            if src.count >= 3:  # If TCI has 3 bands
+                tci_data = crop_to_bounds(src, bounds, src.transform)  # (bands, rows, cols)
+                tci_data = tci_data.transpose(1, 2, 0)  # Change to (rows, cols, bands)
 
-            plt.figure(figsize=(10, 10))
-            plt.imshow(tci_data)
-            plt.title('True Color Image (TCI) of Cropped Region')
-            plt.axis('off')
-            plt.show()
+                plt.figure(figsize=(10, 10))
+                plt.imshow(tci_data)
+                plt.title('True Color Image (TCI) of Cropped Region')
+                plt.axis('off')
+                plt.show()
+            else:
+                print("[WARN] TCI provided but does not have 3 bands; skipping plot.")
+    elif plot_tci:
+        print("[INFO] No TCI provided; skipping TCI plot.")
 
     print("\nStep 2: Running segmentation...")
     # Initialize segmenter
@@ -167,29 +256,55 @@ def main():
 
     # Fit the model and get the labels
     seg.fit(n=n_iterations, beta_jump_length=beta_jump_length)
-    
+
     # Get the final labels (MAP estimate)
     final_labels = labels_map(seg.labels)
     final_labels = final_labels.reshape(img_stack.shape[0], img_stack.shape[1])
-    
+
     # Calculate information entropy
     labels_prob = compute_labels_prob(np.array(seg.labels))
     entropy = compute_ie(labels_prob)
     entropy = entropy.reshape(img_stack.shape[0], img_stack.shape[1])
-    
+
     print(f"Segmentation completed in {time.time() - start_time:.2f} seconds")
 
     # Save results as numpy arrays
-    np.save(f"bayseg_lithology_labels_n{n_classes}_beta{beta_jump_length}.npy", final_labels)
-    np.save(f"bayseg_entropy_n{n_classes}_beta{beta_jump_length}.npy", entropy)
-    print(f"Results saved to bayseg_lithology_labels_n{n_classes}_beta{beta_jump_length}.npy and bayseg_entropy_n{n_classes}_beta{beta_jump_length}.npy")
+    if save_npy:
+        np.save(f"{output_prefix}_labels_n{n_classes}_betajump{beta_jump_length}.npy", final_labels)
+        np.save(f"{output_prefix}_entropy_n{n_classes}_betajump{beta_jump_length}.npy", entropy)
+        print(f"Results saved to {output_prefix}_labels_n{n_classes}_betajump{beta_jump_length}.npy and {output_prefix}_entropy_n{n_classes}_betajump{beta_jump_length}.npy")
 
     # Export as georeferenced GeoTIFF
-    # Get the transform for the cropped region
-    with rasterio.open(bands["B4"]) as src:
-        # Calculate the transform for the cropped region using the actual crop rectangle
-        transform = src.transform * rasterio.Affine.translation(crop_rectangle[2], crop_rectangle[0])
-        
+    # Get the transform for the cropped region based on bounds using reference band
+    with rasterio.open(bands[ref_band]) as src:
+        from rasterio.windows import from_bounds as win_from_bounds, Window, transform as win_transform
+        # Recompute the same window used by crop_to_bounds
+        window = win_from_bounds(bounds[0], bounds[1], bounds[2], bounds[3], transform=src.transform)
+        window = window.round_offsets(op='floor').round_shape(op='ceil')
+        raster_window = Window(col_off=0, row_off=0, width=src.width, height=src.height)
+        window = window.intersection(raster_window)
+
+        # Enforce even window dimensions to match crop_to_bounds behavior
+        if int(round(window.width)) % 2 == 1:
+            if window.col_off + window.width < src.width:
+                window = Window(col_off=window.col_off, row_off=window.row_off,
+                                width=window.width + 1, height=window.height)
+            elif window.col_off > 0:
+                window = Window(col_off=window.col_off - 1, row_off=window.row_off,
+                                width=window.width + 1, height=window.height)
+            window = window.intersection(raster_window)
+
+        if int(round(window.height)) % 2 == 1:
+            if window.row_off + window.height < src.height:
+                window = Window(col_off=window.col_off, row_off=window.row_off,
+                                width=window.width, height=window.height + 1)
+            elif window.row_off > 0:
+                window = Window(col_off=window.col_off, row_off=window.row_off - 1,
+                                width=window.width, height=window.height + 1)
+            window = window.intersection(raster_window)
+
+        transform = win_transform(window, src.transform)
+
         # Create the output profile
         profile = src.profile.copy()
         profile.update({
@@ -203,7 +318,7 @@ def main():
         })
 
         # Save the segmentation result as a GeoTIFF
-        output_path = f"segmentation_result_n{n_classes}_beta{beta_jump_length}.tif"
+        output_path = f"{output_prefix}_result_n{n_classes}_betajump{beta_jump_length}.tif"
         with rasterio.open(output_path, 'w', **profile) as dst:
             dst.write(final_labels.astype(np.uint8), 1)
         print(f"Georeferenced segmentation results saved to {output_path}")
@@ -214,7 +329,7 @@ def main():
             'dtype': 'float32',
             'nodata': -9999
         })
-        entropy_path = f"segmentation_entropy_n{n_classes}_beta{beta_jump_length}.tif"
+        entropy_path = f"{output_prefix}_entropy_n{n_classes}_betajump{beta_jump_length}.tif"
         with rasterio.open(entropy_path, 'w', **entropy_profile) as dst:
             dst.write(entropy.astype(np.float32), 1)
         print(f"Georeferenced entropy results saved to {entropy_path}")
@@ -225,5 +340,87 @@ def main():
     # Plot acceptance ratios
     seg.plot_acc_ratios()
 
+
+def parse_band_arg(band_arg: str):
+    """Parse a band argument of the form NAME=PATH."""
+    if "=" not in band_arg:
+        raise argparse.ArgumentTypeError("Band must be in NAME=PATH format, e.g., B4=/path/to/B04.jp2")
+    name, path = band_arg.split("=", 1)
+    name = name.strip()
+    path = path.strip()
+    if not name:
+        raise argparse.ArgumentTypeError("Band name cannot be empty")
+    if not os.path.exists(path):
+        print(f"[WARN] Provided path does not exist: {path}")
+    return name, path
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generalized segmentation workflow for Sentinel-2 or similar rasters.")
+    parser.add_argument('--band', dest='bands', action='append', type=parse_band_arg, required=False,
+                        help='Band specification as NAME=PATH. Repeat for multiple bands (exclude TCI/SCL here).')
+    parser.add_argument('--scl', type=str, help='Path to SCL raster for soil masking (optional).')
+    parser.add_argument('--tci', type=str, help='Path to TCI raster for plotting (optional).')
+    parser.add_argument('--bounds', type=float, nargs=4, metavar=('XMIN','YMIN','XMAX','YMAX'),
+                        help='Bounds in raster CRS: xmin ymin xmax ymax')
+    parser.add_argument('--n-classes', type=int, default=4)
+    parser.add_argument('--beta-init', type=float, default=30.0)
+    parser.add_argument('--iterations', type=int, default=400)
+    parser.add_argument('--beta-jump', type=float, default=0.1)
+    parser.add_argument('--ref-band', type=str, default=None, help='Band name to use as reference for georeferencing.')
+    parser.add_argument('--no-soil-mask', action='store_true', help='Disable soil masking even if SCL provided.')
+    parser.add_argument('--no-plot-tci', action='store_true', help='Disable TCI plotting.')
+    parser.add_argument('--no-save-npy', action='store_true', help='Do not save intermediate/results NPY files.')
+    parser.add_argument('--output-prefix', type=str, default='segmentation', help='Prefix for output files.')
+
+    # Backward-compatible defaults: if no args provided, use previous hardcoded setup
+    args = parser.parse_args()
+
+    # Build bands dict
+    bands = {}
+    if args.bands:
+        for name, path in args.bands:
+            bands[name] = path
+    # Inject optional SCL/TCI if provided
+    if args.scl:
+        bands['SCL'] = args.scl
+    if args.tci:
+        bands['TCI'] = args.tci
+
+    if not bands:
+        # Fallback to previous hardcoded defaults to preserve old behavior
+        bands = {
+            "B4": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B04_60m.jp2",
+            "B6": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B06_60m.jp2",
+            "B7": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B07_60m.jp2",
+            "B8A": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B8A_60m.jp2",
+            "B11": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B11_60m.jp2",
+            "B12": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_B12_60m.jp2",
+            "TCI": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_TCI_60m.jp2",
+            "SCL": "/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/Data/Tharsis AOI 1/S2A_MSIL2A_20230829T110621_N0509_R137_T29SQB_20230829T152901.SAFE/GRANULE/L2A_T29SQB_A042748_20230829T111659/IMG_DATA/R60m/T29SQB_20230829T110621_SCL_60m.jp2",
+        }
+
+    # Bounds
+    if args.bounds:
+        bounds = tuple(args.bounds)
+    else:
+        bounds = (733891.6, 4168988.9, 756038.65, 4186614.52)
+
+    run_workflow(
+        bands=bands,
+        bounds=bounds,
+        n_classes=args.n_classes,
+        beta_init=args.beta_init,
+        n_iterations=args.iterations,
+        beta_jump_length=args.beta_jump,
+        use_soil_mask=(not args.no_soil_mask),
+        save_npy=(not args.no_save_npy),
+        plot_tci=(not args.no_plot_tci),
+        ref_band=args.ref_band,
+        output_prefix=args.output_prefix,
+    )
+
+
 if __name__ == "__main__":
-    main() 
+    main()
+

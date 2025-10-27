@@ -23,6 +23,22 @@ def crop_to_bounds(src, bounds, transform):
     col_start = max(0, col_start)
     row_stop = min(src.height, row_stop)
     col_stop = min(src.width, col_stop)
+
+    # Enforce even dimensions by expanding the window by one pixel when needed
+    # Height (rows)
+    height = row_stop - row_start
+    if height % 2 == 1:
+        if row_stop < src.height:
+            row_stop += 1
+        elif row_start > 0:
+            row_start -= 1
+    # Width (cols)
+    width = col_stop - col_start
+    if width % 2 == 1:
+        if col_stop < src.width:
+            col_stop += 1
+        elif col_start > 0:
+            col_start -= 1
     
     print(f"Crop window: rows {row_start}:{row_stop}, cols {col_start}:{col_stop}")
     
