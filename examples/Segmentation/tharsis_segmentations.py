@@ -1,5 +1,5 @@
 # Import the run_workflow function from full_workflow
-from Segmentation.full_workflow import run_workflow
+from examples.Segmentation.full_workflow import run_workflow
 
 
 # %%  20m resolution

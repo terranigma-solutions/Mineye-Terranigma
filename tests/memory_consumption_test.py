@@ -9,7 +9,6 @@ using the smallest ROI configuration.
 Based on the performance_comparison.py blueprint.
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
 import time
 import psutil
@@ -17,15 +16,13 @@ import gc
 import tracemalloc
 from typing import Dict, List, Tuple
 import rasterio
-from rasterio.windows import from_bounds
-import os
 import sys
 
 # Add the bayseg directory to path
 sys.path.append('/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/bayseg')
 
 from bayseg.bayseg import BaySeg
-from Segmentation.full_workflow import crop_to_bounds, apply_soil_mask
+from examples.Segmentation.full_workflow import crop_to_bounds, apply_soil_mask
 
 # Import the original BaySeg implementation from performance_comparison.py
 import numpy as np

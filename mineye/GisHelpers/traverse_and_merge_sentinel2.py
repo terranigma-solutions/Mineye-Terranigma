@@ -433,7 +433,7 @@ def main():
     
     # If still not found, try relative path as specified in issue description
     if not sentinel_path.exists():
-        sentinel_path = Path("../Data/Tharsis_all_Sentinel2/raw")
+        sentinel_path = Path("../examples/Data/Tharsis_all_Sentinel2/raw")
     
     print(f"Attempting to traverse: {sentinel_path}")
     

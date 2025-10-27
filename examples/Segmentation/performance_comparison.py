@@ -5,23 +5,19 @@ This script compares performance and memory footprint for datasets of different 
 using the Tharsis segmentation data.
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
 import time
 import psutil
 import gc
 import tracemalloc
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 import rasterio
-from rasterio.windows import from_bounds
-import os
 import sys
 
 # Add the bayseg directory to path
 sys.path.append('/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/bayseg')
 
 from bayseg.bayseg import BaySeg
-from Segmentation.full_workflow import crop_to_bounds, apply_soil_mask
+from examples.Segmentation.full_workflow import crop_to_bounds, apply_soil_mask
 
 
 import numpy as np  # scientific computing library
