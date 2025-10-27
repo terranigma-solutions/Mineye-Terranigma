@@ -256,3 +256,10 @@ http-client.private.env.json
 # Apifox Helper cache
 .idea/.cache/.Apifox_Helper
 .idea/ApifoxUploaderProjectSetting.xml
+*.pkl
+
+# GIS auxiliary files
+*.xml
+
+
+Data/Output_Data/Simple-Models/temp_inputs/
