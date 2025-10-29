@@ -23,9 +23,8 @@ pyro.set_rng_seed(seed)
 torch.manual_seed(seed)
 
 
-def test_error_propagation(simple_geo_model):
-    """Test reading and computing a geological model with topography."""
-
+class TestErrorPropagationMovePoint:
+    @staticmethod
     def _modify_z_for_surface_point1(
             samples: dict[str, Distribution],
             geo_model: gp.data.GeoModel,
@@ -43,6 +42,7 @@ def test_error_propagation(simple_geo_model):
         interp_input.surface_points.sp_coords = new_tensor
         return interp_input
 
+    @staticmethod
     def _update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float, sample_idx: int):
         xyz = np.zeros((1, 3))
         xyz[0, 2] = sample_value
@@ -55,45 +55,48 @@ def test_error_propagation(simple_geo_model):
             Z=world_coord[0, 2]
         )
 
-    geo_model = simple_geo_model
-    BackendTensor.change_backend_gempy(engine_backend=gp.data.AvailableBackends.PYTORCH)
+    def test_error_propagation(self, simple_geo_model):
+        """Test reading and computing a geological model with topography."""
 
-    model_priors = {
-            r'$\mu_{top}$': dist.Normal(
-                loc=geo_model.surface_points_copy_transformed.xyz[0, 2],
-                scale=torch.tensor(0.001, dtype=torch.float64)
-            )
-    }
+        geo_model = simple_geo_model
+        BackendTensor.change_backend_gempy(engine_backend=gp.data.AvailableBackends.PYTORCH)
 
-    prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
-        priors=model_priors,
-        set_interp_input_fn=_modify_z_for_surface_point1,
-        likelihood_fn=None,
-        obs_name=None
-    )
+        model_priors = {
+                r'$\mu_{top}$': dist.Normal(
+                    loc=geo_model.surface_points_copy_transformed.xyz[0, 2],
+                    scale=torch.tensor(0.001, dtype=torch.float64)
+                )
+        }
 
-    n_samples = 50
-    prior_inference_data: az.InferenceData = gpp.run_predictive(
-        prob_model=prob_model,
-        geo_model=geo_model,
-        y_obs_list=[],
-        n_samples=n_samples,
-        plot_trace=True
-    )
+        prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
+            priors=model_priors,
+            set_interp_input_fn=self._modify_z_for_surface_point1,
+            likelihood_fn=None,
+            obs_name=None
+        )
 
-    p2d = gpv.plot_2d(
-        model=geo_model,
-        show_topography=False,
-        legend=False,
-        show_lith=False,
-        show_data=False,
-        show=False
-    )
+        n_samples = 50
+        prior_inference_data: az.InferenceData = gpp.run_predictive(
+            prob_model=prob_model,
+            geo_model=geo_model,
+            y_obs_list=[],
+            n_samples=n_samples,
+            plot_trace=True
+        )
 
-    plot_gempy(
-        geo_model=geo_model,
-        n_samples=n_samples,
-        samples=(prior_inference_data.prior[r'$\mu_{top}$'].values[0, :]),
-        update_model_fn=-update_model_for_plotting,
-        gempy_plot=p2d
-    )
+        p2d = gpv.plot_2d(
+            model=geo_model,
+            show_topography=False,
+            legend=False,
+            show_lith=False,
+            show_data=False,
+            show=False
+        )
+
+        plot_gempy(
+            geo_model=geo_model,
+            n_samples=n_samples,
+            samples=(prior_inference_data.prior[r'$\mu_{top}$'].values[0, :]),
+            update_model_fn=self._update_model_for_plotting,
+            gempy_plot=p2d
+        )
