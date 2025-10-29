@@ -22,27 +22,39 @@ seed = 4003
 pyro.set_rng_seed(seed)
 torch.manual_seed(seed)
 
-def modify_z_for_surface_point1(
-        samples: dict[str, Distribution],
-        geo_model: gp.data.GeoModel,
-) -> InterpolationInput:
-    # TODO: We can make a factory for this type of functions
-    prior_key = r'$\mu_{top}$'
-
-    from gempy.modules.data_manipulation import interpolation_input_from_structural_frame
-    interp_input = interpolation_input_from_structural_frame(geo_model)
-    new_tensor: torch.Tensor = torch.index_put(
-        input=interp_input.surface_points.sp_coords,
-        indices=(torch.tensor([0]), torch.tensor([2])),  # * This has to be Tensors
-        values=(samples[prior_key])
-    )
-    interp_input.surface_points.sp_coords = new_tensor
-    return interp_input
-
 
 def test_error_propagation(simple_geo_model):
     """Test reading and computing a geological model with topography."""
-    # TODO: Code to define the distributions of dips
+
+    def _modify_z_for_surface_point1(
+            samples: dict[str, Distribution],
+            geo_model: gp.data.GeoModel,
+    ) -> InterpolationInput:
+        # TODO: We can make a factory for this type of functions
+        prior_key = r'$\mu_{top}$'
+
+        from gempy.modules.data_manipulation import interpolation_input_from_structural_frame
+        interp_input = interpolation_input_from_structural_frame(geo_model)
+        new_tensor: torch.Tensor = torch.index_put(
+            input=interp_input.surface_points.sp_coords,
+            indices=(torch.tensor([0]), torch.tensor([2])),  # * This has to be Tensors
+            values=(samples[prior_key])
+        )
+        interp_input.surface_points.sp_coords = new_tensor
+        return interp_input
+
+    def _update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float, sample_idx: int):
+        xyz = np.zeros((1, 3))
+        xyz[0, 2] = sample_value
+        world_coord = geo_model.input_transform.apply_inverse(xyz)
+
+        # Modify the surface point
+        gp.modify_surface_points(
+            geo_model=geo_model,
+            slice=0,
+            Z=world_coord[0, 2]
+        )
+
     geo_model = simple_geo_model
     BackendTensor.change_backend_gempy(engine_backend=gp.data.AvailableBackends.PYTORCH)
 
@@ -55,12 +67,10 @@ def test_error_propagation(simple_geo_model):
 
     prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
         priors=model_priors,
-        set_interp_input_fn=modify_z_for_surface_point1,
+        set_interp_input_fn=_modify_z_for_surface_point1,
         likelihood_fn=None,
         obs_name=None
     )
-
-    # TODO: Code to define the method and all of that
 
     n_samples = 50
     prior_inference_data: az.InferenceData = gpp.run_predictive(
@@ -84,32 +94,6 @@ def test_error_propagation(simple_geo_model):
         geo_model=geo_model,
         n_samples=n_samples,
         samples=(prior_inference_data.prior[r'$\mu_{top}$'].values[0, :]),
-        update_model_fn=update_model_for_plotting,
+        update_model_fn=-update_model_for_plotting,
         gempy_plot=p2d
-    )
-
-
-def update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float, sample_idx: int):
-    """
-    Update function for plot_gempy that modifies the model in place.
-
-    Parameters
-    ----------
-    geo_model : gp.data.GeoModel
-        The geological model to update
-    sample_value : float
-        The z-coordinate value from the prior sample (in transformed space)
-    sample_idx : int
-        Index of the current sample (unused but required by signature)
-    """
-    # Convert from transformed to world coordinates
-    xyz = np.zeros((1, 3))
-    xyz[0, 2] = sample_value
-    world_coord = geo_model.input_transform.apply_inverse(xyz)
-
-    # Modify the surface point
-    gp.modify_surface_points(
-        geo_model=geo_model,
-        slice=0,
-        Z=world_coord[0, 2]
     )
