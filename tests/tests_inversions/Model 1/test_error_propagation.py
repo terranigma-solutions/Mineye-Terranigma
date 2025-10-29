@@ -16,7 +16,7 @@ import pyro
 from pyro.distributions import Distribution
 import gempy_probability as gpp
 from gempy_engine.core.data.interpolation_input import InterpolationInput
-
+from gempy_probability.modules.plot.plot_gempy import plot_gempy
 
 seed = 4003
 pyro.set_rng_seed(seed)
@@ -80,41 +80,36 @@ def test_error_propagation(simple_geo_model):
         show=False
     )
 
-    posterior_top_mean_z: np.ndarray = (prior_inference_data.prior[r'$\mu_{top}$'].values[0, :])
-    xyz = np.zeros((posterior_top_mean_z.shape[0], 3))
-    xyz[:, 2] = posterior_top_mean_z
+    plot_gempy(
+        geo_model=geo_model,
+        n_samples=n_samples,
+        samples=(prior_inference_data.prior[r'$\mu_{top}$'].values[0, :]),
+        update_model_fn=update_model_for_plotting,
+        gempy_plot=p2d
+    )
+
+
+def update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float, sample_idx: int):
+    """
+    Update function for plot_gempy that modifies the model in place.
+
+    Parameters
+    ----------
+    geo_model : gp.data.GeoModel
+        The geological model to update
+    sample_value : float
+        The z-coordinate value from the prior sample (in transformed space)
+    sample_idx : int
+        Index of the current sample (unused but required by signature)
+    """
+    # Convert from transformed to world coordinates
+    xyz = np.zeros((1, 3))
+    xyz[0, 2] = sample_value
     world_coord = geo_model.input_transform.apply_inverse(xyz)
-    
-    for i in np.linspace(0, n_samples-1, n_samples,).astype(int):
-        gp.modify_surface_points(
-            geo_model=geo_model,
-            slice=0,
-            Z=world_coord[i, 2]
-        )
-        gp.compute_model(gempy_model=geo_model)
 
-        from gempy_viewer.API._plot_2d_sections_api import plot_sections
-        from gempy_viewer.core.data_to_show import DataToShow
-        plot_sections(
-            gempy_model=geo_model,
-            sections_data=p2d.section_data_list,
-            data_to_show=DataToShow(
-                n_axis=1,
-                show_data=True,
-                show_surfaces=True,
-                show_lith=False
-            ),
-            kwargs_boundaries={
-                    "linewidth": 0.5,
-                    "alpha"    : 0.1,
-            },
-            kwargs_surface_points={
-                    'alpha': 0.1  # semi-transparent
-            },
-        )
-
-    p2d.fig.show()
-
-
-    
-    
+    # Modify the surface point
+    gp.modify_surface_points(
+        geo_model=geo_model,
+        slice=0,
+        Z=world_coord[0, 2]
+    )
