@@ -4,5 +4,7 @@
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../gempy" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../gempy_engine" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../gempy_probability" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../gempy_viewer" vcs="Git" />
   </component>
 </project>

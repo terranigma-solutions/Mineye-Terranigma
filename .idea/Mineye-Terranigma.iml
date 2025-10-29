@@ -6,6 +6,8 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="gempy_engine" />
     <orderEntry type="module" module-name="gempy" />
+    <orderEntry type="module" module-name="gempy_probability" />
+    <orderEntry type="module" module-name="gempy_viewer" />
   </component>
   <component name="PackageRequirementsSettings">
     <option name="removeUnused" value="true" />
