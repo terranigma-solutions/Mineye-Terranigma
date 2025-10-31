@@ -1,3 +1,5 @@
+from typing import Any
+
 import arviz as az
 import numpy as np
 import torch
@@ -199,10 +201,45 @@ class TestErrorPropagationDips:
             plot_trace=True
         )
 
-        gravity_data = prior_inference_data.prior[r'gravity_response'].values[0, :] # number of iterations x number of devices
-        pass
+        # Extract gravity samples: shape (n_chains, n_samples, n_devices)
+        # We use chain 0 for visualization
+        gravity_samples = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
 
-    def _plot_fw_gravity(self, grav, gravity_data: DataFrame, xy_ravel: np.ndarray[tuple[Any, ...], np.dtype]):
+        # Import visualization functions from test_geophysics
+        from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_map_interpolated
+        from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_profiles
+        from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_with_uncertainty
+
+        # Convert observed gravity from mGal to μGal for comparison
+        observed_gravity_ugal = observed_gravity * 1000
+
+        # 1. Comprehensive uncertainty visualization
+        plot_gravity_with_uncertainty(
+            gravity_samples=gravity_samples,
+            xy_coords=xy_ravel,
+            observed_data=observed_gravity_ugal,
+            confidence_level=0.95,
+            title="Gravity Uncertainty Propagation from Dip Uncertainty"
+        )
+
+        # 2. Profile plots with confidence bands
+        plot_gravity_uncertainty_profiles(
+            gravity_samples=gravity_samples,
+            xy_coords=xy_ravel,
+            observed_data=observed_gravity_ugal,
+            n_profiles=4,
+            confidence_level=0.95
+        )
+
+        # 3. Interpolated uncertainty maps (smoother visualization)
+        plot_gravity_uncertainty_map_interpolated(
+            gravity_samples=gravity_samples,
+            xy_coords=xy_ravel,
+            observed_data=observed_gravity_ugal,
+            grid_resolution=100
+        )
+
+    def _plot_fw_gravity(self, grav, gravity_data: "DataFrame", xy_ravel: np.ndarray[tuple[Any, ...], np.dtype]):
         import matplotlib.pyplot as plt
         scatter = plt.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=grav, s=30,
                               cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5)
