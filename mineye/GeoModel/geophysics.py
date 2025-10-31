@@ -93,61 +93,6 @@ def compute_normalization_params(
     return params
 
 
-def apply_normalization(
-        data: np.ndarray,
-        norm_params: Dict[str, float],
-        verbose: bool = False
-) -> np.ndarray:
-    """
-    Apply pre-computed normalization parameters to data.
-
-    This ensures consistent normalization across multiple datasets using the same scale.
-
-    Args:
-        data: Data array to normalize
-        norm_params: Normalization parameters from compute_normalization_params()
-        verbose: Whether to print statistics
-
-    Returns:
-        Normalized data array
-    """
-    method = norm_params['method']
-
-    if method == 'zscore':
-        normalized = (data - norm_params['mean']) / norm_params['std']
-
-    elif method == 'robust_zscore':
-        normalized = (data - norm_params['median']) / (1.4826 * norm_params['mad'])
-
-    elif method == 'minmax':
-        normalized = (data - norm_params['min']) / (norm_params['max'] - norm_params['min'])
-
-    elif method == 'mean_center':
-        normalized = data - norm_params['mean']
-
-    elif method == 'relative':
-        normalized = data / norm_params['range']
-
-    elif method == 'align_to_reference':
-        # Align data to match reference (observed) distribution
-        # CRITICAL: Use FIXED baseline statistics to preserve variability from priors
-        # Step 1: Standardize using FIXED baseline mean/std (not sample-specific!)
-        baseline_mean = norm_params['baseline_forward_mean']
-        baseline_std = norm_params['baseline_forward_std']
-        data_standardized = (data - baseline_mean) / baseline_std
-
-        # Step 2: Scale to match reference std and shift to match reference mean
-        normalized = data_standardized * norm_params['reference_std'] + norm_params['reference_mean']
-
-    else:
-        raise ValueError(f"Invalid normalization method: {method}")
-
-    if verbose:
-        print(f"  Applied {method} normalization: mean={np.mean(normalized):.3f}, "
-              f"std={np.std(normalized):.3f}, min={np.min(normalized):.3f}, max={np.max(normalized):.3f}")
-
-    return normalized
-
 
 def apply_normalization_torch(
         data,  # torch.Tensor or any array-like

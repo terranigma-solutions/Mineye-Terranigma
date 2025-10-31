@@ -1,3 +1,5 @@
+from typing import Any
+
 import arviz as az
 import numpy as np
 import torch
@@ -143,7 +145,7 @@ class TestErrorPropagationDips:
         # This provides the baseline statistics needed to preserve prior variability
         baseline_fw_gravity_np = self._baseline(geo_model)
 
-        norm_params, normalization_method, observed_gravity_ugal, observed_norm = self._normalize(baseline_fw_gravity_np, observed_gravity)
+        norm_params, normalization_method, observed_gravity_ugal = self._normalize(baseline_fw_gravity_np, observed_gravity)
 
         # region PYRO MODEL SETUP ============
         mean_orientations = torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10
@@ -196,7 +198,7 @@ class TestErrorPropagationDips:
         # IMPORTANT: These are ALREADY NORMALIZED (done during inference)
         gravity_samples_norm = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
 
-        gravity_samples_norm, unit_label = self._plot(gravity_samples_norm, normalization_method, observed_gravity_ugal, observed_norm, xy_ravel)
+        gravity_samples_norm, unit_label = self._plot(gravity_samples_norm, observed_gravity_ugal, xy_ravel)
 
         # Print final summary
         print(f"\n{'=' * 60}")
@@ -213,7 +215,7 @@ class TestErrorPropagationDips:
         
         #endreion
 
-    def _plot(self, gravity_samples_norm, normalization_method: str, observed_gravity_ugal, observed_norm: dict[str, float], xy_ravel) -> tuple[str, Any]:
+    def _plot(self, gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, Any]:
         # Import visualization functions
         from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_map_interpolated
         from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_profiles
@@ -222,20 +224,14 @@ class TestErrorPropagationDips:
         # Convert PyTorch tensor to numpy if needed
         if hasattr(gravity_samples_norm, 'numpy'):
             gravity_samples_norm = gravity_samples_norm.numpy()
-        if hasattr(observed_norm, 'numpy'):
-            observed_norm = observed_norm.numpy()
-
-        if normalization_method == 'align_to_reference':
-            unit_label = 'Aligned Gravity (μGal)'
-        else:
-            unit_label = 'Normalized'
+            
+        unit_label = 'Aligned Gravity (μGal)'
 
         print(f"\n{'=' * 60}")
         print(f"EXTRACTED NORMALIZED SAMPLES")
         print(f"{'=' * 60}")
         print(f"Number of samples: {gravity_samples_norm.shape[0]}")
         print(f"Number of devices: {gravity_samples_norm.shape[1]}")
-        print(f"Normalization method: {normalization_method}")
         print(f"Normalization was applied DURING inference (not post-processing)")
         print(f"All samples use consistent normalization parameters from observed data")
         print(f"{'=' * 60}\n")
@@ -253,7 +249,7 @@ class TestErrorPropagationDips:
         plot_gravity_uncertainty_profiles(
             gravity_samples=gravity_samples_norm,
             xy_coords=xy_ravel,
-            observed_data=observed_norm,
+            observed_data=(observed_gravity_ugal),
             n_profiles=4,
             confidence_level=0.95
         )
@@ -262,7 +258,7 @@ class TestErrorPropagationDips:
         plot_gravity_uncertainty_map_interpolated(
             gravity_samples=gravity_samples_norm,
             xy_coords=xy_ravel,
-            observed_data=observed_norm,
+            observed_data=(observed_gravity_ugal),
             grid_resolution=100
         )
         return gravity_samples_norm, unit_label
@@ -279,7 +275,7 @@ class TestErrorPropagationDips:
         if hasattr(baseline_fw_gravity, 'numpy'):
             baseline_fw_gravity_np = baseline_fw_gravity.numpy()
         else:
-            baseline_fw_gravity_np = np.array(-baseline_fw_gravity)
+            baseline_fw_gravity_np = np.array(baseline_fw_gravity)
 
         print(f"Baseline forward model statistics:")
         print(f"  Mean: {np.mean(baseline_fw_gravity_np):.2f} μGal")
@@ -287,10 +283,10 @@ class TestErrorPropagationDips:
         print(f"  Min:  {np.min(baseline_fw_gravity_np):.2f} μGal")
         print(f"  Max:  {np.max(baseline_fw_gravity_np):.2f} μGal")
         print("=" * 60 + "\n")
-        return baseline_fw_gravity_np
+        return -baseline_fw_gravity_np
 
-    def _normalize(self, baseline_fw_gravity_np: ndarray[tuple[Any, ...], dtype[_ScalarT]] | ndarray[tuple[Any, ...], dtype[Any]] | Any, observed_gravity: ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]) -> tuple[float | Any, str, ndarray[Any, dtype[number[Any, int | float | complex] | Any]], dict[str, float]]:
-        from mineye.GeoModel.geophysics import compute_normalization_params, apply_normalization_torch
+    def _normalize(self, baseline_fw_gravity_np , observed_gravity):
+        from mineye.GeoModel.geophysics import compute_normalization_params
 
         # Convert observed gravity from mGal to μGal for comparison
         observed_gravity_ugal = observed_gravity * 1000
@@ -305,8 +301,6 @@ class TestErrorPropagationDips:
             verbose=True
         )
 
-        # Also normalize observed data for later comparison
-        observed_norm = apply_normalization_torch(observed_gravity_ugal, norm_params)
 
         print(f"\n{'=' * 60}")
         print(f"NORMALIZATION PARAMETERS (FIXED for all samples)")
@@ -320,9 +314,9 @@ class TestErrorPropagationDips:
         print(f"✓ All samples normalized using these fixed parameters")
         print(f"✓ This PRESERVES variability from prior uncertainty")
         print(f"{'=' * 60}\n")
-        return norm_params, normalization_method, observed_gravity_ugal, observed_norm
+        return norm_params, normalization_method, observed_gravity_ugal
 
-    def _setup_geomodel(self, gravity_data: DataFrame | GeoDataFrame | Any, simple_geo_model: GeoModel) -> tuple[GeoModel, ndarray[tuple[Any, ...], dtype[_ScalarT]]]:
+    def _setup_geomodel(self, gravity_data, simple_geo_model: gp.data.GeoModel): 
         geo_model: gp.data.GeoModel = simple_geo_model
         BackendTensor.change_backend_gempy(engine_backend=gp.data.AvailableBackends.PYTORCH)
 
