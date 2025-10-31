@@ -238,28 +238,3 @@ class TestErrorPropagationDips:
             observed_data=observed_gravity_ugal,
             grid_resolution=100
         )
-
-    def _plot_fw_gravity(self, grav, gravity_data: "DataFrame", xy_ravel: np.ndarray[tuple[Any, ...], np.dtype]):
-        import matplotlib.pyplot as plt
-        scatter = plt.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=grav, s=30,
-                              cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5)
-
-        # Add colorbar for scatter plot
-        cbar = plt.colorbar(scatter)
-        cbar.set_label(r'Forward Model Gravity ($\mu$gal)')
-
-        print(f"Plotting {len(xy_ravel)} actual measurement locations")
-
-        # Always show actual measurement point locations regardless of grid type
-        actual_measurement_points = np.column_stack([
-                np.array(gravity_data.geometry.x.values),
-                np.array(gravity_data.geometry.y.values)
-        ])
-
-        plt.scatter(actual_measurement_points[:, 0], actual_measurement_points[:, 1],
-                    s=15, c='red', marker='x', alpha=0.8, linewidth=1.5,
-                    label=f'Actual Measurement Points (n={len(actual_measurement_points)})')
-
-        plt.legend(loc='upper right', framealpha=0.9)
-        plt.title('Forward Gravity Model Results')
-        plt.show()

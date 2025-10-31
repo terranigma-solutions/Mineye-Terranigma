@@ -4,7 +4,14 @@ import numpy as np
 from pandas import DataFrame
 
 
-def _plot_comparison(observed_gravity, grav, xy_ravel, 
+from typing import Any
+
+import numpy as np
+from pandas import DataFrame
+from mineye.GeoModel.geophysics import normalize_gravity_pair
+
+
+def _plot_comparison(observed_gravity, grav, xy_ravel,
                      normalization_method='zscore'):
     import matplotlib.pyplot as plt
     print("\n=== Observed vs Predicted Comparison ===")
@@ -13,54 +20,16 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     observed_ugal = observed_gravity * 1000  # Convert mGal to μGal
     forward_model = grav.numpy().copy()
 
-    # Apply normalization if enabled
-    print(f"Applying {normalization_method} normalization...")
-
-    if normalization_method == 'zscore':
-        # Z-score normalization (mean=0, std=1)
-        obs_mean, obs_std = np.mean(observed_ugal), np.std(observed_ugal)
-        fwd_mean, fwd_std = np.mean(forward_model), np.std(forward_model)
-
-        observed_norm = (observed_ugal - obs_mean) / obs_std
-        forward_norm = (forward_model - fwd_mean) / fwd_std
-
-        unit_label = 'Z-score'
-
-    elif normalization_method == 'minmax':
-        # Min-max normalization (0 to 1)
-        obs_min, obs_max = np.min(observed_ugal), np.max(observed_ugal)
-        fwd_min, fwd_max = np.min(forward_model), np.max(forward_model)
-
-        observed_norm = (observed_ugal - obs_min) / (obs_max - obs_min)
-        forward_norm = (forward_model - fwd_min) / (fwd_max - fwd_min)
-
-        unit_label = 'Normalized [0-1]'
-
-    elif normalization_method == 'mean_center':
-        # Mean centering (subtract mean)
-        observed_norm = observed_ugal - np.mean(observed_ugal)
-        forward_norm = forward_model - np.mean(forward_model)
-
-        unit_label = 'Mean-centered (μGal)'
-
-    elif normalization_method == 'relative':
-        # Relative to range
-        obs_range = np.max(observed_ugal) - np.min(observed_ugal)
-        fwd_range = np.max(forward_model) - np.min(forward_model)
-
-        observed_norm = observed_ugal / obs_range
-        forward_norm = forward_model / fwd_range
-
-        unit_label = 'Relative to range'
-
-
-        print(f"  Observed stats (normalized): mean={np.mean(observed_norm):.3f}, std={np.std(observed_norm):.3f}")
-        print(f"  Forward stats (normalized):  mean={np.mean(forward_norm):.3f}, std={np.std(forward_norm):.3f}")
-    else:
-        raise ValueError(f"Invalid normalization method: {normalization_method}")
+    # Apply normalization using extracted function
+    observed_norm, forward_norm, unit_label = normalize_gravity_pair(
+        observed=observed_ugal,
+        forward_model=forward_model,
+        method=normalization_method,
+        verbose=True
+    )
 
     residuals_norm = observed_norm - forward_norm
-    
+
     # Create comparison plot with 4 subplots (add correlation plot)
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
 
