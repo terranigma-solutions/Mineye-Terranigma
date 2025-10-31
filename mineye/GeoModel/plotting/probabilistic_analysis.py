@@ -19,7 +19,7 @@ from mineye.GeoModel.geophysics import normalize_gravity_pair
 
 
 def _plot_comparison(observed_gravity, grav, xy_ravel,
-                     normalization_method='zscore_independent'):
+                     normalization_method='align_to_reference'):
     import matplotlib.pyplot as plt
     print("\n=== Observed vs Predicted Comparison ===")
 

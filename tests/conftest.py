@@ -1,10 +1,16 @@
 import dotenv
+import pyro
+import torch
+
 dotenv.load_dotenv()
 
 import os
 import pytest
 import gempy as gp
 
+seed = 4003
+pyro.set_rng_seed(seed)
+torch.manual_seed(seed)
 
 @pytest.fixture(scope="session")
 def base_dir():

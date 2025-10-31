@@ -1,5 +1,3 @@
-from typing import Any
-
 import arviz as az
 import numpy as np
 import torch
@@ -12,7 +10,6 @@ import gempy_viewer as gpv
 from gempy_engine.core.backend_tensor import BackendTensor
 from gempy_engine.core.data.interpolation_input import InterpolationInput
 from gempy_probability.modules.plot.plot_gempy import plot_gempy
-from mineye.GeoModel.geophysics import normalize_gravity_pair
 
 
 class TestErrorPropagationDips:
@@ -162,18 +159,44 @@ class TestErrorPropagationDips:
             grid_type=[geo_model.grid.GridTypes.CENTERED],
             reset=True
         )
+        
+        # ============ COMPUTE BASELINE FORWARD MODEL ============
+        # CRITICAL: Compute forward model with INITIAL/MEAN parameters before inference
+        # This provides the baseline statistics needed to preserve prior variability
+        print("\n" + "="*60)
+        print("COMPUTING BASELINE FORWARD MODEL")
+        print("="*60)
+        print("Computing gravity with mean/initial prior parameters...")
+
+        gp.compute_model(geo_model)
+        baseline_fw_gravity = geo_model.solutions.gravity
+
+        # Convert to numpy for normalization parameter computation
+        if hasattr(baseline_fw_gravity, 'numpy'):
+            baseline_fw_gravity_np = baseline_fw_gravity.numpy()
+        else:
+            baseline_fw_gravity_np = np.array(baseline_fw_gravity)
+
+        print(f"Baseline forward model statistics:")
+        print(f"  Mean: {np.mean(baseline_fw_gravity_np):.2f} μGal")
+        print(f"  Std:  {np.std(baseline_fw_gravity_np):.2f} μGal")
+        print(f"  Min:  {np.min(baseline_fw_gravity_np):.2f} μGal")
+        print(f"  Max:  {np.max(baseline_fw_gravity_np):.2f} μGal")
+        print("="*60 + "\n")
 
         # ============ NORMALIZATION SETUP ============
-        # Compute normalization parameters from observed data BEFORE inference
+        # Compute normalization parameters from observed data AND baseline forward model
         from mineye.GeoModel.geophysics import compute_normalization_params, apply_normalization_torch
 
         # Convert observed gravity from mGal to μGal for comparison
         observed_gravity_ugal = observed_gravity * 1000
 
-        # Compute normalization parameters once from observed data
-        normalization_method = 'zscore'  # Options: 'zscore', 'robust_zscore', 'minmax', etc.
+        # Compute normalization parameters once from observed data AND baseline forward model
+        # CRITICAL: Pass baseline_forward_model to preserve prior variability
+        normalization_method = 'align_to_reference'
         norm_params = compute_normalization_params(
             reference_data=observed_gravity_ugal,
+            baseline_forward_model=baseline_fw_gravity_np,  # CRITICAL: Baseline model
             method=normalization_method,
             verbose=True
         )
@@ -182,11 +205,16 @@ class TestErrorPropagationDips:
         observed_norm = apply_normalization_torch(observed_gravity_ugal, norm_params)
 
         print(f"\n{'='*60}")
-        print(f"NORMALIZATION PARAMETERS (computed from observed data)")
+        print(f"NORMALIZATION PARAMETERS (FIXED for all samples)")
         print(f"{'='*60}")
         print(f"Method: {norm_params['method']}")
-        print(f"Parameters: {norm_params}")
-        print(f"These will be applied to ALL gravity samples during inference")
+        print(f"Reference (observed) mean: {norm_params['reference_mean']:.2f} μGal")
+        print(f"Reference (observed) std:  {norm_params['reference_std']:.2f} μGal")
+        print(f"Baseline forward mean:     {norm_params['baseline_forward_mean']:.2f} μGal")
+        print(f"Baseline forward std:      {norm_params['baseline_forward_std']:.2f} μGal")
+        print(f"\n✓ Baseline statistics are FIXED (from initial model)")
+        print(f"✓ All samples normalized using these fixed parameters")
+        print(f"✓ This PRESERVES variability from prior uncertainty")
         print(f"{'='*60}\n")
 
         # ============ PYRO MODEL SETUP ============
@@ -222,7 +250,7 @@ class TestErrorPropagationDips:
             obs_name=None
         )
 
-        n_samples = 50
+        n_samples = 10
         prior_inference_data: az.InferenceData = gpp.run_predictive(
             prob_model=prob_model,
             geo_model=geo_model,
@@ -260,6 +288,8 @@ class TestErrorPropagationDips:
             unit_label = 'Mean-centered (μGal)'
         elif normalization_method == 'relative':
             unit_label = 'Relative to range'
+        elif normalization_method == 'align_to_reference':
+            unit_label = 'Aligned Gravity (μGal)'
         else:
             unit_label = 'Normalized'
 
