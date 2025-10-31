@@ -156,17 +156,42 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
     # Create figure with subplots
     fig, axes = plt.subplots(2, 2, figsize=(18, 14))
 
-    # ============ Plot 1: Mean gravity with error bars ============
+    # ============ Plot 1: Mean gravity with uncertainty visualization ============
     ax1 = axes[0, 0]
+    
+    # Adaptive error bar scaling based on spatial extent
+    spatial_extent = max(
+        xy_coords[:, 0].max() - xy_coords[:, 0].min(),
+        xy_coords[:, 1].max() - xy_coords[:, 1].min()
+    )
+    mean_std = np.mean(std_gravity)
+    
+    # Calculate adaptive scale: make error bars ~2% of spatial extent on average
+    target_size = 0.02 * spatial_extent  # Target error bar size
+    error_scale = target_size / mean_std if mean_std > 0 else 1.0
+    
+    # Cap the error scale to avoid extreme values
+    error_scale = np.clip(error_scale, 0.1, 1000)
+    
+    # Main scatter plot with mean gravity
     scatter1 = ax1.scatter(xy_coords[:, 0], xy_coords[:, 1], 
                           c=mean_gravity, s=100, cmap='viridis_r',
                           edgecolors='black', linewidth=1, zorder=3)
 
-    # Add error bars scaled by std
-    error_scale = 500  # Scale factor for visibility
-    ax1.errorbar(xy_coords[:, 0], xy_coords[:, 1], 
-                xerr=std_gravity * error_scale, yerr=std_gravity * error_scale,
-                fmt='none', ecolor='red', alpha=0.3, capsize=3, zorder=2)
+    # Add adaptive error bars
+    # Only show if they won't dominate the plot
+    if error_scale * mean_std < 0.1 * spatial_extent:
+        ax1.errorbar(xy_coords[:, 0], xy_coords[:, 1], 
+                    xerr=std_gravity * error_scale, yerr=std_gravity * error_scale,
+                    fmt='none', ecolor='red', alpha=0.3, capsize=3, zorder=2,
+                    label=f'Uncertainty (scaled {error_scale:.1f}×)')
+        ax1.legend(fontsize=9, loc='upper right')
+    else:
+        # If error bars would be too large, show text warning instead
+        ax1.text(0.02, 0.98, 
+                f'⚠ Large uncertainty\n(mean σ = {mean_std:.1f} μGal)\nSee Plot 2 for details',
+                transform=ax1.transAxes, fontsize=10, verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.7))
 
     ax1.set_title(f'Mean Gravity ± {confidence_level*100:.0f}% CI', fontsize=14, fontweight='bold')
     ax1.set_xlabel('X (m)', fontsize=12)

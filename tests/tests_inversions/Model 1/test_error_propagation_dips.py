@@ -131,93 +131,21 @@ class TestErrorPropagationDips:
         import geopandas as gpd
         import os
 
-        geo_model: gp.data.GeoModel = simple_geo_model
-        BackendTensor.change_backend_gempy(engine_backend=gp.data.AvailableBackends.PYTORCH)
-
         # Model parameters
         # Use actual gravity measurement device locations
         gravity_data = gpd.read_file(os.path.join(geophysical_dir, 'cleaned_gravity_data.geojson'))
         observed_gravity = gravity_data['VALU_BOU267'].values  # in mGal
 
-        xy_ravel = np.column_stack([
-                np.array(gravity_data.geometry.x.values),
-                np.array(gravity_data.geometry.y.values),
-                np.full(len(gravity_data), 0)  # Set Z to surface elevation
-        ])
+        geo_model, xy_ravel = self._setup_geomodel(gravity_data, simple_geo_model)
 
-        self._gravity_precomputations(
-            density_plutonites=2.9,  # kg/m³
-            density_sedimentary_host=2.3,  # kg/m³
-            xy_ravel=xy_ravel,
-            simple_geo_model=geo_model
-        )
-
-        geo_model.interpolation_options.mesh_extraction = False
-
-        gp.set_active_grid(
-            grid=geo_model.grid,
-            grid_type=[geo_model.grid.GridTypes.CENTERED],
-            reset=True
-        )
-        
         # ============ COMPUTE BASELINE FORWARD MODEL ============
         # CRITICAL: Compute forward model with INITIAL/MEAN parameters before inference
         # This provides the baseline statistics needed to preserve prior variability
-        print("\n" + "="*60)
-        print("COMPUTING BASELINE FORWARD MODEL")
-        print("="*60)
-        print("Computing gravity with mean/initial prior parameters...")
+        baseline_fw_gravity_np = self._baseline(geo_model)
 
-        gp.compute_model(geo_model)
-        baseline_fw_gravity = geo_model.solutions.gravity
+        norm_params, normalization_method, observed_gravity_ugal, observed_norm = self._normalize(baseline_fw_gravity_np, observed_gravity)
 
-        # Convert to numpy for normalization parameter computation
-        if hasattr(baseline_fw_gravity, 'numpy'):
-            baseline_fw_gravity_np = baseline_fw_gravity.numpy()
-        else:
-            baseline_fw_gravity_np = np.array(baseline_fw_gravity)
-
-        print(f"Baseline forward model statistics:")
-        print(f"  Mean: {np.mean(baseline_fw_gravity_np):.2f} μGal")
-        print(f"  Std:  {np.std(baseline_fw_gravity_np):.2f} μGal")
-        print(f"  Min:  {np.min(baseline_fw_gravity_np):.2f} μGal")
-        print(f"  Max:  {np.max(baseline_fw_gravity_np):.2f} μGal")
-        print("="*60 + "\n")
-
-        # ============ NORMALIZATION SETUP ============
-        # Compute normalization parameters from observed data AND baseline forward model
-        from mineye.GeoModel.geophysics import compute_normalization_params, apply_normalization_torch
-
-        # Convert observed gravity from mGal to μGal for comparison
-        observed_gravity_ugal = observed_gravity * 1000
-
-        # Compute normalization parameters once from observed data AND baseline forward model
-        # CRITICAL: Pass baseline_forward_model to preserve prior variability
-        normalization_method = 'align_to_reference'
-        norm_params = compute_normalization_params(
-            reference_data=observed_gravity_ugal,
-            baseline_forward_model=baseline_fw_gravity_np,  # CRITICAL: Baseline model
-            method=normalization_method,
-            verbose=True
-        )
-
-        # Also normalize observed data for later comparison
-        observed_norm = apply_normalization_torch(observed_gravity_ugal, norm_params)
-
-        print(f"\n{'='*60}")
-        print(f"NORMALIZATION PARAMETERS (FIXED for all samples)")
-        print(f"{'='*60}")
-        print(f"Method: {norm_params['method']}")
-        print(f"Reference (observed) mean: {norm_params['reference_mean']:.2f} μGal")
-        print(f"Reference (observed) std:  {norm_params['reference_std']:.2f} μGal")
-        print(f"Baseline forward mean:     {norm_params['baseline_forward_mean']:.2f} μGal")
-        print(f"Baseline forward std:      {norm_params['baseline_forward_std']:.2f} μGal")
-        print(f"\n✓ Baseline statistics are FIXED (from initial model)")
-        print(f"✓ All samples normalized using these fixed parameters")
-        print(f"✓ This PRESERVES variability from prior uncertainty")
-        print(f"{'='*60}\n")
-
-        # ============ PYRO MODEL SETUP ============
+        # region PYRO MODEL SETUP ============
         mean_orientations = torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10
         model_priors = {
                 r'dips': dist.Normal(
@@ -232,13 +160,14 @@ class TestErrorPropagationDips:
                 "dips_degrees": lambda samples, gm: samples["dips"],  # Just pass through
         }
 
+        from mineye.GeoModel.geophysics import apply_normalization_torch
         # Post-forward deterministics (extract model outputs)
         # Normalization is applied HERE during inference using the pre-computed parameters
         post_forward_dets = {
                 "gravity_response_raw": lambda samples, gm, sol: sol.gravity,  # Store raw gravity
-                "gravity_response": lambda samples, gm, sol: apply_normalization_torch(sol.gravity, norm_params),  # Normalized!
-                "mean_gravity": lambda samples, gm, sol: torch.mean(apply_normalization_torch(sol.gravity, norm_params)),
-                "max_gravity": lambda samples, gm, sol: torch.max(apply_normalization_torch(sol.gravity, norm_params), 0),
+                "gravity_response"    : lambda samples, gm, sol: apply_normalization_torch(-sol.gravity, norm_params),  # Normalized!
+                "mean_gravity"        : lambda samples, gm, sol: torch.mean(apply_normalization_torch(-sol.gravity, norm_params)),
+                "max_gravity"         : lambda samples, gm, sol: torch.max(apply_normalization_torch(-sol.gravity, norm_params), 0),
         }
 
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
@@ -258,14 +187,33 @@ class TestErrorPropagationDips:
             n_samples=n_samples,
             plot_trace=True
         )
+        
+        # endregion
 
-        # ============ EXTRACT NORMALIZED SAMPLES ============
+        # region EXTRACT NORMALIZED SAMPLES ============
         # Extract gravity samples: shape (n_chains, n_samples, n_devices)
         # We use chain 0 for visualization
         # IMPORTANT: These are ALREADY NORMALIZED (done during inference)
         gravity_samples_norm = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
-        gravity_samples_raw = prior_inference_data.prior[r'gravity_response_raw'].values[0, :]  # Raw values for reference
 
+        gravity_samples_norm, unit_label = self._plot(gravity_samples_norm, normalization_method, observed_gravity_ugal, observed_norm, xy_ravel)
+
+        # Print final summary
+        print(f"\n{'=' * 60}")
+        print(f"INFERENCE COMPLETE - NORMALIZED RESULTS")
+        print(f"{'=' * 60}")
+        print(f"Method: {norm_params['method']}")
+        print(f"Parameters: {norm_params}")
+        print(f"Unit label: {unit_label}")
+        print(f"Samples shape: {gravity_samples_norm.shape}")
+        print(f"✓ Normalization applied DURING inference (in post_forward_deterministics)")
+        print(f"✓ All {gravity_samples_norm.shape[0]} samples use consistent parameters")
+        print(f"✓ Parameters computed from observed data before inference")
+        print(f"{'=' * 60}\n")
+        
+        #endreion
+
+    def _plot(self, gravity_samples_norm, normalization_method: str, observed_gravity_ugal, observed_norm: dict[str, float], xy_ravel) -> tuple[str, Any]:
         # Import visualization functions
         from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_map_interpolated
         from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_profiles
@@ -277,31 +225,20 @@ class TestErrorPropagationDips:
         if hasattr(observed_norm, 'numpy'):
             observed_norm = observed_norm.numpy()
 
-        # Generate unit label
-        if normalization_method == 'zscore':
-            unit_label = 'Z-score'
-        elif normalization_method == 'robust_zscore':
-            unit_label = 'Robust Z-score'
-        elif normalization_method == 'minmax':
-            unit_label = 'Normalized [0-1]'
-        elif normalization_method == 'mean_center':
-            unit_label = 'Mean-centered (μGal)'
-        elif normalization_method == 'relative':
-            unit_label = 'Relative to range'
-        elif normalization_method == 'align_to_reference':
+        if normalization_method == 'align_to_reference':
             unit_label = 'Aligned Gravity (μGal)'
         else:
             unit_label = 'Normalized'
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"EXTRACTED NORMALIZED SAMPLES")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Number of samples: {gravity_samples_norm.shape[0]}")
         print(f"Number of devices: {gravity_samples_norm.shape[1]}")
         print(f"Normalization method: {normalization_method}")
         print(f"Normalization was applied DURING inference (not post-processing)")
         print(f"All samples use consistent normalization parameters from observed data")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # 1. Comprehensive uncertainty visualization (with normalized data)
         plot_gravity_with_uncertainty(
@@ -328,16 +265,86 @@ class TestErrorPropagationDips:
             observed_data=observed_norm,
             grid_resolution=100
         )
+        return gravity_samples_norm, unit_label
 
-        # Print final summary
-        print(f"\n{'='*60}")
-        print(f"INFERENCE COMPLETE - NORMALIZED RESULTS")
-        print(f"{'='*60}")
+    def _baseline(self, geo_model) -> Any:
+        print("\n" + "=" * 60)
+        print("COMPUTING BASELINE FORWARD MODEL")
+        print("=" * 60)
+        print("Computing gravity with mean/initial prior parameters...")
+
+        baseline_fw_gravity = geo_model.solutions.gravity
+
+        # Convert to numpy for normalization parameter computation
+        if hasattr(baseline_fw_gravity, 'numpy'):
+            baseline_fw_gravity_np = baseline_fw_gravity.numpy()
+        else:
+            baseline_fw_gravity_np = np.array(-baseline_fw_gravity)
+
+        print(f"Baseline forward model statistics:")
+        print(f"  Mean: {np.mean(baseline_fw_gravity_np):.2f} μGal")
+        print(f"  Std:  {np.std(baseline_fw_gravity_np):.2f} μGal")
+        print(f"  Min:  {np.min(baseline_fw_gravity_np):.2f} μGal")
+        print(f"  Max:  {np.max(baseline_fw_gravity_np):.2f} μGal")
+        print("=" * 60 + "\n")
+        return baseline_fw_gravity_np
+
+    def _normalize(self, baseline_fw_gravity_np: ndarray[tuple[Any, ...], dtype[_ScalarT]] | ndarray[tuple[Any, ...], dtype[Any]] | Any, observed_gravity: ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]) -> tuple[float | Any, str, ndarray[Any, dtype[number[Any, int | float | complex] | Any]], dict[str, float]]:
+        from mineye.GeoModel.geophysics import compute_normalization_params, apply_normalization_torch
+
+        # Convert observed gravity from mGal to μGal for comparison
+        observed_gravity_ugal = observed_gravity * 1000
+
+        # Compute normalization parameters once from observed data AND baseline forward model
+        # CRITICAL: Pass baseline_forward_model to preserve prior variability
+        normalization_method = 'align_to_reference'
+        norm_params = compute_normalization_params(
+            reference_data=observed_gravity_ugal,
+            baseline_forward_model=baseline_fw_gravity_np,  # CRITICAL: Baseline model
+            method=normalization_method,
+            verbose=True
+        )
+
+        # Also normalize observed data for later comparison
+        observed_norm = apply_normalization_torch(observed_gravity_ugal, norm_params)
+
+        print(f"\n{'=' * 60}")
+        print(f"NORMALIZATION PARAMETERS (FIXED for all samples)")
+        print(f"{'=' * 60}")
         print(f"Method: {norm_params['method']}")
-        print(f"Parameters: {norm_params}")
-        print(f"Unit label: {unit_label}")
-        print(f"Samples shape: {gravity_samples_norm.shape}")
-        print(f"✓ Normalization applied DURING inference (in post_forward_deterministics)")
-        print(f"✓ All {gravity_samples_norm.shape[0]} samples use consistent parameters")
-        print(f"✓ Parameters computed from observed data before inference")
-        print(f"{'='*60}\n")
+        print(f"Reference (observed) mean: {norm_params['reference_mean']:.2f} μGal")
+        print(f"Reference (observed) std:  {norm_params['reference_std']:.2f} μGal")
+        print(f"Baseline forward mean:     {norm_params['baseline_forward_mean']:.2f} μGal")
+        print(f"Baseline forward std:      {norm_params['baseline_forward_std']:.2f} μGal")
+        print(f"\n✓ Baseline statistics are FIXED (from initial model)")
+        print(f"✓ All samples normalized using these fixed parameters")
+        print(f"✓ This PRESERVES variability from prior uncertainty")
+        print(f"{'=' * 60}\n")
+        return norm_params, normalization_method, observed_gravity_ugal, observed_norm
+
+    def _setup_geomodel(self, gravity_data: DataFrame | GeoDataFrame | Any, simple_geo_model: GeoModel) -> tuple[GeoModel, ndarray[tuple[Any, ...], dtype[_ScalarT]]]:
+        geo_model: gp.data.GeoModel = simple_geo_model
+        BackendTensor.change_backend_gempy(engine_backend=gp.data.AvailableBackends.PYTORCH)
+
+        xy_ravel = np.column_stack([
+                np.array(gravity_data.geometry.x.values),
+                np.array(gravity_data.geometry.y.values),
+                np.full(len(gravity_data), 0)  # Set Z to surface elevation
+        ])
+
+        self._gravity_precomputations(
+            density_plutonites=2.9,  # kg/m³
+            density_sedimentary_host=2.3,  # kg/m³
+            xy_ravel=xy_ravel,
+            simple_geo_model=geo_model
+        )
+
+        geo_model.interpolation_options.mesh_extraction = False
+
+        gp.set_active_grid(
+            grid=geo_model.grid,
+            grid_type=[geo_model.grid.GridTypes.CENTERED],
+            reset=True
+        )
+        gp.compute_model(geo_model)
+        return geo_model, xy_ravel
