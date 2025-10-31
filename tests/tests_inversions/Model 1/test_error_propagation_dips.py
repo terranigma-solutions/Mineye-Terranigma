@@ -287,7 +287,6 @@ class TestErrorPropagationDips:
         return -baseline_fw_gravity_np
 
     def _normalize(self, baseline_fw_gravity_np , observed_gravity):
-        from mineye.GeoModel.geophysics import compute_normalization_params
 
         # Convert observed gravity from mGal to μGal for comparison
         observed_gravity_ugal = observed_gravity * 1000
@@ -310,18 +309,6 @@ class TestErrorPropagationDips:
         
         normalization_method = '_'
 
-        print(f"\n{'=' * 60}")
-        print(f"NORMALIZATION PARAMETERS (FIXED for all samples)")
-        print(f"{'=' * 60}")
-        print(f"Method: {norm_params['method']}")
-        print(f"Reference (observed) mean: {norm_params['reference_mean']:.2f} μGal")
-        print(f"Reference (observed) std:  {norm_params['reference_std']:.2f} μGal")
-        print(f"Baseline forward mean:     {norm_params['baseline_forward_mean']:.2f} μGal")
-        print(f"Baseline forward std:      {norm_params['baseline_forward_std']:.2f} μGal")
-        print(f"\n✓ Baseline statistics are FIXED (from initial model)")
-        print(f"✓ All samples normalized using these fixed parameters")
-        print(f"✓ This PRESERVES variability from prior uncertainty")
-        print(f"{'=' * 60}\n")
         return norm_params, normalization_method, observed_gravity_ugal
 
     def _setup_geomodel(self, gravity_data, simple_geo_model: gp.data.GeoModel): 

@@ -1,154 +1,106 @@
+# ... existing code ...
 import numpy as np
-from typing import Literal, Tuple, Dict, Optional
-
-import numpy as np
-from typing import Dict, Optional
-
+from typing import Dict, Optional, Literal, Tuple
 import torch
 
 
 def compute_alignment_params(
         observed: np.ndarray,
         baseline_forward: Optional[np.ndarray] = None,
-        verbose: bool = True
-) -> Dict[str, float]:
+        verbose: bool = True,
+        method: Literal["align_to_reference", "quantile_align"] = "quantile_align",
+        n_quantiles: int = 11
+) -> Dict[str, np.ndarray | float | str]:
     """
-    Compute parameters to linearly align any forward gravity field to the observed distribution.
-    If baseline_forward is provided, its fixed stats are stored to preserve prior variability.
+    Compute parameters to align forward gravity fields to observed distribution.
+    method:
+      - "align_to_reference": linear mean/std alignment (assumes near-normal)
+      - "quantile_align": robust monotonic alignment via piecewise linear quantile mapping
     """
     if verbose:
-        print("Computing alignment parameters from observed data" +
-              (" and baseline forward" if baseline_forward is not None else "") + "...")
+        print(f"Computing {method} alignment parameters...")
+
+    if method == "align_to_reference":
+        params = {
+            "method": method,
+            "reference_mean": float(np.mean(observed)),
+            "reference_std": float(np.std(observed)),
+        }
+        if baseline_forward is not None:
+            params["baseline_forward_mean"] = float(np.mean(baseline_forward))
+            params["baseline_forward_std"] = float(np.std(baseline_forward))
+        if verbose:
+            print(f"  Alignment params: {params}")
+        return params
+
+    # Robust quantile alignment
+    if baseline_forward is None:
+        raise ValueError("quantile_align requires baseline_forward.")
+
+    q = np.linspace(0, 1, n_quantiles)
+    obs_qv = np.quantile(observed, q)
+    base_qv = np.quantile(baseline_forward, q)
+
+    # Ensure strict monotonicity to avoid flat segments
+    eps = 1e-9
+    for arr in (obs_qv, base_qv):
+        # Enforce increasing
+        for i in range(1, len(arr)):
+            if arr[i] <= arr[i-1]:
+                arr[i] = arr[i-1] + eps
 
     params = {
-            "method"        : "align_to_reference",
-            "reference_mean": float(np.mean(observed)),
-            "reference_std" : float(np.std(observed)),
+        "method": "quantile_align",
+        "quantiles": q,
+        "baseline_quantile_values": base_qv.astype(float),
+        "observed_quantile_values": obs_qv.astype(float),
     }
-
-    if baseline_forward is not None:
-        params["baseline_forward_mean"] = float(np.mean(baseline_forward))
-        params["baseline_forward_std"] = float(np.std(baseline_forward))
-
     if verbose:
-        print(f"  Alignment params: {params}")
-
+        print("  Quantile alignment params ready "
+              f"(n_knots={n_quantiles}): ranges "
+              f"[{base_qv[0]:.2f},{base_qv[-1]:.2f}] -> [{obs_qv[0]:.2f},{obs_qv[-1]:.2f}]")
     return params
 
-
-# ... existing code ...
 
 def align_forward_to_observed(
         forward: torch.Tensor,
-        params: Dict[str, float]
-) -> np.ndarray:
+        params: Dict[str, np.ndarray | float | str],
+        eps: float = 1e-6,
+        negate_forward: bool = False
+) -> torch.Tensor:
     """
-    Linearly map a forward gravity field to the observed distribution using precomputed params.
-    If baseline stats exist, they are used to preserve prior variability; otherwise,
-    the forward’s own stats are used (still a linear alignment).
+    Align forward gravity to observed using params from compute_alignment_params.
+    Supports:
+      - method="align_to_reference": linear mean/std
+      - method="quantile_align": robust piecewise-linear quantile mapping
     """
-    ref_mu = params["reference_mean"]
-    ref_sigma = params["reference_std"]
+    x = -forward if negate_forward else forward
+    method = params.get("method", "align_to_reference")
 
-    # Prefer fixed baseline stats if available
-    base_mu = params.get("baseline_forward_mean", float(torch.mean(forward)))
-    base_sigma = params.get("baseline_forward_std", float(torch.std(forward)))
+    if method == "align_to_reference":
+        ref_mu = float(params["reference_mean"])
+        ref_sigma = float(params["reference_std"])
+        base_mu = float(params.get("baseline_forward_mean", torch.mean(x).item()))
+        base_sigma = float(params.get("baseline_forward_std", torch.std(x, unbiased=False).item()))
+        base_sigma = max(base_sigma, eps)
+        standardized = (x - base_mu) / base_sigma
+        return standardized * ref_sigma + ref_mu
 
-    # Standardize with baseline (or forward) stats, then scale/shift to observed
-    standardized = (forward - base_mu) / base_sigma
-    aligned = standardized * ref_sigma + ref_mu
-    return aligned
+    # Quantile alignment (robust)
+    base_qv = torch.tensor(params["baseline_quantile_values"], dtype=x.dtype, device=x.device)
+    obs_qv = torch.tensor(params["observed_quantile_values"], dtype=x.dtype, device=x.device)
 
+    # Clip to baseline support to avoid extrapolation blow-ups
+    x_clipped = torch.clamp(x, min=base_qv[0].item(), max=base_qv[-1].item())
 
+    # Piecewise-linear interpolation: map baseline value -> observed value
+    # Find segment indices
+    idx = torch.searchsorted(base_qv, x_clipped, right=True).clamp(min=1, max=base_qv.numel()-1)
+    x0 = base_qv[idx - 1]
+    x1 = base_qv[idx]
+    y0 = obs_qv[idx - 1]
+    y1 = obs_qv[idx]
+    w = (x_clipped - x0) / torch.clamp(x1 - x0, min=eps)
+    y = y0 + w * (y1 - y0)
+    return y
 # ... existing code ...
-def compute_normalization_params(
-        reference_data: np.ndarray,
-        method: Literal['zscore', 'minmax', 'mean_center', 'relative', 'robust_zscore', 'align_to_reference'] = 'zscore',
-        baseline_forward_model: Optional[np.ndarray] = None,
-        verbose: bool = True
-) -> Dict[str, float]:
-    """
-    Compute normalization parameters from reference data (typically observed data).
-
-    These parameters can then be applied consistently to multiple datasets (e.g., all Pyro samples).
-
-    Args:
-        reference_data: Reference gravity data array (e.g., observed data)
-        method: Normalization method
-        baseline_forward_model: Baseline forward model (e.g., with mean prior parameters).
-                               Required for 'align_to_reference' method to preserve prior variability.
-        verbose: Whether to print statistics
-
-    Returns:
-        Dictionary containing normalization parameters
-    """
-    if verbose:
-        print(f"Computing {method} normalization parameters from reference data...")
-
-    if method == 'zscore':
-        params = {
-                'method': method,
-                'mean'  : float(np.mean(reference_data)),
-                'std'   : float(np.std(reference_data))
-        }
-
-    elif method == 'robust_zscore':
-        median_val = float(np.median(reference_data))
-        mad_val = float(np.median(np.abs(reference_data - median_val)))
-        params = {
-                'method': method,
-                'median': median_val,
-                'mad'   : mad_val
-        }
-
-    elif method == 'minmax':
-        params = {
-                'method': method,
-                'min'   : float(np.min(reference_data)),
-                'max'   : float(np.max(reference_data))
-        }
-
-    elif method == 'mean_center':
-        params = {
-                'method': method,
-                'mean'  : float(np.mean(reference_data))
-        }
-
-    elif method == 'relative':
-        data_range = float(np.max(reference_data) - np.min(reference_data))
-        params = {
-                'method': method,
-                'range' : data_range
-        }
-
-    elif method == 'align_to_reference':
-        # RECOMMENDED for forward models that are shifted/scaled differently from observations
-        # CRITICAL: Stores BOTH reference (observed) AND baseline forward model statistics
-        # This preserves prior variability while aligning scales
-
-        if baseline_forward_model is None:
-            raise ValueError(
-                "align_to_reference method requires baseline_forward_model to preserve prior variability. "
-                "Compute forward model with mean prior parameters before inference."
-            )
-
-        params = {
-                'method'               : method,
-                'reference_mean'       : float(np.mean(reference_data)),
-                'reference_std'        : float(np.std(reference_data)),
-                'reference_min'        : float(np.min(reference_data)),
-                'reference_max'        : float(np.max(reference_data)),
-                # CRITICAL: Fixed baseline statistics to preserve prior variability
-                'baseline_forward_mean': float(np.mean(baseline_forward_model)),
-                'baseline_forward_std' : float(np.std(baseline_forward_model))
-        }
-
-    else:
-        raise ValueError(f"Invalid normalization method: {method}")
-
-    if verbose:
-        print(f"  Normalization parameters: {params}")
-
-    return params
-
-
