@@ -73,23 +73,26 @@ def model_resolution():
 
 @pytest.fixture
 def simple_geo_model(model_extent, model_resolution, model_paths):
-    """Create a simple geological model with the given parameters."""
-    geo_model = gp.create_geomodel(
-        project_name='simple_model',
-        extent=model_extent,
-        refinement=4,
-        resolution=model_resolution,
-        importer_helper=gp.data.ImporterHelper(
-            path_to_orientations=model_paths['orientations'],
-            path_to_surface_points=model_paths['points'],
+    """Factory for creating simple geological models with custom parameters."""
+    def _create_model(project_name='simple_model', refinement=4, extent=None, resolution=None):
+        geo_model = gp.create_geomodel(
+            project_name=project_name,
+            extent=extent or model_extent,
+            refinement=refinement,
+            resolution=resolution or model_resolution,
+            importer_helper=gp.data.ImporterHelper(
+                path_to_orientations=model_paths['orientations'],
+                path_to_surface_points=model_paths['points'],
+            )
         )
-    )
 
-    gp.map_stack_to_surfaces(
-        gempy_model=geo_model,
-        mapping_object={
-            "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
-        }
-    )
+        gp.map_stack_to_surfaces(
+            gempy_model=geo_model,
+            mapping_object={
+                    "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
+            }
+        )
 
-    return geo_model
+        return geo_model
+
+    return _create_model()
