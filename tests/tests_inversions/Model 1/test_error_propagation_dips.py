@@ -12,6 +12,7 @@ import gempy_viewer as gpv
 from gempy_engine.core.backend_tensor import BackendTensor
 from gempy_engine.core.data.interpolation_input import InterpolationInput
 from gempy_probability.modules.plot.plot_gempy import plot_gempy
+from mineye.GeoModel.geophysics import normalize_gravity_pair
 
 
 class TestErrorPropagationDips:
@@ -162,6 +163,33 @@ class TestErrorPropagationDips:
             reset=True
         )
 
+        # ============ NORMALIZATION SETUP ============
+        # Compute normalization parameters from observed data BEFORE inference
+        from mineye.GeoModel.geophysics import compute_normalization_params, apply_normalization_torch
+
+        # Convert observed gravity from mGal to μGal for comparison
+        observed_gravity_ugal = observed_gravity * 1000
+
+        # Compute normalization parameters once from observed data
+        normalization_method = 'zscore'  # Options: 'zscore', 'robust_zscore', 'minmax', etc.
+        norm_params = compute_normalization_params(
+            reference_data=observed_gravity_ugal,
+            method=normalization_method,
+            verbose=True
+        )
+
+        # Also normalize observed data for later comparison
+        observed_norm = apply_normalization_torch(observed_gravity_ugal, norm_params)
+
+        print(f"\n{'='*60}")
+        print(f"NORMALIZATION PARAMETERS (computed from observed data)")
+        print(f"{'='*60}")
+        print(f"Method: {norm_params['method']}")
+        print(f"Parameters: {norm_params}")
+        print(f"These will be applied to ALL gravity samples during inference")
+        print(f"{'='*60}\n")
+
+        # ============ PYRO MODEL SETUP ============
         mean_orientations = torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10
         model_priors = {
                 r'dips': dist.Normal(
@@ -177,10 +205,12 @@ class TestErrorPropagationDips:
         }
 
         # Post-forward deterministics (extract model outputs)
+        # Normalization is applied HERE during inference using the pre-computed parameters
         post_forward_dets = {
-                "gravity_response": lambda samples, gm, sol: sol.gravity,
-                "mean_gravity"    : lambda samples, gm, sol: torch.mean(sol.gravity),
-                "max_gravity"     : lambda samples, gm, sol: torch.max(sol.gravity, 0),
+                "gravity_response_raw": lambda samples, gm, sol: sol.gravity,  # Store raw gravity
+                "gravity_response": lambda samples, gm, sol: apply_normalization_torch(sol.gravity, norm_params),  # Normalized!
+                "mean_gravity": lambda samples, gm, sol: torch.mean(apply_normalization_torch(sol.gravity, norm_params)),
+                "max_gravity": lambda samples, gm, sol: torch.max(apply_normalization_torch(sol.gravity, norm_params), 0),
         }
 
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
@@ -201,40 +231,83 @@ class TestErrorPropagationDips:
             plot_trace=True
         )
 
+        # ============ EXTRACT NORMALIZED SAMPLES ============
         # Extract gravity samples: shape (n_chains, n_samples, n_devices)
         # We use chain 0 for visualization
-        gravity_samples = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
+        # IMPORTANT: These are ALREADY NORMALIZED (done during inference)
+        gravity_samples_norm = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
+        gravity_samples_raw = prior_inference_data.prior[r'gravity_response_raw'].values[0, :]  # Raw values for reference
 
-        # Import visualization functions from test_geophysics
+        # Import visualization functions
         from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_map_interpolated
         from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_profiles
         from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_with_uncertainty
 
-        # Convert observed gravity from mGal to μGal for comparison
-        observed_gravity_ugal = observed_gravity * 1000
+        # Convert PyTorch tensor to numpy if needed
+        if hasattr(gravity_samples_norm, 'numpy'):
+            gravity_samples_norm = gravity_samples_norm.numpy()
+        if hasattr(observed_norm, 'numpy'):
+            observed_norm = observed_norm.numpy()
 
-        # 1. Comprehensive uncertainty visualization
+        # Generate unit label
+        if normalization_method == 'zscore':
+            unit_label = 'Z-score'
+        elif normalization_method == 'robust_zscore':
+            unit_label = 'Robust Z-score'
+        elif normalization_method == 'minmax':
+            unit_label = 'Normalized [0-1]'
+        elif normalization_method == 'mean_center':
+            unit_label = 'Mean-centered (μGal)'
+        elif normalization_method == 'relative':
+            unit_label = 'Relative to range'
+        else:
+            unit_label = 'Normalized'
+
+        print(f"\n{'='*60}")
+        print(f"EXTRACTED NORMALIZED SAMPLES")
+        print(f"{'='*60}")
+        print(f"Number of samples: {gravity_samples_norm.shape[0]}")
+        print(f"Number of devices: {gravity_samples_norm.shape[1]}")
+        print(f"Normalization method: {normalization_method}")
+        print(f"Normalization was applied DURING inference (not post-processing)")
+        print(f"All samples use consistent normalization parameters from observed data")
+        print(f"{'='*60}\n")
+
+        # 1. Comprehensive uncertainty visualization (with normalized data)
         plot_gravity_with_uncertainty(
-            gravity_samples=gravity_samples,
+            gravity_samples=gravity_samples_norm,
             xy_coords=xy_ravel,
             observed_data=observed_gravity_ugal,
             confidence_level=0.95,
             title="Gravity Uncertainty Propagation from Dip Uncertainty"
         )
 
-        # 2. Profile plots with confidence bands
+        # 2. Profile plots with confidence bands (with normalized data)
         plot_gravity_uncertainty_profiles(
-            gravity_samples=gravity_samples,
+            gravity_samples=gravity_samples_norm,
             xy_coords=xy_ravel,
-            observed_data=observed_gravity_ugal,
+            observed_data=observed_norm,
             n_profiles=4,
             confidence_level=0.95
         )
 
-        # 3. Interpolated uncertainty maps (smoother visualization)
+        # 3. Interpolated uncertainty maps (smoother visualization with normalized data)
         plot_gravity_uncertainty_map_interpolated(
-            gravity_samples=gravity_samples,
+            gravity_samples=gravity_samples_norm,
             xy_coords=xy_ravel,
-            observed_data=observed_gravity_ugal,
+            observed_data=observed_norm,
             grid_resolution=100
         )
+
+        # Print final summary
+        print(f"\n{'='*60}")
+        print(f"INFERENCE COMPLETE - NORMALIZED RESULTS")
+        print(f"{'='*60}")
+        print(f"Method: {norm_params['method']}")
+        print(f"Parameters: {norm_params}")
+        print(f"Unit label: {unit_label}")
+        print(f"Samples shape: {gravity_samples_norm.shape}")
+        print(f"✓ Normalization applied DURING inference (in post_forward_deterministics)")
+        print(f"✓ All {gravity_samples_norm.shape[0]} samples use consistent parameters")
+        print(f"✓ Parameters computed from observed data before inference")
+        print(f"{'='*60}\n")

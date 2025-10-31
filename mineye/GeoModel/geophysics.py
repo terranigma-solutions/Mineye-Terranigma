@@ -1,55 +1,155 @@
 import numpy as np
-from typing import Literal, Tuple, Dict
+from typing import Literal, Tuple, Dict, Optional
 
 
-def normalize_gravity_data(
-        data: np.ndarray,
-        method: Literal['zscore', 'minmax', 'mean_center', 'relative'] = 'zscore'
-) -> Tuple[np.ndarray, str]:
+def compute_normalization_params(
+        reference_data: np.ndarray,
+        method: Literal['zscore', 'minmax', 'mean_center', 'relative', 'robust_zscore'] = 'zscore',
+        verbose: bool = True
+) -> Dict[str, float]:
     """
-    Normalize gravity data using various methods.
-    
+    Compute normalization parameters from reference data (typically observed data).
+
+    These parameters can then be applied consistently to multiple datasets (e.g., all Pyro samples).
+
     Args:
-        data: Input gravity data array
-        method: Normalization method to apply:
-            - 'zscore': Z-score normalization (mean=0, std=1)
-            - 'minmax': Min-max normalization (0 to 1)
-            - 'mean_center': Mean centering (subtract mean)
-            - 'relative': Relative to range
-    
+        reference_data: Reference gravity data array (e.g., observed data)
+        method: Normalization method
+        verbose: Whether to print statistics
+
     Returns:
-        Tuple of (normalized_data, unit_label)
-    
-    Raises:
-        ValueError: If invalid normalization method is provided
+        Dictionary containing normalization parameters
     """
+    if verbose:
+        print(f"Computing {method} normalization parameters from reference data...")
+
     if method == 'zscore':
-        # Z-score normalization (mean=0, std=1)
-        data_mean, data_std = np.mean(data), np.std(data)
-        normalized = (data - data_mean) / data_std
-        unit_label = 'Z-score'
+        params = {
+            'method': method,
+            'mean': float(np.mean(reference_data)),
+            'std': float(np.std(reference_data))
+        }
+
+    elif method == 'robust_zscore':
+        median_val = float(np.median(reference_data))
+        mad_val = float(np.median(np.abs(reference_data - median_val)))
+        params = {
+            'method': method,
+            'median': median_val,
+            'mad': mad_val
+        }
 
     elif method == 'minmax':
-        # Min-max normalization (0 to 1)
-        data_min, data_max = np.min(data), np.max(data)
-        normalized = (data - data_min) / (data_max - data_min)
-        unit_label = 'Normalized [0-1]'
+        params = {
+            'method': method,
+            'min': float(np.min(reference_data)),
+            'max': float(np.max(reference_data))
+        }
 
     elif method == 'mean_center':
-        # Mean centering (subtract mean)
-        normalized = data - np.mean(data)
-        unit_label = 'Mean-centered (μGal)'
+        params = {
+            'method': method,
+            'mean': float(np.mean(reference_data))
+        }
 
     elif method == 'relative':
-        # Relative to range
-        data_range = np.max(data) - np.min(data)
-        normalized = data / data_range
-        unit_label = 'Relative to range'
+        data_range = float(np.max(reference_data) - np.min(reference_data))
+        params = {
+            'method': method,
+            'range': data_range
+        }
+    else:
+        raise ValueError(f"Invalid normalization method: {method}")
+
+    if verbose:
+        print(f"  Normalization parameters: {params}")
+
+    return params
+
+
+def apply_normalization(
+        data: np.ndarray,
+        norm_params: Dict[str, float],
+        verbose: bool = False
+) -> np.ndarray:
+    """
+    Apply pre-computed normalization parameters to data.
+
+    This ensures consistent normalization across multiple datasets using the same scale.
+
+    Args:
+        data: Data array to normalize
+        norm_params: Normalization parameters from compute_normalization_params()
+        verbose: Whether to print statistics
+
+    Returns:
+        Normalized data array
+    """
+    method = norm_params['method']
+
+    if method == 'zscore':
+        normalized = (data - norm_params['mean']) / norm_params['std']
+
+    elif method == 'robust_zscore':
+        normalized = (data - norm_params['median']) / (1.4826 * norm_params['mad'])
+
+    elif method == 'minmax':
+        normalized = (data - norm_params['min']) / (norm_params['max'] - norm_params['min'])
+
+    elif method == 'mean_center':
+        normalized = data - norm_params['mean']
+
+    elif method == 'relative':
+        normalized = data / norm_params['range']
 
     else:
         raise ValueError(f"Invalid normalization method: {method}")
 
-    return normalized, unit_label
+    if verbose:
+        print(f"  Applied {method} normalization: mean={np.mean(normalized):.3f}, "
+              f"std={np.std(normalized):.3f}, min={np.min(normalized):.3f}, max={np.max(normalized):.3f}")
+
+    return normalized
+
+
+def apply_normalization_torch(
+        data,  # torch.Tensor or any array-like
+        norm_params: Dict[str, float]
+):
+    """
+    Apply pre-computed normalization parameters to data (PyTorch compatible).
+
+    This version works with PyTorch tensors and can be used inside Pyro models.
+
+    Args:
+        data: Data tensor to normalize (PyTorch tensor or numpy array)
+        norm_params: Normalization parameters from compute_normalization_params()
+
+    Returns:
+        Normalized data (same type as input)
+    """
+    method = norm_params['method']
+
+    if method == 'zscore':
+        normalized = (data - norm_params['mean']) / norm_params['std']
+
+    elif method == 'robust_zscore':
+        normalized = (data - norm_params['median']) / (1.4826 * norm_params['mad'])
+
+    elif method == 'minmax':
+        normalized = (data - norm_params['min']) / (norm_params['max'] - norm_params['min'])
+
+    elif method == 'mean_center':
+        normalized = data - norm_params['mean']
+
+    elif method == 'relative':
+        normalized = data / norm_params['range']
+
+    else:
+        raise ValueError(f"Invalid normalization method: {method}")
+
+    return normalized
+
 
 
 def normalize_gravity_pair(
