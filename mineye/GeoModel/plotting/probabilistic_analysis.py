@@ -3,19 +3,7 @@ from typing import Any
 import numpy as np
 from pandas import DataFrame
 
-
-from typing import Any
-
-import numpy as np
-from pandas import DataFrame
-from mineye.GeoModel.geophysics import normalize_gravity_pair
-
-
-from typing import Any
-
-import numpy as np
-from pandas import DataFrame
-from mineye.GeoModel.geophysics import normalize_gravity_pair
+from mineye.GeoModel.geophysics import compute_alignment_params, align_forward_to_observed
 
 
 def _plot_comparison(observed_gravity, grav, xy_ravel,
@@ -27,13 +15,19 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     observed_ugal = observed_gravity * 1000  # Convert mGal to μGal
     forward_model = -grav.numpy().copy()
 
-    # Apply normalization using extracted function with SHARED parameters
-    observed_norm, forward_norm, unit_label, norm_params = normalize_gravity_pair(
+    
+    params = compute_alignment_params(
         observed=observed_ugal,
-        forward_model=forward_model,
-        method=normalization_method,
-        verbose=True
+        baseline_forward=forward_model
     )
+
+    forward_norm = align_forward_to_observed(
+        forward=forward_model,
+        params=params
+    )
+    
+    observed_norm = observed_ugal.copy()
+    unit_label = r'$\mu$Gal'
 
     residuals_norm = observed_norm - forward_norm
     
@@ -140,8 +134,6 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
         title: Plot title
     """
     import matplotlib.pyplot as plt
-    from matplotlib.patches import Ellipse
-    import matplotlib.transforms as transforms
 
     # Compute statistics
     mean_gravity = np.mean(gravity_samples, axis=0)

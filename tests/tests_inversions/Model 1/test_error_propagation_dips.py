@@ -12,6 +12,7 @@ import gempy_viewer as gpv
 from gempy_engine.core.backend_tensor import BackendTensor
 from gempy_engine.core.data.interpolation_input import InterpolationInput
 from gempy_probability.modules.plot.plot_gempy import plot_gempy
+from mineye.GeoModel.geophysics import align_forward_to_observed
 
 
 class TestErrorPropagationDips:
@@ -162,14 +163,14 @@ class TestErrorPropagationDips:
                 "dips_degrees": lambda samples, gm: samples["dips"],  # Just pass through
         }
 
-        from mineye.GeoModel.geophysics import apply_normalization_torch
         # Post-forward deterministics (extract model outputs)
         # Normalization is applied HERE during inference using the pre-computed parameters
+
         post_forward_dets = {
                 "gravity_response_raw": lambda samples, gm, sol: sol.gravity,  # Store raw gravity
-                "gravity_response"    : lambda samples, gm, sol: apply_normalization_torch(-sol.gravity, norm_params),  # Normalized!
-                "mean_gravity"        : lambda samples, gm, sol: torch.mean(apply_normalization_torch(-sol.gravity, norm_params)),
-                "max_gravity"         : lambda samples, gm, sol: torch.max(apply_normalization_torch(-sol.gravity, norm_params), 0),
+                "gravity_response"    : lambda samples, gm, sol: align_forward_to_observed(-sol.gravity, norm_params),  # Normalized!
+                "mean_gravity"        : lambda samples, gm, sol: torch.mean(align_forward_to_observed(-sol.gravity, norm_params)),
+                "max_gravity"         : lambda samples, gm, sol: torch.max(align_forward_to_observed(-sol.gravity, norm_params), 0),
         }
 
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
@@ -293,14 +294,21 @@ class TestErrorPropagationDips:
 
         # Compute normalization parameters once from observed data AND baseline forward model
         # CRITICAL: Pass baseline_forward_model to preserve prior variability
-        normalization_method = 'align_to_reference'
-        norm_params = compute_normalization_params(
-            reference_data=observed_gravity_ugal,
-            baseline_forward_model=baseline_fw_gravity_np,  # CRITICAL: Baseline model
-            method=normalization_method,
-            verbose=True
-        )
+        # normalization_method = 'align_to_reference'
+        # norm_params = compute_normalization_params(
+        #     reference_data=observed_gravity_ugal,
+        #     baseline_forward_model=baseline_fw_gravity_np,  # CRITICAL: Baseline model
+        #     method=normalization_method,
+        #     verbose=True
+        # )
 
+        from mineye.GeoModel.geophysics import compute_alignment_params
+        norm_params = compute_alignment_params(
+            observed=observed_gravity_ugal,
+            baseline_forward=baseline_fw_gravity_np
+        )
+        
+        normalization_method = '_'
 
         print(f"\n{'=' * 60}")
         print(f"NORMALIZATION PARAMETERS (FIXED for all samples)")
