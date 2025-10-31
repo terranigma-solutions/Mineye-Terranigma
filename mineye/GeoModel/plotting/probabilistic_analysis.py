@@ -19,13 +19,13 @@ from mineye.GeoModel.geophysics import normalize_gravity_pair
 
 
 def _plot_comparison(observed_gravity, grav, xy_ravel,
-                     normalization_method='zscore'):
+                     normalization_method='zscore_independent'):
     import matplotlib.pyplot as plt
     print("\n=== Observed vs Predicted Comparison ===")
 
     # Convert units: observed is in mGal, predicted in μGal
     observed_ugal = observed_gravity * 1000  # Convert mGal to μGal
-    forward_model = grav.numpy().copy()
+    forward_model = -grav.numpy().copy()
 
     # Apply normalization using extracted function with SHARED parameters
     observed_norm, forward_norm, unit_label, norm_params = normalize_gravity_pair(

@@ -55,7 +55,8 @@ def normalize_gravity_data(
 def normalize_gravity_pair(
         observed: np.ndarray,
         forward_model: np.ndarray,
-        method: Literal['zscore', 'minmax', 'mean_center', 'relative'] = 'zscore',
+        method: Literal['zscore', 'minmax', 'mean_center', 'relative',
+        'zscore_independent', 'robust_zscore'] = 'zscore',
         verbose: bool = True
 ) -> Tuple[np.ndarray, np.ndarray, str, Dict[str, float]]:
     """
@@ -79,8 +80,53 @@ def normalize_gravity_pair(
 
     # Compute normalization parameters from COMBINED data
     combined_data = np.concatenate([observed, forward_model])
+    
+    if method == 'zscore_independent':
+        # RECOMMENDED: Normalize each dataset independently, then scale to common range
+        # This preserves spatial patterns while making magnitudes comparable
 
-    if method == 'zscore':
+        # Z-score normalize each independently
+        obs_mean, obs_std = np.mean(observed), np.std(observed)
+        fwd_mean, fwd_std = np.mean(forward_model), np.std(forward_model)
+
+        observed_z = (observed - obs_mean) / obs_std
+        forward_z = (forward_model - fwd_mean) / fwd_std
+
+        # Scale both to common range for visualization
+        combined_min = min(np.min(observed_z), np.min(forward_z))
+        combined_max = max(np.max(observed_z), np.max(forward_z))
+
+        observed_norm = observed_z
+        forward_norm = forward_z
+
+        unit_label = 'Z-score (independent)'
+        norm_params = {
+                'obs_mean': obs_mean, 'obs_std': obs_std,
+                'fwd_mean': fwd_mean, 'fwd_std': fwd_std,
+                'vmin'    : combined_min, 'vmax': combined_max
+        }
+
+    elif method == 'robust_zscore':
+        # Robust normalization using median and MAD (Median Absolute Deviation)
+        # Less sensitive to outliers than standard z-score
+
+        obs_median = np.median(observed)
+        fwd_median = np.median(forward_model)
+
+        obs_mad = np.median(np.abs(observed - obs_median))
+        fwd_mad = np.median(np.abs(forward_model - fwd_median))
+
+        # Robust z-score: (x - median) / (1.4826 * MAD)
+        # Factor 1.4826 makes MAD comparable to std for normal distribution
+        observed_norm = (observed - obs_median) / (1.4826 * obs_mad)
+        forward_norm = (forward_model - fwd_median) / (1.4826 * fwd_mad)
+
+        unit_label = 'Robust Z-score'
+        norm_params = {
+                'obs_median': obs_median, 'obs_mad': obs_mad,
+                'fwd_median': fwd_median, 'fwd_mad': fwd_mad
+        }
+    elif method == 'zscore':
         # Z-score normalization (mean=0, std=1) - use combined mean/std
         data_mean = np.mean(combined_data)
         data_std = np.std(combined_data)
