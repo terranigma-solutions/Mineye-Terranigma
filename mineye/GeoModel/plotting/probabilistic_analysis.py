@@ -11,6 +11,13 @@ from pandas import DataFrame
 from mineye.GeoModel.geophysics import normalize_gravity_pair
 
 
+from typing import Any
+
+import numpy as np
+from pandas import DataFrame
+from mineye.GeoModel.geophysics import normalize_gravity_pair
+
+
 def _plot_comparison(observed_gravity, grav, xy_ravel,
                      normalization_method='zscore'):
     import matplotlib.pyplot as plt
@@ -20,8 +27,8 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     observed_ugal = observed_gravity * 1000  # Convert mGal to μGal
     forward_model = grav.numpy().copy()
 
-    # Apply normalization using extracted function
-    observed_norm, forward_norm, unit_label = normalize_gravity_pair(
+    # Apply normalization using extracted function with SHARED parameters
+    observed_norm, forward_norm, unit_label, norm_params = normalize_gravity_pair(
         observed=observed_ugal,
         forward_model=forward_model,
         method=normalization_method,
@@ -29,31 +36,39 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     )
 
     residuals_norm = observed_norm - forward_norm
-
+    
+    # Compute SHARED colorbar limits for observed and forward plots
+    vmin_shared = min(np.min(observed_norm), np.min(forward_norm))
+    vmax_shared = max(np.max(observed_norm), np.max(forward_norm))
+    
     # Create comparison plot with 4 subplots (add correlation plot)
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
 
-    # Plot 1: Observed gravity
+    # Plot 1: Observed gravity (with shared colorbar limits)
     scatter1 = ax1.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=observed_norm,
-                           s=30, cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5)
+                           s=30, cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5,
+                           vmin=vmin_shared, vmax=vmax_shared)
     ax1.set_title(f'Observed Gravity{"" if not True else f" ({normalization_method})"}')
     ax1.set_xlabel('X (m)')
     ax1.set_ylabel('Y (m)')
     cbar1 = plt.colorbar(scatter1, ax=ax1)
     cbar1.set_label(f'Observed ({unit_label})')
 
-    # Plot 2: Forward model gravity
+    # Plot 2: Forward model gravity (with shared colorbar limits)
     scatter2 = ax2.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=forward_norm,
-                           s=30, cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5)
+                           s=30, cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5,
+                           vmin=vmin_shared, vmax=vmax_shared)
     ax2.set_title(f'Forward Model Gravity{"" if not True else f" ({normalization_method})"}')
     ax2.set_xlabel('X (m)')
     ax2.set_ylabel('Y (m)')
     cbar2 = plt.colorbar(scatter2, ax=ax2)
     cbar2.set_label(f'Forward Model ({unit_label})')
 
-    # Plot 3: Residuals (observed - predicted)
+    # Plot 3: Residuals (observed - predicted) - use symmetric colorbar
+    residual_limit = max(abs(np.min(residuals_norm)), abs(np.max(residuals_norm)))
     scatter3 = ax3.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=residuals_norm,
-                           s=30, cmap='RdBu_r', alpha=0.8, edgecolors='black', linewidth=0.5)
+                           s=30, cmap='RdBu_r', alpha=0.8, edgecolors='black', linewidth=0.5,
+                           vmin=-residual_limit, vmax=residual_limit)
     ax3.set_title(f'Residuals (Observed - Forward Model){"" if not True else f" ({normalization_method})"}')
     ax3.set_xlabel('X (m)')
     ax3.set_ylabel('Y (m)')
@@ -66,11 +81,14 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     ax4.set_ylabel(f'Forward Model ({unit_label})')
     ax4.set_title('Observed vs Forward Model Correlation')
 
-    # Add 1:1 line
-    lims = [min(ax4.get_xlim()[0], ax4.get_ylim()[0]), max(ax4.get_xlim()[1], ax4.get_ylim()[1])]
+    # Add 1:1 line with shared limits
+    lims = [vmin_shared, vmax_shared]
     ax4.plot(lims, lims, 'r--', alpha=0.75, linewidth=2, label='1:1 line')
+    ax4.set_xlim(lims)
+    ax4.set_ylim(lims)
     ax4.legend()
     ax4.grid(True, alpha=0.3)
+    ax4.set_aspect('equal', adjustable='box')
 
     # Calculate and display correlation coefficient
     correlation = np.corrcoef(observed_norm, forward_norm)[0, 1]
