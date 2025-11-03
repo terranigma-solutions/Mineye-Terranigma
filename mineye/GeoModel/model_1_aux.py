@@ -1,8 +1,10 @@
 from functools import partial
-from typing import Any
+from typing import Any, Tuple
 
+from typing import Union, Sequence
 import arviz
 import numpy as np
+import torch
 from pyro.distributions import Distribution
 
 import gempy as gp
@@ -119,7 +121,7 @@ def setup_geomodel(gravity_data, simple_geo_model: gp.data.GeoModel):
 
 
 def _gravity_precomputations(density_plutonites: float, density_sedimentary_host: float,
-                            xy_ravel: np.ndarray, simple_geo_model: gp.data.GeoModel):
+                             xy_ravel: np.ndarray, simple_geo_model: gp.data.GeoModel):
     print("Using actual gravity measurement locations...")
     print(f"Using {len(xy_ravel)} actual measurement points")
 
@@ -194,10 +196,6 @@ def modify_orientations(
         key: str
 ) -> InterpolationInput:
     from gempy.modules.data_manipulation import interpolation_input_from_structural_frame
-    from gempy.modules.data_manipulation.manipulate_points import (
-        compute_adp_from_gradients,
-        convert_orientation_to_pole_vector
-    )
 
     interp_input: InterpolationInput = interpolation_input_from_structural_frame(geo_model)
     samples_value = samples[key]
@@ -218,3 +216,130 @@ def modify_orientations(
     interp_input.orientations.dip_gradients = gradients
     return interp_input
 
+
+
+def convert_orientation_to_pole_vector(
+        azimuth: Union[torch.Tensor, Sequence[float]],
+        dip: Union[torch.Tensor, Sequence[float]],
+        polarity: Union[torch.Tensor, Sequence[float]]
+) -> torch.Tensor:
+    """
+    Convert orientation parameters (azimuth, dip, polarity) to pole vectors (gradients).
+    
+    PyTorch version that preserves gradient flow for automatic differentiation.
+    
+    Parameters
+    ----------
+    azimuth : torch.Tensor or Sequence[float]
+        Azimuth angles in degrees [0, 360]
+    dip : torch.Tensor or Sequence[float]
+        Dip angles in degrees [0, 180]
+    polarity : torch.Tensor or Sequence[float]
+        Polarity values (typically ±1)
+    
+    Returns
+    -------
+    gradients : torch.Tensor
+        Pole vectors with shape (n, 3) where columns are [G_x, G_y, G_z]
+    
+    Notes
+    -----
+    - Converts inputs to tensors if they aren't already
+    - All trigonometric operations preserve gradients
+    - Output shape is (n_orientations, 3)
+    
+    Example
+    -------
+    >>> azimuth = torch.tensor([90.0, 180.0], dtype=torch.float64)
+    >>> dip = torch.tensor([45.0, 30.0], dtype=torch.float64)
+    >>> polarity = torch.tensor([1.0, 1.0], dtype=torch.float64)
+    >>> gradients = convert_orientation_to_pole_vector(azimuth, dip, polarity)
+    >>> gradients.shape
+    torch.Size([2, 3])
+    """
+    # Convert to tensors if needed (preserves gradients if already tensors)
+    if not isinstance(azimuth, torch.Tensor):
+        azimuth = torch.as_tensor(azimuth, dtype=torch.float64)
+    if not isinstance(dip, torch.Tensor):
+        dip = torch.as_tensor(dip, dtype=torch.float64)
+    if not isinstance(polarity, torch.Tensor):
+        polarity = torch.as_tensor(polarity, dtype=torch.float64)
+
+    # Ensure consistent dtype
+    azimuth = azimuth.to(dtype=torch.float64)
+    dip = dip.to(dtype=torch.float64)
+    polarity = polarity.to(dtype=torch.float64)
+
+    # Convert degrees to radians
+    azimuth_rad = torch.deg2rad(azimuth)
+    dip_rad = torch.deg2rad(dip)
+
+    # Calculate gradient components (all differentiable operations)
+    G_x = torch.sin(dip_rad) * torch.sin(azimuth_rad) * polarity
+    G_y = torch.sin(dip_rad) * torch.cos(azimuth_rad) * polarity
+    G_z = torch.cos(dip_rad) * polarity
+
+    # Stack into (n, 3) array
+    # Use torch.stack instead of vstack for better control
+    gradients = torch.stack([G_x, G_y, G_z], dim=-1)
+
+    return gradients
+def compute_adp_from_gradients(
+        G_x: torch.Tensor,
+        G_y: torch.Tensor,
+        G_z: torch.Tensor
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Compute azimuth, dip, and polarity from gradient components.
+    
+    PyTorch version that preserves gradient flow for automatic differentiation.
+    
+    Parameters
+    ----------
+    G_x : torch.Tensor
+        Gradient in X direction
+    G_y : torch.Tensor
+        Gradient in Y direction
+    G_z : torch.Tensor
+        Gradient in Z direction
+    
+    Returns
+    -------
+    azimuth : torch.Tensor
+        Azimuth in degrees [0, 360]
+    dip : torch.Tensor
+        Dip angle in degrees [0, 180]
+    polarity : torch.Tensor
+        Polarity values (all ones in this implementation)
+    
+    Notes
+    -----
+    - Uses torch.where() instead of boolean indexing to preserve gradients
+    - Clamps values for numerical stability
+    - All operations are differentiable
+    """
+    # Calculate polarity (assumed to be 1 for all)
+    polarity = torch.ones_like(G_x)
+
+    # Calculate dip
+    # Clamp G_z/polarity to [-1, 1] for numerical stability in arccos
+    cos_dip = torch.clamp(G_z / polarity, min=-1.0, max=1.0)
+    dip = torch.rad2deg(torch.acos(cos_dip))
+
+    # Replace NaN with 0 (torch equivalent of np.nan_to_num)
+    dip = torch.where(torch.isnan(dip), torch.zeros_like(dip), dip)
+
+    # Calculate azimuth
+    azimuth = torch.rad2deg(torch.atan2(G_x / polarity, G_y / polarity))
+
+    # Replace NaN with 0
+    azimuth = torch.where(torch.isnan(azimuth), torch.zeros_like(azimuth), azimuth)
+
+    # Shift values from [-180, 0] to [180, 360]
+    # Use torch.where to preserve gradients (instead of boolean indexing)
+    azimuth = torch.where(azimuth < 0, azimuth + 360.0, azimuth)
+
+    # Adjust azimuth where dip is nearly zero (azimuth is undefined)
+    azimuth = torch.where(dip < 0.001, torch.zeros_like(azimuth), azimuth)
+
+    return azimuth, dip, polarity

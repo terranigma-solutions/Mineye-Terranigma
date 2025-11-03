@@ -56,9 +56,6 @@ class TestProbabilisticInversion:
         }
 
         # * 5) Set up likelihood functions
-        # length_scale_prior = torch.tensor(1_000.0)
-        # variance_prior = torch.tensor(25.0 ** 2)
-
         length_scale = pyro.sample(
             "length_scale",
             dist.LogNormal(
@@ -94,8 +91,8 @@ class TestProbabilisticInversion:
         # * 7) Run predictive
         gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
         trace = trace_pyro_model(prob_model, geo_model, torch.tensor(observed_gravity_ugal, dtype=torch.float64))
-        return 
-        if False:
+        compute_prior_predictive = True
+        if compute_prior_predictive:
             prior_inference_data: az.InferenceData = gpp.run_predictive(
                 prob_model=prob_model,
                 geo_model=geo_model,
@@ -111,7 +108,7 @@ class TestProbabilisticInversion:
             geo_model=geo_model,
             y_obs_list=gravity_observations_tensor,
             config=NUTSConfig(
-                step_size=0.0085,
+                step_size=0.1,
                 adapt_step_size=True,
                 target_accept_prob=0.9,
                 max_tree_depth=10,
@@ -119,10 +116,12 @@ class TestProbabilisticInversion:
                 num_samples=200,
                 warmup_steps=50,
             ),
-            plot_trace=False,
+            plot_trace=True,
             run_posterior_predictive=True
         )
-        data.extend(prior_inference_data)
+        
+        if compute_prior_predictive:
+            data.extend(prior_inference_data)
 
         # After MCMC
         print(f"Divergences: {data.sample_stats.diverging.sum().item()}")
