@@ -1,6 +1,6 @@
-# ... existing code ...
+from typing import Dict, Optional, Literal
+
 import numpy as np
-from typing import Dict, Optional, Literal, Tuple
 import torch
 
 
