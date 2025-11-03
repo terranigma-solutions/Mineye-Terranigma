@@ -1,21 +1,25 @@
+import sys
+import os
+# Add project root to path for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
 import numpy as np
 import gempy as gp
 import geopandas as gpd
 import matplotlib.pyplot as plt
-import os
 import pickle
+from mineye.config import paths
 
 # ========== CONFIG ==========
-BASE_DIR = os.getcwd()
-data_dir = os.path.abspath(os.path.join(BASE_DIR, '..', 'Data', 'Input_Data'))
-geomodel_dir = os.path.abspath(os.path.join(BASE_DIR, '..', 'Data', 'Output_Data'))
-geophysical_dir = os.path.join(data_dir, 'Geophysical_Cleaned_Data')
-forward_model_folder = os.path.abspath(os.path.join(BASE_DIR, '..',  'GeoModel', 'Geological_Forward_Modelling'))
+BASE_DIR = paths.get_base_dir()
+data_dir = paths.get_data_dir(BASE_DIR)
+geomodel_dir = paths.get_geomodel_dir(BASE_DIR)
+geophysical_dir = paths.get_geophysical_dir(BASE_DIR)
+temp_inputs_dir = paths.get_tmp_dir(BASE_DIR)
 
-temp_inputs_dir = os.path.join(geomodel_dir, 'Simple-Models', 'temp_inputs')
-pickle_model_path = os.path.join(temp_inputs_dir, 'simple_geo_model.pkl')
-gravity_data_path = os.path.join(geophysical_dir, 'cleaned_gravity_data.geojson')
-contact_points_path = os.path.join(geomodel_dir, 'Simple-Models', 'contact_points.csv')
+pickle_model_path = paths.get_pickle_model_path(BASE_DIR)
+gravity_data_path = paths.get_gravity_data_path(BASE_DIR)
+contact_points_path = paths.get_contact_points_path(BASE_DIR)
 
 # Model parameters
 density_plutonites = 2.9  # kg/m³
