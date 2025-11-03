@@ -1,9 +1,15 @@
+from functools import partial
 from typing import Any
 
+import arviz
 import numpy as np
+from pyro.distributions import Distribution
 
 import gempy as gp
 from gempy_engine.core.backend_tensor import BackendTensor
+from gempy_engine.core.data.interpolation_input import InterpolationInput
+from gempy_probability.modules.plot.plot_gempy import plot_gempy
+import gempy_viewer as gpv
 
 
 def plot(gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, Any]:
@@ -89,7 +95,7 @@ def normalize(baseline_fw_gravity_np, observed_gravity):
     return norm_params
 
 
-def setup_geomodel(self, gravity_data, simple_geo_model: gp.data.GeoModel):
+def setup_geomodel(gravity_data, simple_geo_model: gp.data.GeoModel):
     geo_model: gp.data.GeoModel = simple_geo_model
     BackendTensor.change_backend_gempy(engine_backend=gp.data.AvailableBackends.PYTORCH)
 
@@ -99,7 +105,7 @@ def setup_geomodel(self, gravity_data, simple_geo_model: gp.data.GeoModel):
             np.full(len(gravity_data), 0)  # Set Z to surface elevation
     ])
 
-    self.gravity_precomputations(density_plutonites=2.9, density_sedimentary_host=2.3, xy_ravel=xy_ravel, simple_geo_model=geo_model)
+    _gravity_precomputations(density_plutonites=2.9, density_sedimentary_host=2.3, xy_ravel=xy_ravel, simple_geo_model=geo_model)
 
     geo_model.interpolation_options.mesh_extraction = False
 
@@ -112,8 +118,8 @@ def setup_geomodel(self, gravity_data, simple_geo_model: gp.data.GeoModel):
     return geo_model, xy_ravel
 
 
-def gravity_precomputations(density_plutonites: float, density_sedimentary_host: float,
-                             xy_ravel: np.ndarray, simple_geo_model: gp.data.GeoModel):
+def _gravity_precomputations(density_plutonites: float, density_sedimentary_host: float,
+                            xy_ravel: np.ndarray, simple_geo_model: gp.data.GeoModel):
     print("Using actual gravity measurement locations...")
     print(f"Using {len(xy_ravel)} actual measurement points")
 
@@ -138,3 +144,77 @@ def gravity_precomputations(density_plutonites: float, density_sedimentary_host:
         tz=gravity_gradient,
         densities=np.array([density_sedimentary_host, density_plutonites])  # kg/m³ for different formations,
     )
+
+
+def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.InferenceData):
+    gp.set_active_grid(
+        grid=geo_model.grid,
+        grid_type=[geo_model.grid.GridTypes.OCTREE],
+        reset=True
+    )
+
+    geo_model.geophysics_input = None
+
+    gp.compute_model(gempy_model=geo_model)
+
+    p2d = gpv.plot_2d(
+        model=geo_model,
+        show_topography=False,
+        legend=False,
+        show_lith=False,
+        show_data=False,
+        show=False
+    )
+
+    plot_gempy(
+        geo_model=geo_model,
+        n_samples=20,
+        samples=(prior_inference_data.prior[r'dips'].values[0, :]),
+        update_model_fn=_update_model_for_plotting,
+        gempy_plot=p2d
+    )
+
+
+def _update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float, sample_idx: int):
+    # # Modify the surface point
+    gp.modify_orientations(
+        geo_model=geo_model,
+        dip=sample_value,
+    )
+
+
+def create_orientation_modifier(key: str):
+    """Factory function that creates orientation modifier functions for different keys."""
+    return partial(modify_orientations, key=key)
+
+
+def modify_orientations(
+        samples: dict[str, Distribution],
+        geo_model: gp.data.GeoModel,
+        key: str
+) -> InterpolationInput:
+    from gempy.modules.data_manipulation import interpolation_input_from_structural_frame
+    from gempy.modules.data_manipulation.manipulate_points import (
+        compute_adp_from_gradients,
+        convert_orientation_to_pole_vector
+    )
+
+    interp_input: InterpolationInput = interpolation_input_from_structural_frame(geo_model)
+    samples_value = samples[key]
+
+    og_gradients = interp_input.orientations.dip_gradients
+    azimuth, dip, polarity = compute_adp_from_gradients(
+        G_x=og_gradients[:, 0],
+        G_y=og_gradients[:, 1],
+        G_z=og_gradients[:, 2],
+    )
+
+    gradients = convert_orientation_to_pole_vector(
+        azimuth=azimuth,
+        dip=samples_value,
+        polarity=polarity
+    )
+
+    interp_input.orientations.dip_gradients = gradients
+    return interp_input
+
