@@ -16,7 +16,7 @@ def test_simple_model(simple_geo_model):
     # Add assertions here to verify the model is computed correctly
     assert simple_geo_model is not None
 
-    gpv.plot_3d(simple_geo_model, ve=5, image=False)
+    gpv.plot_3d(simple_geo_model, ve=5, image=True)
 
 
 def test_simple_model_with_topography(simple_geo_model, topography_dir):
@@ -37,4 +37,4 @@ def test_simple_model_with_topography(simple_geo_model, topography_dir):
     # Add assertions here to verify the model is computed correctly
     assert simple_geo_model is not None
 
-    gpv.plot_3d(simple_geo_model, ve=5, image=False)
+    gpv.plot_3d(simple_geo_model, ve=5, image=True)

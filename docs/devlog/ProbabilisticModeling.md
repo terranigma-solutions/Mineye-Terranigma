@@ -1,6 +1,6 @@
 ## Brainstorming
 
-- Make a forward uncertainty model for the orientations
+- [ ] Make a forward uncertainty model for the orientations
 - Gravity inversion
 - Magnetic inversion
 - Double inversion 
