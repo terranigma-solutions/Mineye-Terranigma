@@ -6,6 +6,7 @@ import geopandas as gpd
 import pyro
 import torch
 from pyro import distributions as dist
+from pyro.contrib.gp.kernels import Exponential
 
 import gempy_probability as gpp
 from mineye.GeoModel.geophysics import align_forward_to_observed
@@ -55,9 +56,27 @@ class TestProbabilisticInversion:
         }
 
         # * 5) Set up likelihood functions
-        length_scale_prior = torch.tensor(1_000.0)
-        variance_prior = torch.tensor(25.0 ** 2)
-        covariance_matrix = gaussian_kernel(xy_ravel[:,:2], length_scale_prior, variance_prior)
+        # length_scale_prior = torch.tensor(1_000.0)
+        # variance_prior = torch.tensor(25.0 ** 2)
+
+        length_scale = pyro.sample(
+            "length_scale",
+            dist.LogNormal(
+                loc=torch.log(torch.tensor(2000.0)),  # Median = 2 km
+                scale=1.0  # 68% interval: [~700m, ~5.5km], 95%: [~250m, ~16km]
+            )
+        )
+        # Option A: Inverse-Gamma (conjugate, traditional)
+        variance = pyro.sample(
+            "variance",
+            dist.InverseGamma(
+                concentration=3.0,  # Shape parameter
+                rate=75000.0        # Scale parameter
+            )
+            # This gives: Mean ≈ 37,500, Mode ≈ 25,000
+            # Roughly covers your 15k-40k range
+        )
+        covariance_matrix = gaussian_kernel(xy_ravel[:,:2], length_scale, variance)
         likelihood_fn = generate_multigravity_likelihood(covariance_matrix)
         
         # * 6) Set up Pyro model
@@ -80,7 +99,14 @@ class TestProbabilisticInversion:
         )
 
         # * 8) Run inference
+        # After MCMC
+        print(f"Divergences: {data.sample_stats.diverging.sum().item()}")
+        print(f"Max tree depth: {(data.sample_stats.tree_depth == 10).sum().item()}")
+        print(f"ESS: {az.ess(data)}")
+        print(f"R-hat: {az.rhat(data)}")  # Should be < 1.01
 
+        # Posterior predictive checks
+        az.plot_ppc(data, num_pp_samples=100)
         # * 9) Analysis inference
         gravity_samples_norm, unit_label = plot(
             gravity_samples_norm=prior_inference_data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
@@ -104,8 +130,18 @@ def generate_multigravity_likelihood(covariance_matrix):
 def multigravity_likelihood(solutions: gp.data.Solutions, covariance_matrix) -> dist:
     simulated_geophysics = solutions.gravity
     pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
-    normal = dist.MultivariateNormal(simulated_geophysics, covariance_matrix)
-    return normal
+
+    nu = pyro.sample(
+        name="nu",
+        fn=Exponential(0.2)  # Mean = 5, favors moderate heavy tails
+    ) + 2.0  # Ensures nu > 2 (so variance exists)
+    # Student-t for heavy tails
+    likelihood = dist.MultivariateStudentT(
+        df=nu,  # degrees of freedom (sample as hyperparameter)
+        loc=simulated_geophysics,
+        scale_tril=torch.linalg.cholesky(covariance_matrix)
+    )
+    return likelihood
 
 
 def gaussian_kernel(locations, length_scale, variance):
