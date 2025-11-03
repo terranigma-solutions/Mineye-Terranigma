@@ -226,10 +226,12 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
 
     if observed_data is not None:
         # Scatter plot with error bars
-        ax4.errorbar(observed_data, mean_gravity, yerr=[mean_gravity - lower_ci, upper_ci - mean_gravity],
-                    fmt='o', alpha=0.6, ecolor='gray', capsize=4, markersize=6,
-                    label='Predictions with CI')
+        yerr_lower = np.abs(mean_gravity - lower_ci)
+        yerr_upper = np.abs(upper_ci - mean_gravity)
 
+        ax4.errorbar(observed_data, mean_gravity, yerr=[yerr_lower, yerr_upper],
+                     fmt='o', alpha=0.6, ecolor='gray', capsize=4, markersize=6,
+                     label='Predictions with CI')
         # 1:1 line
         lims = [min(np.min(observed_data), np.min(lower_ci)), 
                 max(np.max(observed_data), np.max(upper_ci))]

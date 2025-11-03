@@ -25,6 +25,27 @@ class TestProbabilisticInversion:
         # * 1) Read gravity data
         gravity_data = gpd.read_file(os.path.join(geophysical_dir, 'cleaned_gravity_data.geojson'))
         observed_gravity = gravity_data['VALU_BOU267'].values  # in mGal
+
+        # Take a spatially distributed subset of measurements
+        n_points = 20  # Adjust this number to control how many points you want
+        xy_coords = gravity_data.geometry.apply(lambda p: (p.x, p.y)).to_list()
+        xy_array = np.array(xy_coords)
+
+        # Use K-means clustering to get well-distributed points
+        from sklearn.cluster import KMeans
+        kmeans = KMeans(n_clusters=n_points, random_state=42)
+        kmeans.fit(xy_array)
+
+        # Find the closest points to cluster centers
+        from scipy.spatial.distance import cdist
+        centers = kmeans.cluster_centers_
+        distances = cdist(centers, xy_array)
+        indices = [np.argmin(dist) for dist in distances]
+
+        # Filter the gravity data
+        observed_gravity = observed_gravity[indices]
+        gravity_data = gravity_data.iloc[indices]
+
         observed_gravity_ugal = observed_gravity * 1000
 
         # * 2) Setup initial Geomodel and normalize forward gravity to the observed gravity
@@ -56,16 +77,6 @@ class TestProbabilisticInversion:
         }
 
         # * 5) Set up likelihood functions
-        # likelihood_fn = generate_multigravity_likelihood(
-        #     covariance_matrix=(gaussian_kernel(xy_ravel[:, :2], length_scale, variance)),
-        #     norm_params=norm_params
-        # )
-
-        # likelihood_fn = generate_multigravity_likelihood_hierarchical(
-        #     xy_locations=xy_ravel,
-        #     norm_params=norm_params
-        # )
-
         likelihood_fn = generate_multigravity_likelihood_diagonal(
             norm_params=norm_params
         )
@@ -85,13 +96,13 @@ class TestProbabilisticInversion:
         # * 7) Run predictive
         gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
         trace = trace_pyro_model(prob_model, geo_model, torch.tensor(observed_gravity_ugal, dtype=torch.float64))
-        compute_prior_predictive = False
+        compute_prior_predictive = True
         if compute_prior_predictive:
             prior_inference_data: az.InferenceData = gpp.run_predictive(
                 prob_model=prob_model,
                 geo_model=geo_model,
                 y_obs_list=gravity_observations_tensor,
-                n_samples=n_samples,
+                n_samples=10,
                 plot_trace=True
             )
 
@@ -107,8 +118,8 @@ class TestProbabilisticInversion:
                 target_accept_prob=0.65,
                 max_tree_depth=5,
                 init_strategy='median',
-                num_samples=200,
-                warmup_steps=50,
+                num_samples=20,
+                warmup_steps=5,
             ),
             plot_trace=True,
             run_posterior_predictive=True
@@ -119,12 +130,12 @@ class TestProbabilisticInversion:
 
         # After MCMC
         print(f"Divergences: {data.sample_stats.diverging.sum().item()}")
-        print(f"Max tree depth: {(data.sample_stats.tree_depth == 10).sum().item()}")
+        # print(f"Max tree depth: {(data.sample_stats.tree_depth == 10).sum().item()}")
         print(f"ESS: {az.ess(data)}")
         print(f"R-hat: {az.rhat(data)}")  # Should be < 1.01
         # 
         # # Posterior predictive checks
-        az.plot_ppc(data, num_pp_samples=100)
+        az.plot_ppc(data, num_pp_samples=20)
         # * 9) Analysis inference
         gravity_samples_norm, unit_label = plot(
             gravity_samples_norm=prior_inference_data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
@@ -426,7 +437,7 @@ def generate_multigravity_likelihood_diagonal(norm_params):
         # Sample noise standard deviation
         sigma = pyro.sample(
             "sigma",
-            dist.HalfNormal(torch.tensor(10_000.0, dtype=torch.float64))  # 100 µGal noise
+            dist.HalfNormal(torch.tensor(500.0, dtype=torch.float64))  # 100 µGal noise
         )
 
         # Independent Normal likelihood (much more stable!)
