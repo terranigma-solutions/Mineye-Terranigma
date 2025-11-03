@@ -27,7 +27,7 @@ def generate_orientations_from_points(points_df, default_dip, default_azimuth, u
             # Compute squared distances to all points (exclude self)
             dx = X_all - current_x
             dy = Y_all - current_y
-            d2 = dx*dx + dy*dy
+            d2 = (dx*dx + dy*dy).astype(float)  # Ensure float type for np.inf
 
             # Exclude self by setting its distance to +inf
             self_abs_index = points_df.index[iloc_idx]
@@ -240,7 +240,7 @@ def add_manual_orientations_at_points(orientations_df, points_df,
         # Compute squared distances to all other points (exclude self)
         dx = X_all - current_x
         dy = Y_all - current_y
-        d2 = dx*dx + dy*dy
+        d2 = (dx*dx + dy*dy).astype(float)  # Ensure float type for np.inf
 
         # Exclude self by setting its distance to +inf
         self_pos = np.where(id_all == target_id)[0][0]
@@ -309,3 +309,105 @@ def add_manual_orientations_at_points(orientations_df, points_df,
         return updated_orientations
     else:
         return orientations_df
+
+
+def process_geological_data(
+    points_df,
+    default_dip=10,
+    default_azimuth=0,
+    use_default_azimuth=False,
+    boundary_tolerance=800,
+    formation_id=34,
+    simplification_level=0.9,
+    manual_orientations_at_points=None,
+    azimuth_flip_by_id=None,
+    manual_dip_by_id=None
+):
+    """
+    Complete data processing workflow for geological modeling.
+
+    This function combines all data cleaning and manipulation steps:
+    1. Generate orientations from contact points
+    2. Remove boundary artifacts
+    3. Simplify formation data
+    4. Add IDs to dataframes
+    5. Add manual orientations at specific points
+    6. Apply azimuth flips by ID
+    7. Apply manual dip adjustments by ID
+
+    Args:
+        points_df: DataFrame with contact points
+        default_dip: Default dip value for orientations
+        default_azimuth: Default azimuth value for orientations
+        use_default_azimuth: Whether to use default azimuth instead of computing
+        boundary_tolerance: Distance from boundary to remove artifacts
+        formation_id: ID of the geological formation
+        simplification_level: 0=no simplification, 1=maximum simplification
+        manual_orientations_at_points: List of point IDs to add manual orientations
+        azimuth_flip_by_id: Dict mapping orientation ID to flip boolean (180°)
+        manual_dip_by_id: Dict mapping orientation ID to manual dip value
+
+    Returns:
+        Tuple of (orientations_df, points_df) with all processing applied
+    """
+    # Step 1: Generate orientations from contact points
+    orientations_df = generate_orientations_from_points(
+        points_df,
+        default_dip=default_dip,
+        default_azimuth=default_azimuth,
+        use_default_azimuth=use_default_azimuth
+    )
+
+    # Step 2: Remove boundary artifacts
+    orientations_df, points_df = remove_boundary_artifacts(
+        points_df,
+        orientations_df,
+        boundary_tolerance=boundary_tolerance
+    )
+
+    # Step 3: Apply simplification after cleaning
+    orientations_df, points_df = simplify_formation_data(
+        orientations_df,
+        points_df,
+        formation_id,
+        simplification_level
+    )
+
+    # Step 4: Ensure 'id' columns exist
+    if 'id' not in orientations_df.columns:
+        orientations_df['id'] = np.arange(len(orientations_df))
+
+    if 'id' not in points_df.columns:
+        points_df['id'] = np.arange(len(points_df))
+
+    # Step 5: Add manual orientations if specified
+    if manual_orientations_at_points:
+        orientations_df = add_manual_orientations_at_points(
+            orientations_df,
+            points_df,
+            manual_orientations_at_points,
+            default_dip
+        )
+
+    # Step 6: Apply azimuth flips by ID (180°)
+    if azimuth_flip_by_id:
+        for oid, flip in azimuth_flip_by_id.items():
+            if not flip:
+                continue
+            mask = orientations_df['id'] == oid
+            orientations_df.loc[mask, 'azimuth'] = (
+                orientations_df.loc[mask, 'azimuth'] + 180
+            ) % 360
+
+    # Step 7: Apply manual dip overrides by ID
+    if manual_dip_by_id:
+        for oid, dip in manual_dip_by_id.items():
+            mask = orientations_df['id'] == oid
+            try:
+                dip_val = float(dip)
+            except (TypeError, ValueError):
+                continue
+            orientations_df.loc[mask, 'dip'] = np.clip(dip_val, 0, 90)
+
+    return orientations_df, points_df
+

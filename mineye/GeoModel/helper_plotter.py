@@ -4,8 +4,7 @@ import geopandas as gpd
 import os
 import numpy as np
 import pandas as pd
-
-from mineye.GeoModel import HelperMethods
+from . import helper_methods
 
 
 def create_cross_section(geo_model, cross_section: int):
@@ -68,7 +67,7 @@ def plot_initial_data_on_map(gis_map_info: str,
 
     if show_original_full_points:
         ax.scatter(original_points['X'], original_points['Y'], c='gray', s=16, alpha=0.35, marker='x', label='Original Points')
-        original_orientations = HelperMethods.generate_orientations_from_points(original_points, default_dip=45, default_azimuth=90)
+        original_orientations = helper_methods.generate_orientations_from_points(original_points, default_dip=45, default_azimuth=90)
         ax.scatter(original_orientations['X'], original_orientations['Y'], c='gray', s=20, alpha=0.25, label='Original Orientations')
 
     # Plot ONLY the reduced/cleaned points (current working dataset)
