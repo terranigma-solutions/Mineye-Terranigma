@@ -80,7 +80,9 @@ def model_resolution():
 @pytest.fixture
 def simple_geo_model(model_extent, model_resolution, model_paths):
     """Factory for creating simple geological models with custom parameters."""
-    def _create_model(project_name='simple_model', refinement=4, extent=None, resolution=None):
+    model_resolution =None # ! Let's use octrees 
+    
+    def _create_model(project_name='simple_model', refinement=5, extent=None, resolution=None):
         geo_model = gp.create_geomodel(
             project_name=project_name,
             extent=extent or model_extent,

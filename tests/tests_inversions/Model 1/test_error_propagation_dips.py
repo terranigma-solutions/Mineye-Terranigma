@@ -55,7 +55,8 @@ class TestErrorPropagationDips:
             dip=sample_value,
         )
 
-    def test_error_propagation(self, simple_geo_model):
+    def test_error_propagation(self, simple_geo_model, n_samples=50):
+
         """Test reading and computing a geological model with topography."""
 
         geo_model = simple_geo_model
@@ -77,7 +78,6 @@ class TestErrorPropagationDips:
             obs_name=None
         )
 
-        n_samples = 50
         prior_inference_data: az.InferenceData = gpp.run_predictive(
             prob_model=prob_model,
             geo_model=geo_model,
@@ -103,34 +103,7 @@ class TestErrorPropagationDips:
             gempy_plot=p2d
         )
 
-    def _gravity_precomputations(self, density_plutonites: float, density_sedimentary_host: float,
-                                 xy_ravel: np.ndarray, simple_geo_model: gp.data.GeoModel):
-        print("Using actual gravity measurement locations...")
-        print(f"Using {len(xy_ravel)} actual measurement points")
-
-        print("Computing forward gravity model...")
-
-        # Step 1: Set centered grid
-        print("Setting up centered grid...")
-        gp.set_centered_grid(
-            grid=simple_geo_model.grid,
-            centers=xy_ravel,
-            resolution=np.array([10, 10, 15]),
-            radius=np.array([5000, 5000, 5000])
-        )
-
-        # Step 2: Calculate gravity gradient (tz component)
-        print("Calculating gravity gradient...")
-        gravity_gradient = gp.calculate_gravity_gradient(simple_geo_model.grid.centered_grid)
-
-        # Step 3: Configure geophysics input
-        print("Configuring geophysics input...")
-        simple_geo_model.geophysics_input = gp.data.GeophysicsInput(
-            tz=gravity_gradient,
-            densities=np.array([density_sedimentary_host, density_plutonites])  # kg/m³ for different formations,
-        )
-
-    def test_gravity_error_propagation(self, simple_geo_model, geophysical_dir):
+    def test_gravity_error_propagation(self, simple_geo_model, geophysical_dir, n_samples=50):
         import geopandas as gpd
         import os
 
@@ -146,7 +119,8 @@ class TestErrorPropagationDips:
         # This provides the baseline statistics needed to preserve prior variability
         baseline_fw_gravity_np = self._baseline(geo_model)
 
-        norm_params, normalization_method, observed_gravity_ugal = self._normalize(baseline_fw_gravity_np, observed_gravity)
+        observed_gravity_ugal = observed_gravity * 1000
+        norm_params = self._normalize(baseline_fw_gravity_np, observed_gravity_ugal)
 
         # region PYRO MODEL SETUP ============
         mean_orientations = torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10
@@ -182,7 +156,6 @@ class TestErrorPropagationDips:
             obs_name=None
         )
 
-        n_samples = 10
         prior_inference_data: az.InferenceData = gpp.run_predictive(
             prob_model=prob_model,
             geo_model=geo_model,
@@ -190,16 +163,16 @@ class TestErrorPropagationDips:
             n_samples=n_samples,
             plot_trace=True
         )
-        
+
         # endregion
 
         # region EXTRACT NORMALIZED SAMPLES ============
-        # Extract gravity samples: shape (n_chains, n_samples, n_devices)
-        # We use chain 0 for visualization
-        # IMPORTANT: These are ALREADY NORMALIZED (done during inference)
         gravity_samples_norm = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
-
-        gravity_samples_norm, unit_label = self._plot(gravity_samples_norm, observed_gravity_ugal, xy_ravel)
+        gravity_samples_norm, unit_label = self._plot(
+            gravity_samples_norm=gravity_samples_norm,
+            observed_gravity_ugal=observed_gravity_ugal,
+            xy_ravel=xy_ravel
+        )
 
         # Print final summary
         print(f"\n{'=' * 60}")
@@ -213,10 +186,42 @@ class TestErrorPropagationDips:
         print(f"✓ All {gravity_samples_norm.shape[0]} samples use consistent parameters")
         print(f"✓ Parameters computed from observed data before inference")
         print(f"{'=' * 60}\n")
-        
-        #endreion
 
-    def _plot(self, gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, Any]:
+        # endregion
+
+        # region gempy representation
+        gp.set_active_grid(
+            grid=geo_model.grid,
+            grid_type=[geo_model.grid.GridTypes.OCTREE],
+            reset=True
+        )
+
+
+        geo_model.geophysics_input = None
+
+        gp.compute_model(gempy_model=geo_model)
+
+        p2d = gpv.plot_2d(
+            model=geo_model,
+            show_topography=False,
+            legend=False,
+            show_lith=False,
+            show_data=False,
+            show=False
+        )
+
+        plot_gempy(
+            geo_model=geo_model,
+            n_samples=20,
+            samples=(prior_inference_data.prior[r'dips'].values[0, :]),
+            update_model_fn=self._update_model_for_plotting,
+            gempy_plot=p2d
+        )
+        
+        # endregion
+
+    @staticmethod
+    def _plot(gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, Any]:
         # Import visualization functions
         from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_map_interpolated
         from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_profiles
@@ -225,7 +230,7 @@ class TestErrorPropagationDips:
         # Convert PyTorch tensor to numpy if needed
         if hasattr(gravity_samples_norm, 'numpy'):
             gravity_samples_norm = gravity_samples_norm.numpy()
-            
+
         unit_label = 'Aligned Gravity (μGal)'
 
         print(f"\n{'=' * 60}")
@@ -264,7 +269,8 @@ class TestErrorPropagationDips:
         )
         return gravity_samples_norm, unit_label
 
-    def _baseline(self, geo_model) -> Any:
+    @staticmethod
+    def _baseline(geo_model) -> Any:
         print("\n" + "=" * 60)
         print("COMPUTING BASELINE FORWARD MODEL")
         print("=" * 60)
@@ -286,32 +292,18 @@ class TestErrorPropagationDips:
         print("=" * 60 + "\n")
         return -baseline_fw_gravity_np
 
-    def _normalize(self, baseline_fw_gravity_np , observed_gravity):
-
+    @staticmethod
+    def _normalize(baseline_fw_gravity_np, observed_gravity):
         # Convert observed gravity from mGal to μGal for comparison
-        observed_gravity_ugal = observed_gravity * 1000
-
-        # Compute normalization parameters once from observed data AND baseline forward model
-        # CRITICAL: Pass baseline_forward_model to preserve prior variability
-        # normalization_method = 'align_to_reference'
-        # norm_params = compute_normalization_params(
-        #     reference_data=observed_gravity_ugal,
-        #     baseline_forward_model=baseline_fw_gravity_np,  # CRITICAL: Baseline model
-        #     method=normalization_method,
-        #     verbose=True
-        # )
-
         from mineye.GeoModel.geophysics import compute_alignment_params
         norm_params = compute_alignment_params(
-            observed=observed_gravity_ugal,
+            observed=observed_gravity,
             baseline_forward=baseline_fw_gravity_np
         )
-        
-        normalization_method = '_'
 
-        return norm_params, normalization_method, observed_gravity_ugal
+        return norm_params
 
-    def _setup_geomodel(self, gravity_data, simple_geo_model: gp.data.GeoModel): 
+    def _setup_geomodel(self, gravity_data, simple_geo_model: gp.data.GeoModel):
         geo_model: gp.data.GeoModel = simple_geo_model
         BackendTensor.change_backend_gempy(engine_backend=gp.data.AvailableBackends.PYTORCH)
 
@@ -337,3 +329,31 @@ class TestErrorPropagationDips:
         )
         gp.compute_model(geo_model)
         return geo_model, xy_ravel
+
+    @staticmethod
+    def _gravity_precomputations(density_plutonites: float, density_sedimentary_host: float,
+                                 xy_ravel: np.ndarray, simple_geo_model: gp.data.GeoModel):
+        print("Using actual gravity measurement locations...")
+        print(f"Using {len(xy_ravel)} actual measurement points")
+
+        print("Computing forward gravity model...")
+
+        # Step 1: Set centered grid
+        print("Setting up centered grid...")
+        gp.set_centered_grid(
+            grid=simple_geo_model.grid,
+            centers=xy_ravel,
+            resolution=np.array([10, 10, 15]),
+            radius=np.array([5000, 5000, 5000])
+        )
+
+        # Step 2: Calculate gravity gradient (tz component)
+        print("Calculating gravity gradient...")
+        gravity_gradient = gp.calculate_gravity_gradient(simple_geo_model.grid.centered_grid)
+
+        # Step 3: Configure geophysics input
+        print("Configuring geophysics input...")
+        simple_geo_model.geophysics_input = gp.data.GeophysicsInput(
+            tz=gravity_gradient,
+            densities=np.array([density_sedimentary_host, density_plutonites])  # kg/m³ for different formations,
+        )
