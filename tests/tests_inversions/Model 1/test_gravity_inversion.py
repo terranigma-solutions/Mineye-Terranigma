@@ -3,10 +3,9 @@ from functools import partial
 
 import arviz as az
 import geopandas as gpd
+import numpy as np
 import pyro
 import torch
-from pyro import distributions as dist
-from pyro.contrib.gp.kernels import Exponential
 
 import gempy_probability as gpp
 from mineye.GeoModel.geophysics import align_forward_to_observed
@@ -100,13 +99,13 @@ class TestProbabilisticInversion:
 
         # * 8) Run inference
         # After MCMC
-        print(f"Divergences: {data.sample_stats.diverging.sum().item()}")
-        print(f"Max tree depth: {(data.sample_stats.tree_depth == 10).sum().item()}")
-        print(f"ESS: {az.ess(data)}")
-        print(f"R-hat: {az.rhat(data)}")  # Should be < 1.01
-
-        # Posterior predictive checks
-        az.plot_ppc(data, num_pp_samples=100)
+        # print(f"Divergences: {data.sample_stats.diverging.sum().item()}")
+        # print(f"Max tree depth: {(data.sample_stats.tree_depth == 10).sum().item()}")
+        # print(f"ESS: {az.ess(data)}")
+        # print(f"R-hat: {az.rhat(data)}")  # Should be < 1.01
+        # 
+        # # Posterior predictive checks
+        # az.plot_ppc(data, num_pp_samples=100)
         # * 9) Analysis inference
         gravity_samples_norm, unit_label = plot(
             gravity_samples_norm=prior_inference_data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
@@ -117,6 +116,47 @@ class TestProbabilisticInversion:
         # * 9) Analysis Gempy Model
 
         gempy_viz(geo_model, prior_inference_data)
+
+
+    def test_gravity_duplicates(self, geophysical_dir):
+        """Test reading and computing a geological model."""
+
+        # Use actual gravity measurement device locations
+        # * 1) Read gravity data
+        gravity_data = gpd.read_file(os.path.join(geophysical_dir, 'cleaned_gravity_data.geojson'))
+        observed_gravity = gravity_data['VALU_BOU267'].values  # in mGal
+
+        # * 1b) CHECK FOR DUPLICATES
+        xy_coords = gravity_data[['geometry']].apply(lambda row: (row.geometry.x, row.geometry.y), axis=1)
+        xy_array = np.array(xy_coords.tolist())
+
+        # Find unique locations (within 1m tolerance)
+        from scipy.spatial.distance import pdist, squareform
+        distances = squareform(pdist(xy_array))
+        np.fill_diagonal(distances, np.inf)  # Ignore self-distances
+
+        duplicates = np.any(distances < 1.0, axis=1)  # Locations within 1m
+        if np.any(duplicates):
+            print(f"WARNING: Found {duplicates.sum()} stations with duplicates/near-duplicates")
+            print("Removing duplicates...")
+
+            # Keep first occurrence of each duplicate set
+            keep_mask = np.ones(len(xy_array), dtype=bool)
+            for i in np.where(duplicates)[0]:
+                if keep_mask[i]:
+                    # Find all duplicates of this point
+                    dups = distances[i] < 1.0
+                    # Keep first, remove rest
+                    dup_indices = np.where(dups)[0]
+                    if len(dup_indices) > 0:
+                        keep_mask[dup_indices[1:]] = False
+
+            # Filter data
+            gravity_data = gravity_data[keep_mask]
+            observed_gravity = gravity_data['VALU_BOU267'].values
+            observed_gravity_ugal = observed_gravity * 1000
+            print(f"Kept {keep_mask.sum()} unique stations out of {len(keep_mask)}")
+
 
 
 import gempy as gp
@@ -133,7 +173,7 @@ def multigravity_likelihood(solutions: gp.data.Solutions, covariance_matrix) -> 
 
     nu = pyro.sample(
         name="nu",
-        fn=Exponential(0.2)  # Mean = 5, favors moderate heavy tails
+        fn=(dist.Exponential(0.2))  # Mean = 5, favors moderate heavy tails
     ) + 2.0  # Ensures nu > 2 (so variance exists)
     # Student-t for heavy tails
     likelihood = dist.MultivariateStudentT(
@@ -144,11 +184,110 @@ def multigravity_likelihood(solutions: gp.data.Solutions, covariance_matrix) -> 
     return likelihood
 
 
-def gaussian_kernel(locations, length_scale, variance):
+def gaussian_kernel_(locations, length_scale, variance):
     import torch
     # Compute the squared Euclidean distance between each pair of points
     locations = torch.tensor(locations)
     distance_squared = torch.cdist(locations, locations, p=2).pow(2)
     # Compute the covariance matrix using the Gaussian kernel
     covariance_matrix = variance * torch.exp(-0.5 * distance_squared / length_scale ** 2)
+    return covariance_matrix
+
+
+def gaussian_kernel(locations, length_scale, variance, nugget=None):
+    """
+    Numerically stable Gaussian kernel with automatic jitter.
+
+    Parameters
+    ----------
+    locations : torch.Tensor or np.ndarray
+        Shape (n_stations, 2) - station coordinates
+    length_scale : float or torch.Tensor
+        Correlation length scale (same units as locations)
+    variance : float or torch.Tensor
+        Signal variance (µGal²)
+    nugget : float or torch.Tensor, optional
+        Nugget effect (independent measurement noise).
+        If None, uses 0.1% of variance as minimum
+
+    Returns
+    -------
+    covariance_matrix : torch.Tensor
+        Positive-definite (n_stations, n_stations) covariance
+    """
+    import torch
+
+    # Type safety
+    locations = torch.tensor(locations, dtype=torch.float64)
+    length_scale = torch.as_tensor(length_scale, dtype=torch.float64)
+    variance = torch.as_tensor(variance, dtype=torch.float64)
+
+    # Default nugget: 0.1% of signal variance (common practice)
+    if nugget is None:
+        nugget = 0.001 * variance
+    else:
+        nugget = torch.as_tensor(nugget, dtype=torch.float64)
+
+    n_stations = locations.shape[0]
+
+    # Compute distances
+    distance_squared = torch.cdist(locations, locations, p=2).pow(2)
+
+    # Stabilized exponential: avoid underflow for large distances
+    # exp(-x) ≈ 0 for x > 30, so clip argument
+    exponent = -0.5 * distance_squared / (length_scale ** 2 + 1e-10)  # Avoid division by zero
+    exponent = torch.clamp(exponent, min=-30.0)  # Prevent underflow
+
+    # Kernel
+    K = variance * torch.exp(exponent)
+
+    # Add nugget (diagonal noise)
+    K = K + torch.eye(n_stations, dtype=torch.float64) * nugget
+
+    # Final safety check - if still not PD, add more jitter
+    try:
+        torch.linalg.cholesky(K)
+    except RuntimeError:
+        # Gradually increase jitter until PD
+        extra_jitter = 1e-6 * variance
+        max_attempts = 10
+        for attempt in range(max_attempts):
+            K = K + torch.eye(n_stations, dtype=torch.float64) * extra_jitter
+            try:
+                torch.linalg.cholesky(K)
+                print(f"Warning: Added extra jitter {extra_jitter:.2e} to ensure positive-definiteness")
+                break
+            except RuntimeError:
+                extra_jitter *= 10
+        else:
+            raise RuntimeError("Could not make covariance matrix positive-definite even with jitter")
+
+    return K
+
+def gaussian_kernel__(locations, length_scale, variance):
+    import torch
+
+    # Ensure consistent dtype
+    locations = torch.tensor(locations, dtype=torch.float64)
+    length_scale = torch.as_tensor(length_scale, dtype=torch.float64)
+    variance = torch.as_tensor(variance, dtype=torch.float64)
+
+    # Compute squared Euclidean distances
+    distance_squared = torch.cdist(locations, locations, p=2).pow(2)
+
+    # Gaussian kernel
+    covariance_matrix = variance * torch.exp(-0.5 * distance_squared / length_scale ** 2)
+
+    # DIAGNOSTIC: Print matrix properties
+    print(f"Covariance matrix shape: {covariance_matrix.shape}")
+    print(f"Diagonal min/max: {covariance_matrix.diag().min():.2e} / {covariance_matrix.diag().max():.2e}")
+    print(f"Off-diagonal min/max: {covariance_matrix[~torch.eye(covariance_matrix.shape[0], dtype=bool)].min():.2e} / {covariance_matrix[~torch.eye(covariance_matrix.shape[0], dtype=bool)].max():.2e}")
+    print(f"Condition number: {torch.linalg.cond(covariance_matrix):.2e}")
+    print(f"Min eigenvalue: {torch.linalg.eigvalsh(covariance_matrix)[0]:.2e}")
+
+    # Check for duplicates
+    unique_locs = torch.unique(locations, dim=0)
+    if unique_locs.shape[0] < locations.shape[0]:
+        print(f"WARNING: Found {locations.shape[0] - unique_locs.shape[0]} duplicate locations!")
+
     return covariance_matrix
