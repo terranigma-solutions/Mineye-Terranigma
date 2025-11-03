@@ -14,6 +14,9 @@ from gempy_engine.core.data.interpolation_input import InterpolationInput
 from gempy_probability.modules.plot.plot_gempy import plot_gempy
 from mineye.GeoModel.geophysics import align_forward_to_observed
 
+# noinspection PyUnusedImports
+from tests import conftest
+
 
 class TestErrorPropagationDips:
     prior_key = r'dips'
@@ -97,7 +100,7 @@ class TestErrorPropagationDips:
 
         plot_gempy(
             geo_model=geo_model,
-            n_samples=n_samples,
+            n_samples=20,
             samples=(prior_inference_data.prior[r'dips'].values[0, :]),
             update_model_fn=self._update_model_for_plotting,
             gempy_plot=p2d

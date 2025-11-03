@@ -13,7 +13,7 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
 
     # Convert units: observed is in mGal, predicted in μGal
     observed_ugal = observed_gravity * 1000  # Convert mGal to μGal
-    forward_model = -grav.numpy().copy()
+    forward_model = -grav
 
     
     params = compute_alignment_params(
@@ -26,7 +26,9 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
         params=params
     )
     
-    observed_norm = observed_ugal.copy()
+    forward_norm = forward_norm.numpy()
+    
+    observed_norm = observed_ugal
     unit_label = r'$\mu$Gal'
 
     residuals_norm = observed_norm - forward_norm
