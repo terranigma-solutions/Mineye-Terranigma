@@ -20,7 +20,7 @@ class TestProbabilisticInversion:
 
     def test_gravity_inversion(self, simple_geo_model, geophysical_dir, n_samples=50):
         """Test reading and computing a geological model."""
-
+        print("Test gravity inversion...")
         # Use actual gravity measurement device locations
         # * 1) Read gravity data
         gravity_data = gpd.read_file(os.path.join(geophysical_dir, 'cleaned_gravity_data.geojson'))
@@ -56,28 +56,22 @@ class TestProbabilisticInversion:
         }
 
         # * 5) Set up likelihood functions
-        length_scale = pyro.sample(
-            "length_scale",
-            dist.LogNormal(
-                loc=torch.log(torch.tensor(2000.0)),  # Median = 2 km
-                scale=1.0  # 68% interval: [~700m, ~5.5km], 95%: [~250m, ~16km]
-            )
-        )
-        # Option A: Inverse-Gamma (conjugate, traditional)
-        variance = pyro.sample(
-            "variance",
-            dist.InverseGamma(
-                concentration=3.0,  # Shape parameter
-                rate=75000.0        # Scale parameter
-            )
-            # This gives: Mean ≈ 37,500, Mode ≈ 25,000
-            # Roughly covers your 15k-40k range
-        )
-        likelihood_fn = generate_multigravity_likelihood(
-            covariance_matrix=(gaussian_kernel(xy_ravel[:, :2], length_scale, variance)),
+        # likelihood_fn = generate_multigravity_likelihood(
+        #     covariance_matrix=(gaussian_kernel(xy_ravel[:, :2], length_scale, variance)),
+        #     norm_params=norm_params
+        # )
+
+        # likelihood_fn = generate_multigravity_likelihood_hierarchical(
+        #     xy_locations=xy_ravel,
+        #     norm_params=norm_params
+        # )
+
+        likelihood_fn = generate_multigravity_likelihood_diagonal(
             norm_params=norm_params
         )
         
+        
+
         # * 6) Set up Pyro model
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
             priors=model_priors,
@@ -91,7 +85,7 @@ class TestProbabilisticInversion:
         # * 7) Run predictive
         gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
         trace = trace_pyro_model(prob_model, geo_model, torch.tensor(observed_gravity_ugal, dtype=torch.float64))
-        compute_prior_predictive = True
+        compute_prior_predictive = False
         if compute_prior_predictive:
             prior_inference_data: az.InferenceData = gpp.run_predictive(
                 prob_model=prob_model,
@@ -108,18 +102,18 @@ class TestProbabilisticInversion:
             geo_model=geo_model,
             y_obs_list=gravity_observations_tensor,
             config=NUTSConfig(
-                step_size=0.1,
+                step_size=0.0001,
                 adapt_step_size=True,
-                target_accept_prob=0.9,
-                max_tree_depth=10,
-                init_strategy='auto',
+                target_accept_prob=0.65,
+                max_tree_depth=5,
+                init_strategy='median',
                 num_samples=200,
                 warmup_steps=50,
             ),
             plot_trace=True,
             run_posterior_predictive=True
         )
-        
+
         if compute_prior_predictive:
             data.extend(prior_inference_data)
 
@@ -141,7 +135,6 @@ class TestProbabilisticInversion:
         # * 9) Analysis Gempy Model
 
         gempy_viz(geo_model, prior_inference_data)
-
 
     def test_gravity_duplicates(self, geophysical_dir):
         """Test reading and computing a geological model."""
@@ -183,7 +176,6 @@ class TestProbabilisticInversion:
             print(f"Kept {keep_mask.sum()} unique stations out of {len(keep_mask)}")
 
 
-
 import gempy as gp
 import pyro.distributions as dist
 
@@ -192,53 +184,78 @@ def generate_multigravity_likelihood(covariance_matrix, norm_params):
     return partial(multigravity_likelihood, covariance_matrix=covariance_matrix, norm_params=norm_params)
 
 
-def multigravity_likelihood(solutions: gp.data.Solutions, covariance_matrix, norm_params) -> dist:
-    simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
-    pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
+def generate_multigravity_likelihood_hierarchical(xy_locations: torch.Tensor, norm_params):
+    """
+    Generate hierarchical likelihood with hyperparameters sampled INSIDE.
+    
+    This is the correct pattern for Pyro/NUTS.
+    """
 
-    nu = pyro.sample(
-        name="nu",
-        fn=(dist.Exponential(0.2))  # Mean = 5, favors moderate heavy tails
-    ) + 2.0  # Ensures nu > 2 (so variance exists)
-    # Student-t for heavy tails
-    likelihood = dist.MultivariateStudentT(
-        df=nu,  # degrees of freedom (sample as hyperparameter)
-        loc=simulated_geophysics,
-        scale_tril=torch.linalg.cholesky(covariance_matrix)
-    )
-    return likelihood
+    def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
+        # Normalize the forward model output
+        simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
+        pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
+
+        # ✓ Sample hyperparameters HERE, inside the likelihood
+        length_scale = pyro.sample(
+            "length_scale",
+            dist.LogNormal(
+                loc=torch.tensor(np.log(2000.0), dtype=torch.float64),
+                scale=torch.tensor(0.8, dtype=torch.float64)
+            )
+        )
+
+        variance = pyro.sample(
+            "variance",
+            dist.InverseGamma(
+                concentration=torch.tensor(3.0, dtype=torch.float64),
+                rate=torch.tensor(75000.0, dtype=torch.float64)
+            )
+        )
+
+        nu = pyro.sample(
+            "nu",
+            dist.Exponential(torch.tensor(0.2, dtype=torch.float64))
+        ) + 2.0
+
+        # Build covariance matrix with sampled hyperparameters
+        covariance_matrix = gaussian_kernel(xy_locations, length_scale, variance)
+
+        # Compute Cholesky
+        try:
+            scale_tril = torch.linalg.cholesky(covariance_matrix)
+        except torch._C._LinAlgError as e:
+            print(f"Cholesky failed with length_scale={length_scale.item():.2f}, "
+                  f"variance={variance.item():.2f}")
+            raise
+
+        # Return Student-t likelihood
+        return dist.MultivariateStudentT(
+            df=nu,
+            loc=simulated_geophysics,
+            scale_tril=scale_tril
+        )
+
+    return likelihood_fn
 
 
-
+# Keep your gaussian_kernel function as-is
 def gaussian_kernel(locations, length_scale, variance, nugget=None):
     """
     Numerically stable Gaussian kernel with automatic jitter.
-
-    Parameters
-    ----------
-    locations : torch.Tensor or np.ndarray
-        Shape (n_stations, 2) - station coordinates
-    length_scale : float or torch.Tensor
-        Correlation length scale (same units as locations)
-    variance : float or torch.Tensor
-        Signal variance (µGal²)
-    nugget : float or torch.Tensor, optional
-        Nugget effect (independent measurement noise).
-        If None, uses 0.1% of variance as minimum
-
-    Returns
-    -------
-    covariance_matrix : torch.Tensor
-        Positive-definite (n_stations, n_stations) covariance
     """
     import torch
 
     # Type safety
-    locations = torch.tensor(locations, dtype=torch.float64)
+    if not isinstance(locations, torch.Tensor):
+        locations = torch.tensor(locations, dtype=torch.float64)
+    else:
+        locations = locations.to(dtype=torch.float64)
+
     length_scale = torch.as_tensor(length_scale, dtype=torch.float64)
     variance = torch.as_tensor(variance, dtype=torch.float64)
 
-    # Default nugget: 0.1% of signal variance (common practice)
+    # Default nugget: 0.1% of signal variance
     if nugget is None:
         nugget = 0.001 * variance
     else:
@@ -249,36 +266,18 @@ def gaussian_kernel(locations, length_scale, variance, nugget=None):
     # Compute distances
     distance_squared = torch.cdist(locations, locations, p=2).pow(2)
 
-    # Stabilized exponential: avoid underflow for large distances
-    # exp(-x) ≈ 0 for x > 30, so clip argument
-    exponent = -0.5 * distance_squared / (length_scale ** 2 + 1e-10)  # Avoid division by zero
-    exponent = torch.clamp(exponent, min=-30.0)  # Prevent underflow
+    # Stabilized exponential
+    exponent = -0.5 * distance_squared / (length_scale.pow(2) + 1e-10)
+    exponent = torch.clamp(exponent, min=-30.0)
 
     # Kernel
     K = variance * torch.exp(exponent)
 
-    # Add nugget (diagonal noise)
-    K = K + torch.eye(n_stations, dtype=torch.float64) * nugget
-
-    # Final safety check - if still not PD, add more jitter
-    try:
-        torch.linalg.cholesky(K)
-    except RuntimeError:
-        # Gradually increase jitter until PD
-        extra_jitter = 1e-6 * variance
-        max_attempts = 10
-        for attempt in range(max_attempts):
-            K = K + torch.eye(n_stations, dtype=torch.float64) * extra_jitter
-            try:
-                torch.linalg.cholesky(K)
-                print(f"Warning: Added extra jitter {extra_jitter:.2e} to ensure positive-definiteness")
-                break
-            except RuntimeError:
-                extra_jitter *= 10
-        else:
-            raise RuntimeError("Could not make covariance matrix positive-definite even with jitter")
+    # Add nugget
+    K = K + torch.eye(n_stations, dtype=torch.float64, device=K.device) * nugget
 
     return K
+
 
 def debug_gradient_flow(likelihood_fn, solutions, obs_data):
     """
@@ -288,9 +287,9 @@ def debug_gradient_flow(likelihood_fn, solutions, obs_data):
     """
     import torch
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("GRADIENT FLOW DIAGNOSTIC")
-    print("="*80)
+    print("=" * 80)
 
     # Get the distribution
     lik_dist = likelihood_fn(solutions)
@@ -346,7 +345,7 @@ def debug_gradient_flow(likelihood_fn, solutions, obs_data):
         except Exception as e:
             print(f"✗ Backward pass failed: {e}")
 
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
 
 # Usage in your test:
@@ -412,3 +411,25 @@ def trace_pyro_model(prob_model, geo_model, obs_data, print_full=True):
     print("\n" + "=" * 80 + "\n")
 
     return trace
+
+
+def generate_multigravity_likelihood_diagonal(norm_params):
+    """
+    Use independent Normal distributions instead of multivariate.
+    Much more stable and faster.
+    """
+
+    def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
+        simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
+        pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
+
+        # Sample noise standard deviation
+        sigma = pyro.sample(
+            "sigma",
+            dist.HalfNormal(torch.tensor(10_000.0, dtype=torch.float64))  # 100 µGal noise
+        )
+
+        # Independent Normal likelihood (much more stable!)
+        return dist.Normal(simulated_geophysics, sigma).to_event(1)
+
+    return likelihood_fn
