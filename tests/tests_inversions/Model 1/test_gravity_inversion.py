@@ -75,8 +75,10 @@ class TestProbabilisticInversion:
             # This gives: Mean ≈ 37,500, Mode ≈ 25,000
             # Roughly covers your 15k-40k range
         )
-        covariance_matrix = gaussian_kernel(xy_ravel[:,:2], length_scale, variance)
-        likelihood_fn = generate_multigravity_likelihood(covariance_matrix)
+        likelihood_fn = generate_multigravity_likelihood(
+            covariance_matrix=(gaussian_kernel(xy_ravel[:, :2], length_scale, variance)),
+            norm_params=norm_params
+        )
         
         # * 6) Set up Pyro model
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
@@ -92,7 +94,7 @@ class TestProbabilisticInversion:
         prior_inference_data: az.InferenceData = gpp.run_predictive(
             prob_model=prob_model,
             geo_model=geo_model,
-            y_obs_list=observed_gravity_ugal,
+            y_obs_list=torch.tensor(observed_gravity_ugal),
             n_samples=n_samples,
             plot_trace=True
         )
@@ -163,12 +165,12 @@ import gempy as gp
 import pyro.distributions as dist
 
 
-def generate_multigravity_likelihood(covariance_matrix):
-    return partial(multigravity_likelihood, covariance_matrix=covariance_matrix)
+def generate_multigravity_likelihood(covariance_matrix, norm_params):
+    return partial(multigravity_likelihood, covariance_matrix=covariance_matrix, norm_params=norm_params)
 
 
-def multigravity_likelihood(solutions: gp.data.Solutions, covariance_matrix) -> dist:
-    simulated_geophysics = solutions.gravity
+def multigravity_likelihood(solutions: gp.data.Solutions, covariance_matrix, norm_params) -> dist:
+    simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
     pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
 
     nu = pyro.sample(
@@ -183,15 +185,6 @@ def multigravity_likelihood(solutions: gp.data.Solutions, covariance_matrix) -> 
     )
     return likelihood
 
-
-def gaussian_kernel_(locations, length_scale, variance):
-    import torch
-    # Compute the squared Euclidean distance between each pair of points
-    locations = torch.tensor(locations)
-    distance_squared = torch.cdist(locations, locations, p=2).pow(2)
-    # Compute the covariance matrix using the Gaussian kernel
-    covariance_matrix = variance * torch.exp(-0.5 * distance_squared / length_scale ** 2)
-    return covariance_matrix
 
 
 def gaussian_kernel(locations, length_scale, variance, nugget=None):
@@ -263,31 +256,3 @@ def gaussian_kernel(locations, length_scale, variance, nugget=None):
             raise RuntimeError("Could not make covariance matrix positive-definite even with jitter")
 
     return K
-
-def gaussian_kernel__(locations, length_scale, variance):
-    import torch
-
-    # Ensure consistent dtype
-    locations = torch.tensor(locations, dtype=torch.float64)
-    length_scale = torch.as_tensor(length_scale, dtype=torch.float64)
-    variance = torch.as_tensor(variance, dtype=torch.float64)
-
-    # Compute squared Euclidean distances
-    distance_squared = torch.cdist(locations, locations, p=2).pow(2)
-
-    # Gaussian kernel
-    covariance_matrix = variance * torch.exp(-0.5 * distance_squared / length_scale ** 2)
-
-    # DIAGNOSTIC: Print matrix properties
-    print(f"Covariance matrix shape: {covariance_matrix.shape}")
-    print(f"Diagonal min/max: {covariance_matrix.diag().min():.2e} / {covariance_matrix.diag().max():.2e}")
-    print(f"Off-diagonal min/max: {covariance_matrix[~torch.eye(covariance_matrix.shape[0], dtype=bool)].min():.2e} / {covariance_matrix[~torch.eye(covariance_matrix.shape[0], dtype=bool)].max():.2e}")
-    print(f"Condition number: {torch.linalg.cond(covariance_matrix):.2e}")
-    print(f"Min eigenvalue: {torch.linalg.eigvalsh(covariance_matrix)[0]:.2e}")
-
-    # Check for duplicates
-    unique_locs = torch.unique(locations, dim=0)
-    if unique_locs.shape[0] < locations.shape[0]:
-        print(f"WARNING: Found {locations.shape[0] - unique_locs.shape[0]} duplicate locations!")
-
-    return covariance_matrix
