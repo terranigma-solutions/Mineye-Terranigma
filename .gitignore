@@ -265,5 +265,7 @@ http-client.private.env.json
 # GIS auxiliary files
 *.xml
 
-
+# Temporary files for simple model inputs
 examples/Data/Output_Data/Simple-Models/temp_inputs/
+Data/Output_Data/Simple-Models/temp_inputs/
+
