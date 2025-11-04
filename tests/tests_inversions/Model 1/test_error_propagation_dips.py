@@ -1,17 +1,15 @@
 import arviz as az
 import torch
 from pyro import distributions as dist
-from pyro.distributions import Distribution
 
 import gempy as gp
 import gempy_probability as gpp
 import gempy_viewer as gpv
 from gempy_engine.core.backend_tensor import BackendTensor
-from gempy_engine.core.data.interpolation_input import InterpolationInput
 from gempy_probability.modules.plot.plot_gempy import plot_gempy
 from mineye.GeoModel.geophysics import align_forward_to_observed
-from mineye.GeoModel.model_one.probabilistic_model import normalize
-from mineye.GeoModel.model_one.setup import baseline, setup_geomodel
+from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel
+from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
 from mineye.GeoModel.model_one.visualization import plot, gempy_viz
 # noinspection PyUnusedImports
 from tests import conftest
@@ -46,7 +44,7 @@ class TestErrorPropagationDips:
 
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
             priors=model_priors,
-            set_interp_input_fn=_modify_dips_for_orientations,
+            set_interp_input_fn=create_orientation_modifier(key=TestErrorPropagationDips.prior_key),
             likelihood_fn=None,
             obs_name=None
         )
@@ -122,7 +120,7 @@ class TestErrorPropagationDips:
 
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
             priors=model_priors,
-            set_interp_input_fn=self._modify_dips_for_orientations,
+            set_interp_input_fn=create_orientation_modifier(key=TestErrorPropagationDips.prior_key),
             likelihood_fn=None,
             pre_forward_deterministics=pre_forward_dets,
             post_forward_deterministics=post_forward_dets,
