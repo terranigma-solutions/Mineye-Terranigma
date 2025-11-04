@@ -12,7 +12,9 @@ from matplotlib import pyplot as plt
 import gempy_probability as gpp
 from gempy_probability.core.samplers_data import NUTSConfig
 from mineye.GeoModel.geophysics import align_forward_to_observed
-from mineye.GeoModel.model_1_aux import setup_geomodel, baseline, normalize, plot, gempy_viz, create_orientation_modifier
+from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
+from mineye.GeoModel.model_one.setup import baseline, setup_geomodel
+from mineye.GeoModel.model_one.visualization import plot, gempy_viz
 # noinspection PyUnusedImports
 from tests import conftest
 

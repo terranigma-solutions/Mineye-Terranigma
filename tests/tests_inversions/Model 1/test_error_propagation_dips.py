@@ -10,7 +10,9 @@ from gempy_engine.core.backend_tensor import BackendTensor
 from gempy_engine.core.data.interpolation_input import InterpolationInput
 from gempy_probability.modules.plot.plot_gempy import plot_gempy
 from mineye.GeoModel.geophysics import align_forward_to_observed
-from mineye.GeoModel.model_1_aux import setup_geomodel, baseline, normalize, plot, gempy_viz, _modify_dips_for_orientations
+from mineye.GeoModel.model_one.probabilistic_model import normalize
+from mineye.GeoModel.model_one.setup import baseline, setup_geomodel
+from mineye.GeoModel.model_one.visualization import plot, gempy_viz
 # noinspection PyUnusedImports
 from tests import conftest
 
