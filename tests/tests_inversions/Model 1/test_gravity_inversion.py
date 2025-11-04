@@ -25,30 +25,7 @@ class TestProbabilisticInversion:
         print("Test gravity inversion...")
         # Use actual gravity measurement device locations
         # * 1) Read gravity data
-        gravity_data = gpd.read_file(os.path.join(geophysical_dir, 'cleaned_gravity_data.geojson'))
-        observed_gravity = gravity_data['VALU_BOU267'].values  # in mGal
-
-        # Take a spatially distributed subset of measurements
-        n_points = 20  # Adjust this number to control how many points you want
-        xy_coords = gravity_data.geometry.apply(lambda p: (p.x, p.y)).to_list()
-        xy_array = np.array(xy_coords)
-
-        # Use K-means clustering to get well-distributed points
-        from sklearn.cluster import KMeans
-        kmeans = KMeans(n_clusters=n_points, random_state=42)
-        kmeans.fit(xy_array)
-
-        # Find the closest points to cluster centers
-        from scipy.spatial.distance import cdist
-        centers = kmeans.cluster_centers_
-        distances = cdist(centers, xy_array)
-        indices = [np.argmin(dist) for dist in distances]
-
-        # Filter the gravity data
-        observed_gravity = observed_gravity[indices]
-        gravity_data = gravity_data.iloc[indices]
-
-        observed_gravity_ugal = observed_gravity * 1000
+        gravity_data, observed_gravity_ugal = self._read_gravity(geophysical_dir)
 
         # * 2) Setup initial Geomodel and normalize forward gravity to the observed gravity
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
@@ -131,21 +108,48 @@ class TestProbabilisticInversion:
 
         data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))
 
+    def _read_gravity(self, geophysical_dir):
+        gravity_data = gpd.read_file(os.path.join(geophysical_dir, 'cleaned_gravity_data.geojson'))
+        observed_gravity = gravity_data['VALU_BOU267'].values  # in mGal
+
+        # Take a spatially distributed subset of measurements
+        n_points = 20  # Adjust this number to control how many points you want
+        xy_coords = gravity_data.geometry.apply(lambda p: (p.x, p.y)).to_list()
+        xy_array = np.array(xy_coords)
+
+        # Use K-means clustering to get well-distributed points
+        from sklearn.cluster import KMeans
+        kmeans = KMeans(n_clusters=n_points, random_state=42)
+        kmeans.fit(xy_array)
+
+        # Find the closest points to cluster centers
+        from scipy.spatial.distance import cdist
+        centers = kmeans.cluster_centers_
+        distances = cdist(centers, xy_array)
+        indices = [np.argmin(dist) for dist in distances]
+
+        # Filter the gravity data
+        observed_gravity = observed_gravity[indices]
+        gravity_data = gravity_data.iloc[indices]
+
+        observed_gravity_ugal = observed_gravity * 1000
+        return gravity_data, observed_gravity_ugal
+
     def test_run_diagnostics(self):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))
         check_mcmc_quality(data)
-        
+
         # After MCMC - Modern ArviZ diagnostics (2025)
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("MCMC DIAGNOSTICS")
-        print("="*60)
-        
+        print("=" * 60)
+
         # 1. Divergences
         n_divergences = int(data.sample_stats.diverging.sum().values)
         print(f"Divergences: {n_divergences}")
         if n_divergences > 0:
             print(f"  ⚠️  WARNING: {n_divergences} divergent transitions detected!")
-        
+
         # 2. ESS (Effective Sample Size) - use bulk and tail
         ess_bulk = az.ess(data, method="bulk")
         ess_tail = az.ess(data, method="tail")
@@ -157,7 +161,7 @@ class TestProbabilisticInversion:
             else:
                 # For multi-dimensional variables, show summary
                 print(f"  {var}: min={float(values.min()):.1f}, mean={float(values.mean()):.1f}, max={float(values.max()):.1f}")
-        
+
         print(f"\nESS (tail):")
         for var in ess_tail.data_vars:
             values = ess_tail[var].values
@@ -165,7 +169,7 @@ class TestProbabilisticInversion:
                 print(f"  {var}: {float(values):.1f}")
             else:
                 print(f"  {var}: min={float(values.min()):.1f}, mean={float(values.mean()):.1f}, max={float(values.max()):.1f}")
-        
+
         # 3. R-hat (should be < 1.01, ideally < 1.05)
         rhat = az.rhat(data)
         print(f"\nR-hat:")
@@ -179,7 +183,7 @@ class TestProbabilisticInversion:
                 max_rhat = float(values.max())
                 warning = " ⚠️" if max_rhat > 1.01 else ""
                 print(f"  {var}: max={max_rhat:.4f}{warning}")
-        
+
         # 4. MCSE (Monte Carlo Standard Error)
         mcse = az.mcse(data)
         print(f"\nMCSE:")
@@ -189,16 +193,16 @@ class TestProbabilisticInversion:
                 print(f"  {var}: {float(values):.6f}")
             else:
                 print(f"  {var}: mean={float(values.mean()):.6f}")
-        
+
         # 5. Comprehensive summary table
         summary = az.summary(
             data,
             var_names=None,  # All variables
-            hdi_prob=0.94,   # 94% HDI is standard
-            kind="stats"     # Can also use "diagnostics"
+            hdi_prob=0.94,  # 94% HDI is standard
+            kind="stats"  # Can also use "diagnostics"
         )
         print(f"\nSummary Statistics:\n{summary}")
-        
+
         # 6. Visual diagnostics (recommended)
         if True:  # Set to False to skip plots
             az.plot_trace(data, compact=True)
@@ -211,7 +215,7 @@ class TestProbabilisticInversion:
                 plt.show()
             except Exception as e:
                 print(f"Could not create rank plot: {e}")
-            
+
             # 8. Energy plot (only if energy data is available from HMC/NUTS)
             try:
                 if hasattr(data.sample_stats, 'energy'):
@@ -221,26 +225,27 @@ class TestProbabilisticInversion:
                     print("\nNote: Energy diagnostics not available (requires Pyro with log_prob tracking)")
             except Exception as e:
                 print(f"Could not create energy plot: {e}")
-        
-        print("="*60 + "\n")
 
-    
-   
-    def test_run_analysis(self):
+        print("=" * 60 + "\n")
 
-        data = az.from_netcdf("./arviz_data.nc")
+    def test_run_analysis(self, simple_geo_model, geophysical_dir):
+
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))
+
+        gravity_data, observed_gravity_ugal = self._read_gravity(geophysical_dir)
+        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
+
         # # Posterior predictive checks
         az.plot_ppc(data, num_pp_samples=20)
         # * 9) Analysis inference
         gravity_samples_norm, unit_label = plot(
-            gravity_samples_norm=prior_inference_data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+            gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
             observed_gravity_ugal=observed_gravity_ugal,
             xy_ravel=xy_ravel
         )
 
         # * 9) Analysis Gempy Model
-
-        gempy_viz(geo_model, prior_inference_data)
+        gempy_viz(geo_model, data)
 
     def test_gravity_duplicates(self, geophysical_dir):
         """Test reading and computing a geological model."""
@@ -284,6 +289,7 @@ class TestProbabilisticInversion:
 
 import gempy as gp
 import pyro.distributions as dist
+
 
 def check_mcmc_quality(data: az.InferenceData, min_ess: float = 400, max_rhat: float = 1.01) -> bool:
     """
@@ -354,6 +360,7 @@ def check_mcmc_quality(data: az.InferenceData, min_ess: float = 400, max_rhat: f
     else:
         print("\n❌ Critical issues detected - consider re-running with adjusted parameters")
         return False
+
 
 def check_mcmc_quality_(data: az.InferenceData, min_ess: float = 400, max_rhat: float = 1.01) -> bool:
     """
