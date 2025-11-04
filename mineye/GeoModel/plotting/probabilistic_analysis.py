@@ -148,7 +148,7 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
     upper_ci = np.percentile(gravity_samples, upper_percentile, axis=0)
 
     # Create figure with subplots
-    fig, axes = plt.subplots(2, 2, figsize=(18, 14))
+    fig, axes = plt.subplots(2, 2, figsize=(18, 14), layout='constrained')
 
     # ============ Plot 1: Mean gravity with uncertainty visualization ============
     ax1 = axes[0, 0]
@@ -268,7 +268,6 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
         ax4.grid(True, alpha=0.3, axis='y')
 
     plt.suptitle(title, fontsize=16, fontweight='bold', y=0.995)
-    plt.tight_layout()
     plt.show()
 
     # Print summary statistics
