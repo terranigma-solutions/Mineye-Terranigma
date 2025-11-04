@@ -12,7 +12,7 @@ from mineye.config import paths
 
 # ========== CONFIG ==========
 BASE_DIR = paths.get_base_dir()
-data_dir = paths.get_data_dir(BASE_DIR)
+data_dir = paths.get_data_dir()
 geomodel_dir = paths.get_geomodel_dir(BASE_DIR)
 geophysical_dir = paths.get_geophysical_dir(BASE_DIR)
 temp_inputs_dir = paths.get_tmp_dir(BASE_DIR)
