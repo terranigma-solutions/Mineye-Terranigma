@@ -2,6 +2,7 @@ import os
 
 import arviz as az
 import torch
+from matplotlib import pyplot as plt
 from pyro import distributions as dist
 
 import gempy_probability as gpp
@@ -98,6 +99,9 @@ class TestProbabilisticInversion:
                 init_strategy='median',
                 num_samples=20,
                 warmup_steps=5,
+                num_samples=200,
+                warmup_steps=200,
+                num_chains=2
             ),
             plot_trace=True,
             run_posterior_predictive=True
@@ -145,7 +149,6 @@ class TestProbabilisticInversion:
 
         plt.show()
 
-        return 
         # * 9) Analysis inference
         gravity_samples_norm, unit_label = plot(
             gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
