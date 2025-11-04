@@ -7,13 +7,13 @@ import pandas as pd
 from . import helper_methods
 
 
-def create_cross_section(geo_model, cross_section: int):
+def create_cross_section(geo_model, cross_section: int, vertical_exaggeration: int):
     i = 0
     while i < cross_section:
         if i % 2 == 0:
-            gpv.plot_2d(geo_model, ve=6,
+            gpv.plot_2d(geo_model, ve=vertical_exaggeration,
                         cell_number=i,
-                        show_topography=True,
+                        show_topography=False,
                         legend=True,
                         show_data=False,
                         direction="y")
@@ -23,9 +23,9 @@ def create_cross_section(geo_model, cross_section: int):
     i = 0
     while i < cross_section:
         if i % 2 == 0:
-            gpv.plot_2d(geo_model, ve=6,
+            gpv.plot_2d(geo_model, ve=vertical_exaggeration,
                         cell_number=i,
-                        show_topography=True,
+                        show_topography=False,
                         legend=True,
                         show_data=False,
                         direction="x")
