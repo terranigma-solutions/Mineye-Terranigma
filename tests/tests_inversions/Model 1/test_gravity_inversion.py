@@ -6,6 +6,7 @@ from pyro import distributions as dist
 
 import gempy_probability as gpp
 from gempy_probability.core.samplers_data import NUTSConfig
+from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
@@ -121,6 +122,30 @@ class TestProbabilisticInversion:
 
         # # Posterior predictive checks
         az.plot_ppc(data, num_pp_samples=20)
+
+        plt.rcParams['figure.dpi'] = 72  # Lower DPI for faster rendering
+        
+        axes = az.plot_density(
+            data=[data, data.prior],
+            var_names=["dips"],
+            filter_vars="like",
+            hdi_prob=0.95,
+            shade=.2,
+            data_labels=["Posterior", "Prior"],
+            colors=[default_red, default_blue],
+        )
+
+        # # Apply log scale to all y-axes
+        if isinstance(axes, np.ndarray):
+            for ax in axes.flatten():
+                ax.set_yscale('log')
+        else:
+            axes.set_yscale('log')
+
+
+        plt.show()
+
+        return 
         # * 9) Analysis inference
         gravity_samples_norm, unit_label = plot(
             gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
