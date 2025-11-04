@@ -1,11 +1,13 @@
 import os
 from functools import partial
 
+import arviz
 import arviz as az
 import geopandas as gpd
 import numpy as np
 import pyro
 import torch
+from matplotlib import pyplot as plt
 
 import gempy_probability as gpp
 from gempy_probability.core.samplers_data import NUTSConfig
@@ -50,6 +52,7 @@ class TestProbabilisticInversion:
 
         # * 2) Setup initial Geomodel and normalize forward gravity to the observed gravity
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
+        geo_model.interpolation_options.sigmoid_slope = 100
         baseline_fw_gravity_np = baseline(geo_model)
         norm_params = normalize(baseline_fw_gravity_np, observed_gravity_ugal)
 
@@ -80,8 +83,6 @@ class TestProbabilisticInversion:
         likelihood_fn = generate_multigravity_likelihood_diagonal(
             norm_params=norm_params
         )
-        
-        
 
         # * 6) Set up Pyro model
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
@@ -128,12 +129,79 @@ class TestProbabilisticInversion:
         if compute_prior_predictive:
             data.extend(prior_inference_data)
 
-        # After MCMC
-        print(f"Divergences: {data.sample_stats.diverging.sum().item()}")
-        # print(f"Max tree depth: {(data.sample_stats.tree_depth == 10).sum().item()}")
-        print(f"ESS: {az.ess(data)}")
-        print(f"R-hat: {az.rhat(data)}")  # Should be < 1.01
-        # 
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))
+
+    def test_run_diagnostics(self):
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))
+        # After MCMC - Modern ArviZ diagnostics (2025)
+        print("\n" + "=" * 60)
+        print("MCMC DIAGNOSTICS")
+        print("=" * 60)
+
+        # 1. Divergences
+        n_divergences = int(data.sample_stats.diverging.sum().values)
+        print(f"Divergences: {n_divergences}")
+        if n_divergences > 0:
+            print(f"  ⚠️  WARNING: {n_divergences} divergent transitions detected!")
+
+        # 2. ESS (Effective Sample Size) - use bulk and tail
+        ess_bulk = az.ess(data, method="bulk")
+        ess_tail = az.ess(data, method="tail")
+        print(f"\nESS (bulk):")
+        for var in ess_bulk.data_vars:
+            print(f"  {var}: {float(ess_bulk[var].values):.1f}")
+        print(f"\nESS (tail):")
+        for var in ess_tail.data_vars:
+            print(f"  {var}: {float(ess_tail[var].values):.1f}")
+
+        # 3. R-hat (should be < 1.01, ideally < 1.05)
+        rhat = az.rhat(data)
+        print(f"\nR-hat:")
+        for var in rhat.data_vars:
+            rhat_val = float(rhat[var].values)
+            warning = " ⚠️" if rhat_val > 1.01 else ""
+            print(f"  {var}: {rhat_val:.4f}{warning}")
+
+        # 4. MCSE (Monte Carlo Standard Error)
+        mcse = az.mcse(data)
+        print(f"\nMCSE:")
+        for var in mcse.data_vars:
+            print(f"  {var}: {float(mcse[var].values):.6f}")
+
+        # 5. Comprehensive summary table
+        summary = az.summary(
+            data,
+            var_names=None,  # All variables
+            hdi_prob=0.94,  # 94% HDI is standard
+            kind="stats"  # Can also use "diagnostics"
+        )
+        print(f"\nSummary Statistics:\n{summary}")
+
+        # 6. Visual diagnostics (recommended)
+        if True:  # Set to False to skip plots
+            az.plot_trace(data, compact=True)
+            plt.tight_layout()
+
+            # 7. Rank plots (better than trace plots for convergence)
+            try:
+                az.plot_rank(data, var_names=["dips"])
+            except Exception as e:
+                print(f"Could not create rank plot: {e}")
+
+            # 8. Energy plot (only if energy data is available from HMC/NUTS)
+            try:
+                if hasattr(data.sample_stats, 'energy'):
+                    az.plot_energy(data)
+                else:
+                    print("\nNote: Energy diagnostics not available (requires Pyro with log_prob tracking)")
+            except Exception as e:
+                print(f"Could not create energy plot: {e}")
+       
+        print("=" * 60 + "\n")
+
+    def test_run_analysis(self):
+
+        data = az.from_netcdf("./arviz_data.nc")
         # # Posterior predictive checks
         az.plot_ppc(data, num_pp_samples=20)
         # * 9) Analysis inference
