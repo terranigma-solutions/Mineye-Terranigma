@@ -2,6 +2,7 @@ import os
 
 import arviz as az
 import torch
+from pyro import distributions as dist
 
 import gempy_probability as gpp
 from gempy_probability.core.samplers_data import NUTSConfig
@@ -10,7 +11,7 @@ from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
 from mineye.GeoModel.model_one.probabilistic_model_diagnostics import trace_pyro_model
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal
-from mineye.GeoModel.model_one.setup import baseline, setup_geomodel, read_gravity
+from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.visualization import plot, gempy_viz
 # noinspection PyUnusedImports
 from tests import conftest
