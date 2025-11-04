@@ -133,72 +133,99 @@ class TestProbabilisticInversion:
 
     def test_run_diagnostics(self):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))
+        check_mcmc_quality(data)
+        
         # After MCMC - Modern ArviZ diagnostics (2025)
-        print("\n" + "=" * 60)
+        print("\n" + "="*60)
         print("MCMC DIAGNOSTICS")
-        print("=" * 60)
-
+        print("="*60)
+        
         # 1. Divergences
         n_divergences = int(data.sample_stats.diverging.sum().values)
         print(f"Divergences: {n_divergences}")
         if n_divergences > 0:
             print(f"  ⚠️  WARNING: {n_divergences} divergent transitions detected!")
-
+        
         # 2. ESS (Effective Sample Size) - use bulk and tail
         ess_bulk = az.ess(data, method="bulk")
         ess_tail = az.ess(data, method="tail")
         print(f"\nESS (bulk):")
         for var in ess_bulk.data_vars:
-            print(f"  {var}: {float(ess_bulk[var].values):.1f}")
+            values = ess_bulk[var].values
+            if values.size == 1:
+                print(f"  {var}: {float(values):.1f}")
+            else:
+                # For multi-dimensional variables, show summary
+                print(f"  {var}: min={float(values.min()):.1f}, mean={float(values.mean()):.1f}, max={float(values.max()):.1f}")
+        
         print(f"\nESS (tail):")
         for var in ess_tail.data_vars:
-            print(f"  {var}: {float(ess_tail[var].values):.1f}")
-
+            values = ess_tail[var].values
+            if values.size == 1:
+                print(f"  {var}: {float(values):.1f}")
+            else:
+                print(f"  {var}: min={float(values.min()):.1f}, mean={float(values.mean()):.1f}, max={float(values.max()):.1f}")
+        
         # 3. R-hat (should be < 1.01, ideally < 1.05)
         rhat = az.rhat(data)
         print(f"\nR-hat:")
         for var in rhat.data_vars:
-            rhat_val = float(rhat[var].values)
-            warning = " ⚠️" if rhat_val > 1.01 else ""
-            print(f"  {var}: {rhat_val:.4f}{warning}")
-
+            values = rhat[var].values
+            if values.size == 1:
+                rhat_val = float(values)
+                warning = " ⚠️" if rhat_val > 1.01 else ""
+                print(f"  {var}: {rhat_val:.4f}{warning}")
+            else:
+                max_rhat = float(values.max())
+                warning = " ⚠️" if max_rhat > 1.01 else ""
+                print(f"  {var}: max={max_rhat:.4f}{warning}")
+        
         # 4. MCSE (Monte Carlo Standard Error)
         mcse = az.mcse(data)
         print(f"\nMCSE:")
         for var in mcse.data_vars:
-            print(f"  {var}: {float(mcse[var].values):.6f}")
-
+            values = mcse[var].values
+            if values.size == 1:
+                print(f"  {var}: {float(values):.6f}")
+            else:
+                print(f"  {var}: mean={float(values.mean()):.6f}")
+        
         # 5. Comprehensive summary table
         summary = az.summary(
             data,
             var_names=None,  # All variables
-            hdi_prob=0.94,  # 94% HDI is standard
-            kind="stats"  # Can also use "diagnostics"
+            hdi_prob=0.94,   # 94% HDI is standard
+            kind="stats"     # Can also use "diagnostics"
         )
         print(f"\nSummary Statistics:\n{summary}")
-
+        
         # 6. Visual diagnostics (recommended)
         if True:  # Set to False to skip plots
             az.plot_trace(data, compact=True)
             plt.tight_layout()
+            plt.show()
 
             # 7. Rank plots (better than trace plots for convergence)
             try:
                 az.plot_rank(data, var_names=["dips"])
+                plt.show()
             except Exception as e:
                 print(f"Could not create rank plot: {e}")
-
+            
             # 8. Energy plot (only if energy data is available from HMC/NUTS)
             try:
                 if hasattr(data.sample_stats, 'energy'):
                     az.plot_energy(data)
+                    plt.show()
                 else:
                     print("\nNote: Energy diagnostics not available (requires Pyro with log_prob tracking)")
             except Exception as e:
                 print(f"Could not create energy plot: {e}")
-       
-        print("=" * 60 + "\n")
+        
+        print("="*60 + "\n")
 
+    
+   
     def test_run_analysis(self):
 
         data = az.from_netcdf("./arviz_data.nc")
@@ -257,6 +284,139 @@ class TestProbabilisticInversion:
 
 import gempy as gp
 import pyro.distributions as dist
+
+def check_mcmc_quality(data: az.InferenceData, min_ess: float = 400, max_rhat: float = 1.01) -> bool:
+    """
+    Automated MCMC quality checks following 2025 best practices.
+
+    Args:
+        data: ArviZ InferenceData object
+        min_ess: Minimum acceptable ESS (bulk)
+        max_rhat: Maximum acceptable R-hat value
+
+    Returns:
+        True if all checks pass, False otherwise
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    issues = []
+    warnings = []
+
+    # Check divergences
+    n_divergences = int(data.sample_stats.diverging.sum().values)
+    if n_divergences > 0:
+        issues.append(f"❌ {n_divergences} divergent transitions")
+
+    # Check ESS - properly handle xarray Dataset with multi-dimensional variables
+    ess_bulk = az.ess(data, method="bulk")
+    for var in ess_bulk.data_vars:
+        values = np.array(ess_bulk[var].values)  # Ensure it's a numpy array
+        # Use minimum ESS if multi-dimensional (worst case)
+        ess_val = float(values.min())
+
+        if ess_val < min_ess:
+            if ess_val < min_ess / 2:
+                issues.append(f"❌ {var}: ESS = {ess_val:.1f} (< {min_ess})")
+            else:
+                warnings.append(f"⚠️  {var}: ESS = {ess_val:.1f} (< {min_ess})")
+
+    # Check R-hat - properly handle xarray Dataset with multi-dimensional variables
+    rhat = az.rhat(data)
+    for var in rhat.data_vars:
+        values = np.array(rhat[var].values)  # Ensure it's a numpy array
+        # Use maximum R-hat if multi-dimensional (worst case)
+        rhat_val = float(values.max())
+
+        if rhat_val > max_rhat:
+            if rhat_val > 1.1:
+                issues.append(f"❌ {var}: R-hat = {rhat_val:.4f} (> {max_rhat})")
+            else:
+                warnings.append(f"⚠️  {var}: R-hat = {rhat_val:.4f} (> {max_rhat})")
+
+    # Report results
+    if issues:
+        print("\n❌ CRITICAL MCMC QUALITY ISSUES:")
+        for issue in issues:
+            print(f"  {issue}")
+
+    if warnings:
+        print("\n⚠️  MCMC QUALITY WARNINGS:")
+        for warning in warnings:
+            print(f"  {warning}")
+
+    if not issues and not warnings:
+        print("\n✅ All MCMC quality checks passed!")
+        return True
+    elif not issues:
+        print("\n⚠️  Some warnings, but no critical issues")
+        return True
+    else:
+        print("\n❌ Critical issues detected - consider re-running with adjusted parameters")
+        return False
+
+def check_mcmc_quality_(data: az.InferenceData, min_ess: float = 400, max_rhat: float = 1.01) -> bool:
+    """
+    Automated MCMC quality checks following 2025 best practices.
+
+    Args:
+        data: ArviZ InferenceData object
+        min_ess: Minimum acceptable ESS (bulk)
+        max_rhat: Maximum acceptable R-hat value
+
+    Returns:
+        True if all checks pass, False otherwise
+    """
+    import matplotlib.pyplot as plt
+
+    issues = []
+    warnings = []
+
+    # Check divergences
+    n_divergences = int(data.sample_stats.diverging.sum().values)
+    if n_divergences > 0:
+        issues.append(f"❌ {n_divergences} divergent transitions")
+
+    # Check ESS - properly handle xarray Dataset
+    ess_bulk = az.ess(data, method="bulk")
+    for var in ess_bulk.data_vars:
+        ess_val = float(ess_bulk[var].values)
+        if ess_val < min_ess:
+            if ess_val < min_ess / 2:
+                issues.append(f"❌ {var}: ESS = {ess_val:.1f} (< {min_ess})")
+            else:
+                warnings.append(f"⚠️  {var}: ESS = {ess_val:.1f} (< {min_ess})")
+
+    # Check R-hat - properly handle xarray Dataset
+    rhat = az.rhat(data)
+    for var in rhat.data_vars:
+        rhat_val = float(rhat[var].values)
+        if rhat_val > max_rhat:
+            if rhat_val > 1.1:
+                issues.append(f"❌ {var}: R-hat = {rhat_val:.4f} (> {max_rhat})")
+            else:
+                warnings.append(f"⚠️  {var}: R-hat = {rhat_val:.4f} (> {max_rhat})")
+
+    # Report results
+    if issues:
+        print("\n❌ CRITICAL MCMC QUALITY ISSUES:")
+        for issue in issues:
+            print(f"  {issue}")
+
+    if warnings:
+        print("\n⚠️  MCMC QUALITY WARNINGS:")
+        for warning in warnings:
+            print(f"  {warning}")
+
+    if not issues and not warnings:
+        print("\n✅ All MCMC quality checks passed!")
+        return True
+    elif not issues:
+        print("\n⚠️  Some warnings, but no critical issues")
+        return True
+    else:
+        print("\n❌ Critical issues detected - consider re-running with adjusted parameters")
+        return False
 
 
 def generate_multigravity_likelihood(covariance_matrix, norm_params):
