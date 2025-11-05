@@ -1,4 +1,3 @@
-import io
 import os
 
 import arviz as az
@@ -6,14 +5,14 @@ import torch
 from matplotlib import pyplot as plt
 from pyro import distributions as dist, optim
 from pyro.infer import SVI, Trace_ELBO
-from pyro.infer.autoguide import AutoNormalizingFlow, AutoIAFNormal
+from pyro.infer.autoguide import AutoIAFNormal
 from pyro.optim import Adam
 
 import gempy_probability as gpp
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
-from mineye.GeoModel.model_one.probabilistic_model_diagnostics import trace_pyro_model
+from mineye.GeoModel.model_one.probabilistic_model_diagnostics import trace_pyro_model, _plot_probability_model_graph
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.visualization import plot, gempy_viz
@@ -78,7 +77,7 @@ class TestProbabilisticInversionVI:
         # Exploring model dependencies
         
         if False:
-            self._graph(prob_model, geo_model, torch.tensor(observed_gravity_ugal))
+            _plot_probability_model_graph(prob_model, geo_model, torch.tensor(observed_gravity_ugal))
 
         # * 7) Run predictive
         gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
@@ -89,7 +88,7 @@ class TestProbabilisticInversionVI:
                 prob_model=prob_model,
                 geo_model=geo_model,
                 y_obs_list=gravity_observations_tensor,
-                n_samples=10,
+                n_samples=100,
                 plot_trace=True
             )
 
@@ -103,7 +102,7 @@ class TestProbabilisticInversionVI:
         )
 
         # Set up optimizer
-        optimizer = optim.ClippedAdam({"lr": 1e-3, "clip_norm": 10.0})
+        optimizer = optim.ClippedAdam({"lr": 1e-4, "clip_norm": 10.0})
 
         # Set up SVI
         svi = SVI(
@@ -114,7 +113,7 @@ class TestProbabilisticInversionVI:
         )
 
         # Run SVI optimization
-        num_iterations = 1000
+        num_iterations = 5000
         losses = []
         print("Starting VI optimization...")
         for i in range(num_iterations):
@@ -125,15 +124,7 @@ class TestProbabilisticInversionVI:
 
         print(f"Final loss: {losses[-1]:.4f}")
 
-        # Plot loss curve
-        plt.figure(figsize=(10, 6))
-        plt.plot(losses)
-        plt.xlabel('Iteration')
-        plt.ylabel('ELBO Loss')
-        plt.title('Variational Inference Convergence')
-        plt.grid(True)
-        plt.show()
-
+        self._plot_loss_curve(losses)
         # * 9) Sample from the variational posterior
         from pyro.infer import Predictive
 
@@ -158,41 +149,25 @@ class TestProbabilisticInversionVI:
         if compute_prior_predictive:
             data.extend(prior_inference_data)
 
-        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi.nc"))
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_II.nc"))
 
         print("VI inference completed and saved!")
 
         return data
 
-    def _graph(self, model, geo_model, y_obs_list=None):
-        # ! This is not working well, the geo_model dependency is not properly picked up
-        
-        from pyro.infer.inspect import get_dependencies
-        import pyro
-        dependencies = get_dependencies(model, model_args=(geo_model, y_obs_list[:1]))
-        dependencies
+    def _plot_loss_curve(self, losses):
+        plt.figure(figsize=(10, 6))
 
-        # %%
-        graph = pyro.render_model(
-            model=model,
-            model_args=(geo_model, y_obs_list,),
-            render_params=True,
-            render_distributions=True,
-            render_deterministic=True
-        )
+        # Filter out extreme values for better visualization
+        loss_array = np.array(losses)
+        upper_bound = np.percentile(loss_array, 99)
+        filtered_losses = np.where(loss_array < upper_bound, loss_array, upper_bound)
 
-        graph.attr(dpi='300')
-        # Convert the graph to a PNG image format
-        s = graph.pipe(format='png')
-
-        # Open the image with PIL
-        from PIL import Image
-        image = Image.open(io.BytesIO(s))
-
-        # Plot the image with matplotlib
-        plt.figure(figsize=(10, 4))
-        plt.imshow(image)
-        plt.axis('off')  # Turn off axis
+        plt.plot(filtered_losses)
+        plt.xlabel('Iteration')
+        plt.ylabel('ELBO Loss (filtered)')
+        plt.title('Variational Inference Convergence')
+        plt.grid(True)
         plt.show()
 
     def test_run_diagnostics_vi(self):

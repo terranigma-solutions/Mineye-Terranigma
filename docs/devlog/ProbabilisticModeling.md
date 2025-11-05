@@ -13,3 +13,9 @@
 - Magnetic inversion
 - Double inversion 
 - Mapping gravity in a fancier way
+
+
+## Notes 
+
+- Model 1:
+    - Dip 1 and 5 (and 4) seems to carry all the information

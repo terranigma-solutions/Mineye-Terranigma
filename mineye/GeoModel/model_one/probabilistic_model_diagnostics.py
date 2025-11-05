@@ -1,3 +1,11 @@
+import io
+
+import pyro
+from PIL import Image
+from matplotlib import pyplot
+from pyro.infer.inspect import get_dependencies
+
+
 def debug_gradient_flow(likelihood_fn, solutions, obs_data):
     """
     Systematically check where gradient flow breaks.
@@ -112,3 +120,36 @@ def trace_pyro_model(prob_model, geo_model, obs_data, print_full=True):
     print("\n" + "=" * 80 + "\n")
 
     return trace
+
+
+def _plot_probability_model_graph(model, geo_model, y_obs_list=None):
+    # ! This is not working well, the geo_model dependency is not properly picked up
+    # ! This does not work at all when keops is on
+    
+    from pyro.infer.inspect import get_dependencies
+    import pyro
+    dependencies = get_dependencies(model, model_args=(geo_model, y_obs_list[:1]))
+    dependencies
+
+    # %%
+    graph = pyro.render_model(
+        model=model,
+        model_args=(geo_model, y_obs_list,),
+        render_params=True,
+        render_distributions=True,
+        render_deterministic=True
+    )
+
+    graph.attr(dpi='300')
+    # Convert the graph to a PNG image format
+    s = graph.pipe(format='png')
+
+    # Open the image with PIL
+    from PIL import Image
+    image = Image.open(io.BytesIO(s))
+
+    # Plot the image with matplotlib
+    plt.figure(figsize=(10, 4))
+    plt.imshow(image)
+    plt.axis('off')  # Turn off axis
+    plt.show()
