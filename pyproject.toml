@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mineye-terranigma"
+version = "0.1.0"
+description = "Geological modeling and geophysical inversion tools"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "gempy>=2025.2.0",
+    "gempy-viewer>=2025.1.2",
+    "matplotlib~=3.10.7",
+    "numpy~=2.3.4",
+    "pandas~=2.3.3",
+    "scipy~=1.16.2",
+    "rasterio",
+    "scikit-image",
+    "scikit-learn",
+    "geopandas",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mineye*"]
+exclude = ["tests*", "examples*", "docs*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests", "examples"]
+
