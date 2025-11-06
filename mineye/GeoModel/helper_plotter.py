@@ -150,3 +150,127 @@ def plot_initial_data_on_map(gis_map_info: str,
             print(f"Scalebar failed: {e}")
 
     plt.tight_layout(); plt.show()
+
+
+def plot_forward_gravity_model(xy_ravel, grav, gravity_data, gravity_resolution=20, use_actual_locations=True):
+    """
+    Plot forward gravity model results.
+
+    Args:
+        xy_ravel: Array of measurement point coordinates
+        grav: Computed gravity values
+        gravity_data: GeoDataFrame with actual measurement locations
+        gravity_resolution: Grid resolution (used if not using actual locations)
+        use_actual_locations: Whether to use actual measurement locations or regular grid
+    """
+    fig, ax = plt.subplots(figsize=(12, 10))
+
+    if use_actual_locations:
+        scatter = ax.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=grav, s=30,
+                            cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5)
+        cbar = plt.colorbar(scatter, ax=ax)
+        cbar.set_label(r'Forward Model Gravity ($\mu$gal)')
+        print(f"Plotting {len(xy_ravel)} actual measurement locations")
+    else:
+        grav_res = gravity_resolution
+        ax.scatter(xy_ravel[:, 0], xy_ravel[:, 1], s=1, c='white', alpha=0.5)
+        im = ax.imshow(grav.reshape(grav_res, grav_res),
+                   extent=(xy_ravel[:, 0].min() + (xy_ravel[0, 0] - xy_ravel[1, 0]) / 2,
+                           xy_ravel[:, 0].max() - (xy_ravel[0, 0] - xy_ravel[1, 0]) / 2,
+                           xy_ravel[:, 1].min() + (xy_ravel[0, 1] - xy_ravel[grav_res, 1]) / 2,
+                           xy_ravel[:, 1].max() - (xy_ravel[0, 1] - xy_ravel[grav_res, 1]) / 2),
+                   cmap='viridis_r', origin='lower', alpha=.8)
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label(r'Forward Model Gravity ($\mu$gal)')
+        print(f"Plotting regular grid: {grav_res}x{grav_res} points")
+
+    # Show actual measurement point locations
+    actual_measurement_points = np.column_stack([
+        np.array(gravity_data.geometry.x.values),
+        np.array(gravity_data.geometry.y.values)
+    ])
+    ax.scatter(actual_measurement_points[:, 0], actual_measurement_points[:, 1],
+               s=15, c='red', marker='x', alpha=0.8, linewidth=1.5,
+               label=f'Actual Measurement Points (n={len(actual_measurement_points)})')
+
+    ax.legend(loc='upper right', framealpha=0.9)
+    ax.set_title('Forward Gravity Model Results', fontsize=14, fontweight='bold')
+    ax.set_xlabel('X (m)')
+    ax.set_ylabel('Y (m)')
+    ax.set_aspect('equal')
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_gravity_comparison(xy_ravel, observed_norm, forward_norm, residuals_norm,
+                            unit_label, normalize_data=True, normalization_method='minmax'):
+    """
+    Plot comparison between observed and forward model gravity.
+
+    Args:
+        xy_ravel: Array of measurement point coordinates
+        observed_norm: Normalized observed gravity values
+        forward_norm: Normalized forward model gravity values
+        residuals_norm: Normalized residuals (observed - forward)
+        unit_label: Label for the units being used
+        normalize_data: Whether data was normalized
+        normalization_method: Method used for normalization
+
+    Returns:
+        correlation: Correlation coefficient between observed and forward model
+    """
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+
+    # Plot 1: Observed gravity
+    scatter1 = ax1.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=observed_norm,
+                          s=30, cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5)
+    title_suffix = f" ({normalization_method})" if normalize_data else ""
+    ax1.set_title(f'Observed Gravity{title_suffix}', fontsize=12, fontweight='bold')
+    ax1.set_xlabel('X (m)')
+    ax1.set_ylabel('Y (m)')
+    ax1.set_aspect('equal')
+    cbar1 = plt.colorbar(scatter1, ax=ax1)
+    cbar1.set_label(f'Observed ({unit_label})')
+
+    # Plot 2: Forward model gravity
+    scatter2 = ax2.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=forward_norm,
+                          s=30, cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5)
+    ax2.set_title(f'Forward Model Gravity{title_suffix}', fontsize=12, fontweight='bold')
+    ax2.set_xlabel('X (m)')
+    ax2.set_ylabel('Y (m)')
+    ax2.set_aspect('equal')
+    cbar2 = plt.colorbar(scatter2, ax=ax2)
+    cbar2.set_label(f'Forward Model ({unit_label})')
+
+    # Plot 3: Residuals
+    scatter3 = ax3.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=residuals_norm,
+                          s=30, cmap='RdBu_r', alpha=0.8, edgecolors='black', linewidth=0.5)
+    ax3.set_title(f'Residuals (Observed - Forward Model){title_suffix}', fontsize=12, fontweight='bold')
+    ax3.set_xlabel('X (m)')
+    ax3.set_ylabel('Y (m)')
+    ax3.set_aspect('equal')
+    cbar3 = plt.colorbar(scatter3, ax=ax3)
+    cbar3.set_label(f'Residuals ({unit_label})')
+
+    # Plot 4: Correlation plot
+    ax4.scatter(observed_norm, forward_norm, alpha=0.7, s=40, edgecolors='black', linewidth=0.5)
+    ax4.set_xlabel(f'Observed ({unit_label})')
+    ax4.set_ylabel(f'Forward Model ({unit_label})')
+    ax4.set_title('Observed vs Forward Model Correlation', fontsize=12, fontweight='bold')
+
+    # Add 1:1 line
+    lims = [min(ax4.get_xlim()[0], ax4.get_ylim()[0]), max(ax4.get_xlim()[1], ax4.get_ylim()[1])]
+    ax4.plot(lims, lims, 'r--', alpha=0.75, linewidth=2, label='1:1 line')
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
+
+    # Calculate and display correlation coefficient
+    correlation = np.corrcoef(observed_norm, forward_norm)[0, 1]
+    ax4.text(0.05, 0.95, f'R = {correlation:.3f}', transform=ax4.transAxes,
+             bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontsize=12, fontweight='bold')
+
+    plt.tight_layout()
+    plt.show()
+
+    return correlation
+

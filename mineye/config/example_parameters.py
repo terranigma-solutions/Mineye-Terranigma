@@ -73,3 +73,32 @@ class SoricomSimpleModelConfig:
     SHOW_BOUNDARIES = True
     SHOW_DATA = True
     SHOW_LEGEND = False
+
+
+class TharsisGravityConfig:
+    """Configuration parameters for Tharsis gravity forward modeling and inversion."""
+
+    # Model parameters
+    DENSITY_PLUTONITES = 2.9  # kg/m³
+    DENSITY_SEDIMENTARY_HOST = 2.3  # kg/m³
+    GRAVITY_RESOLUTION = 20  # Number of gravity measurement points per axis
+
+    # Centered grid parameters for gravity calculation
+    CENTERED_GRID_RESOLUTION = np.array([10, 10, 15])
+    CENTERED_GRID_RADIUS = np.array([5000, 5000, 5000])
+
+    # Measurement grid options
+    USE_ACTUAL_MEASUREMENT_LOCATIONS = True  # True: use gravity device locations, False: use regular grid
+
+    # Normalization options
+    NORMALIZE_DATA = True  # Enable/disable normalization
+    NORMALIZATION_METHOD = 'minmax'  # Options: 'zscore', 'minmax', 'mean_center', 'relative'
+
+    # Gravity data field name
+    GRAVITY_FIELD_NAME = 'VALU_BOU267'  # Field name in the GeoJSON file (in mGal)
+
+    # Visualization options
+    SHOW_FORWARD_MODEL = True
+    SHOW_COMPARISON_PLOTS = True
+    SAVE_RESULTS = True
+

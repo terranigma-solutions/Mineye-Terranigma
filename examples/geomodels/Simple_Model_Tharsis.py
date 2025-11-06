@@ -8,7 +8,37 @@ from mineye.config.example_parameters import TharsisModelConfig
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-def test_simple_model_with_topo_thar():
+
+def create_simple_model():
+    """
+    Create and compute a simple Tharsis geological model without topography or visualization.
+
+    Returns:
+        geo_model: Computed GemPy geological model
+    """
+    geo_model = gp.create_geomodel(
+        project_name=TharsisModelConfig.PROJECT_NAME,
+        extent=TharsisModelConfig.EXTENT,
+        refinement=TharsisModelConfig.REFINEMENT,
+        resolution=TharsisModelConfig.RESOLUTION,
+        importer_helper=gp.data.ImporterHelper(
+            path_to_orientations=paths.get_orientations_path(),
+            path_to_surface_points=paths.get_points_path(),
+        )
+    )
+
+    gp.map_stack_to_surfaces(
+        gempy_model=geo_model,
+        mapping_object=TharsisModelConfig.SURFACE_MAPPING
+    )
+
+    gp.set_topography_from_file(grid=geo_model.grid, filepath=paths.get_topography_path())
+    gp.compute_model(geo_model)
+
+    return geo_model
+
+
+def test_simple_model_with_plots():
     geo_model = gp.create_geomodel(
         project_name=TharsisModelConfig.PROJECT_NAME,
         extent=TharsisModelConfig.EXTENT,
