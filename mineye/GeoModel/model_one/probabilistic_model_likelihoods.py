@@ -27,7 +27,7 @@ def generate_multigravity_likelihood_diagonal(norm_params):
         #     dist.HalfNormal(torch.tensor(5_000.0, dtype=torch.float64)).expand([n_stations]).to_event(1)  # 100 µGal noise
         # )
 
-        sigma = torch.tensor(500.0, dtype=torch.float64)
+        sigma = torch.tensor(5_000.0, dtype=torch.float64)
         
         # Independent Normal likelihood (much more stable!)
         # sigma = pyro.sample(
