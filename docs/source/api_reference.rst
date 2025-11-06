@@ -1,70 +1,19 @@
-Code
-====
+API Reference
+=============
 
-.. toctree::
-   :maxdepth: 3
+.. note::
+   This API reference will be expanded as modules used in the example galleries are documented.
+   Currently, the focus is on providing working examples rather than comprehensive API documentation.
 
-
-GemPy API
----------
-.. currentmodule:: gempy
-.. autosummary::
-    :toctree: GemPy API
-    :template: base.rst
-
-    compute_model
-    create_geomodel
-    map_stack_to_surfaces
-
-
-Plot
-----
-.. currentmodule:: gempy_viewer
-.. autosummary::
-    :toctree: Plot
-    :template: base.rst
-
-    plot_2d
-    plot_3d
-
-Data Classes
-============
-
-.. toctree::
-    :maxdepth: 3
-
-Modeling Classes
-----------------
-.. module:: gempy.core.data
-.. autosummary::
-    :toctree: Modeling Classes
-    :template: class.rst
-
-    GeoModel
-    StructuralFrame
-    StructuralGroup
-    StructuralElement
-    SurfacePointsTable
-    OrientationsTable
-    InterpolationOptions
-    Grid
-    Solutions
-    RawArraysSolution
-
-Helper Classes
+Mineye Package
 --------------
-.. currentmodule:: gempy.core.data
-.. autosummary::
-    :toctree: Helper Classes
-    :template: class.rst
 
-    ImporterHelper
+The ``mineye`` package contains modules for geological modeling, geophysical inversion, and GIS utilities.
 
-Enumerators
------------
-.. currentmodule:: gempy.core.data
-.. autosummary::
-    :toctree: Modeling Classes
-    :template: class.rst
-    
-    StackRelationType
+Main Modules:
+
+* ``mineye.GeoModel`` - Geological modeling and probabilistic inversion
+* ``mineye.GisHelpers`` - GIS data processing utilities
+* ``mineye.config`` - Configuration management
+
+For detailed usage, please refer to the example galleries.

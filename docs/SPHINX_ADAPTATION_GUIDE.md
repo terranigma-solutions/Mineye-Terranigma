@@ -6,6 +6,15 @@ This guide details all steps needed to adapt the GemPy Sphinx documentation conf
 
 The current docs folder contains Sphinx configuration files copied from a GemPy project. These need to be customized to generate documentation for Mineye-Terranigma.
 
+**USER DECISIONS:**
+- ✅ **Example galleries:** YES - This is the main purpose of the documentation
+- ✅ **Copyright holder:** Terranigma Solutions GmbH
+- ✅ **Hosting:** GitHub Pages (default URL, no custom domain)
+- ✅ **Project description:** Will be tweaked later
+- ✅ **API modules:** Only modules used in sphinx gallery examples
+
+**IMPLEMENTATION STATUS:** In progress - see checkboxes below
+
 ---
 
 ## 1. Critical Configuration Changes (`docs/source/conf.py`)
@@ -24,87 +33,11 @@ release = gempy.__version__
 
 **Action Required:**
 - [ ] Change `project = 'Mineye-Terranigma'`
-- [ ] Update copyright to your organization/name
-- [ ] Create `AUTHORS.rst` file (see Section 2.1) OR remove the author file reading logic
-- [ ] Update version/release to use your package version OR hardcode it
+- [ ] Update copyright to `Terranigma Solutions GmbH`
+- [ ] Create `AUTHORS.rst` file with company name
+- [ ] Create setup.py with versioning (will add `mineye.__version__`)
 
-**Questions for you:**
-- What should the copyright holder name be?
-Terranigma Solutions GmbH
-- Do you want to maintain an AUTHORS.rst file?
-Maybe but then it would be the company
-- Does `mineye` package have a `__version__` attribute?
-not yet but it should. Can you make a setup.py based on the gempy one:
-
-import os
-from os import path
-
-from setuptools import setup, find_packages
-
-
-def read_requirements(file_name, base_path=""):
-# Construct the full path to the requirements file
-full_path = os.path.join(base_path, file_name)
-requirements = []
-with open(full_path, "r", encoding="utf-8") as f:
-for line in f:
-# Strip whitespace and ignore comments
-line = line.strip()
-if line.startswith("#") or not line:
-continue
-
-            # Handle -r directive
-            if line.startswith("-r "):
-                referenced_file = line.split()[1]  # Extract the file name
-                # Recursively read the referenced file, making sure to include the base path
-                requirements.extend(read_requirements(referenced_file, base_path=base_path))
-            else:
-                requirements.append(line)
-
-    return requirements
-
-
-
-
-with open("README.md", "r") as fh:
-long_description = fh.read()
-
-setup(
-name='gempy',
-packages=find_packages(exclude=('test', 'docs', 'examples')),
-install_requires=read_requirements("requirements.txt", "requirements"),
-extras_require={
-"opt": read_requirements("optional-requirements.txt", "requirements"),
-"base": read_requirements("base-requirements.txt", "requirements"),
-},
-url='https://github.com/cgre-aachen/gempy',
-license='EUPL-1.2',
-author='Miguel de la Varga, Alexander Zimmerman, Elisa Heim, Alexander Schaaf, Fabian Stamm, Florian Wellmann, Jan Niederau, Andrew Annex',
-author_email='gempy@terranigma-solutions.com',
-description='An Open-source, Python-based 3-D structural geological modeling software.',
-long_description=long_description,
-long_description_content_type='text/markdown',
-keywords=['geology', '3-D modeling', 'structural geology', 'uncertainty'],
-classifiers=[
-"Development Status :: 5 - Production/Stable",
-"Intended Audience :: Developers",
-"License :: OSI Approved :: European Union Public Licence 1.2 (EUPL 1.2)",
-"Operating System :: OS Independent",
-"Programming Language :: Python :: 3",
-"Programming Language :: Python :: 3.10",
-"Programming Language :: Python :: 3.11",
-"Programming Language :: Python :: 3.12",
-],
-setup_requires=['setuptools_scm'],
-use_scm_version={
-"root"            : ".",
-"relative_to"     : __file__,
-"write_to"        : path.join("gempy", "_version.py"),
-"fallback_version": "3.0.0"
-},
-)
-
-
+**DECIDED:** Using Terranigma Solutions GmbH as copyright holder and author
 
 ### 1.2 Import Dependencies (Lines 20-29)
 
@@ -121,21 +54,20 @@ import pyvista
 
 ### 1.3 Sphinx Extensions (Lines 51-64)
 
-**Current extensions are mostly fine, but verify:**
-- [ ] `myst_parser` - for Markdown support (you have `devlog/ProbabilisticModeling.md`)
-- [ ] `sphinx_gallery.gen_gallery` - only needed if you want auto-generated example galleries. Yes we do
+**KEEPING:** sphinx_gallery.gen_gallery extension (galleries are the main purpose)
 
 **Action Required:**
-- [ ] If you don't have example scripts to showcase, remove `'sphinx_gallery.gen_gallery'` from extensions
-- [ ] Remove or comment out entire `sphinx_gallery_conf` section (lines 135-168) if not using galleries
+- [ ] Keep `'sphinx_gallery.gen_gallery'` in extensions
+- [ ] Update `sphinx_gallery_conf` section to point to correct directories
 
 ### 1.4 Sphinx Gallery Configuration (Lines 135-168)
 
-**Current:** Points to non-existent example directories
+**DECIDED:** Using example galleries - this is the main purpose of the docs
 
 **Action Required - CRITICAL:**
-- [ ] **Option A (Recommended):** Remove `'sphinx_gallery.gen_gallery'` from extensions AND delete the entire `sphinx_gallery_conf` dictionary
-- [ ] **Option B:** Create example directories and scripts (see Section 5)
+- [ ] Create example directories structure
+- [ ] Update `sphinx_gallery_conf` to point to new directory structure
+- [ ] Simplify gallery configuration for Mineye project
 
 ### 1.5 HTML Theme Configuration (Lines 178-204)
 
@@ -285,10 +217,10 @@ import pyvista
 
 **Current:** `gempy.rocks`
 
+**DECIDED:** Using default GitHub Pages URL (no custom domain)
+
 **Action Required:**
-- [ ] **If hosting on GitHub Pages with custom domain:** Update to your domain
-- [ ] **If using default GitHub Pages:** Delete this file
-- [ ] **If not hosting online:** Delete this file
+- [ ] Delete this file
 
 ### 4.2 Remove Built Documentation
 

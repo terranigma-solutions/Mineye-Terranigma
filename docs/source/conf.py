@@ -24,18 +24,15 @@ import warnings
 
 import sphinx_gallery
 from sphinx_gallery.sorting import FileNameSortKey
-import gempy
-import pyvista
 import numpy as np
 
-# region PyVista Configuration
-pyvista.set_error_output_file('errors.txt')
-pyvista.OFF_SCREEN = True  # Not necessary - simply an insurance policy. Ensure that offscreen rendering is used for docs generation
-pyvista.set_plot_theme('document')  # Preferred plotting style for documentation
-pyvista.FIGURE_PATH = os.path.join(os.path.abspath('_images/'), 'auto-generated/')  # Save figures in specified directory
-pyvista.BUILDING_GALLERY = True
-if not os.path.exists(pyvista.FIGURE_PATH):
-    os.makedirs(pyvista.FIGURE_PATH)
+# Try to import mineye for version info
+try:
+    import mineye
+    has_mineye = True
+except ImportError:
+    has_mineye = False
+    print("Warning: mineye package not found. Install with 'pip install -e .' from project root.")
 
 sys.path.insert(0, os.path.abspath('.'))
 
@@ -96,21 +93,27 @@ templates_path = ['_templates']
 # You can specify multiple suffix as a list of string:
 #
 
-source_suffix = ['.rst']
+source_suffix = ['.rst', '.md']
 
 # The master toctree document.
 master_doc = 'index'
 
 # region General information about the project.
-project = 'GemPy'
+project = 'Mineye-Terranigma'
 year = datetime.date.today().year
-copyright = u'2023-{}, Gempy Probability Developers'.format(year)
+copyright = u'2024-{}, Terranigma Solutions GmbH'.format(year)
 
 with open(os.path.join(os.path.dirname(__file__), '../../AUTHORS.rst'), 'r') as f:
-    author = f.read()
+    author = f.read().strip()
 
-version = gempy.__version__  # The short X.Y version.
-release = gempy.__version__  # The full version, including alpha/beta/rc tags.
+# Get version from package or use fallback
+if has_mineye and hasattr(mineye, '__version__'):
+    version = mineye.__version__
+    release = mineye.__version__
+else:
+    version = '0.1.0'
+    release = '0.1.0'
+
 today_fmt = '%d %B %Y'
 language = 'en'
 
@@ -135,33 +138,25 @@ linkcheck_timeout = 500
 sphinx_gallery_conf = {
         # path to your examples scripts
         "examples_dirs"          : [
-                "../../examples/tutorials/0-intro",
-                "../../examples/tutorials/1-first_example_of_inference",
-                "../../examples/tutorials/2-basic_geology",
-                "../../examples/tutorials/3-probabilistic_inversion",
-                "../../examples/utils",
+                "../../examples/01_basic_examples",
+                "../../examples/02_probabilistic_modeling",
         ],
         # path where to save gallery generated examples
         "gallery_dirs"           : [
-                "examples_intro",
-                "examples_first_example_of_inference",
-                "examples_basic_geology",
-                "examples_probabilistic_inversion",
-                "examples_utils",
+                "examples_basic",
+                "examples_probabilistic",
         ],
 
-        'ignore_pattern': r'__init__\.py|._aux_func.py',
-        "filename_pattern"       : r"\.py",
-        "download_all_examples"  : False,  # Remove the "Download all examples" button from the top level gallery
-        "within_subsection_order": FileNameSortKey,  # Sort gallery example by file name instead of number of lines (default)
-        "backreferences_dir"     : 'gen_modules/backreferences',  # directory where function granular galleries are stored
-        "doc_module"             : ("gempy", "gempy_viewer", 'numpy', 'pandas', 'matplotlib'),  # Modules for which function level galleries are created.  In
-        "image_scrapers"         : ('pyvista', 'matplotlib'),
-        'first_notebook_cell'    : ("%matplotlib inline\n"
-                                    "from pyvista import set_plot_theme\n"
-                                    "set_plot_theme('document')"),
+        'ignore_pattern': r'__init__\.py',
+        "filename_pattern"       : r"plot_.*\.py",  # Only files starting with plot_
+        "download_all_examples"  : False,
+        "within_subsection_order": FileNameSortKey,
+        "backreferences_dir"     : 'gen_modules/backreferences',
+        "doc_module"             : ("mineye", 'numpy', 'pandas', 'matplotlib'),
+        "image_scrapers"         : ('matplotlib',),
+        'first_notebook_cell'    : "%matplotlib inline\n",
         'reference_url'          : {
-                'gempy': None,  # The module you locally document uses None
+                'mineye': None,  # The module you locally document uses None
                 'numpy': 'https://numpy.org/doc/stable/'
         },
         "nested_sections"        : False,
@@ -177,10 +172,10 @@ sphinx_gallery_conf = {
 
 html_theme = 'alabaster'
 html_theme_options = {
-        'github_user'     : 'gempy-project',
-        'github_repo'     : 'gempy',
+        'github_user'     : 'leguark',
+        'github_repo'     : 'Mineye-Terranigma',
         'github_type'     : 'star',
-        'logo'            : 'logos/gempy.png',
+        'logo'            : 'logos/Terranigma.png',
         'logo_name'       : False,
         'travis_button'   : False,
         'page_width'      : '1200px',
@@ -201,20 +196,20 @@ html_sidebars = {'**': ['about.html', 'navigation.html',
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-html_favicon = '_static/logos/favicon.ico'
+# html_favicon = '_static/logos/favicon.ico'  # Uncomment when favicon is created
 
 # endregion
 
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'GemPydoc'
+htmlhelp_basename = 'MineyeTerranigmadoc'
 
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, 'gempy', 'GemPy Documentation', [author], 1)]
+man_pages = [(master_doc, 'mineye-terranigma', 'Mineye-Terranigma Documentation', [author], 1)]
 
 # region other options
 # Remove matplotlib agg warnings from generated doc when using plt.show
