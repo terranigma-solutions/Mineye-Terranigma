@@ -44,7 +44,7 @@ def test_simple_model_gravity(simple_geo_model, geophysical_dir):
     grav = sol.gravity
     
     gpv.plot_2d(simple_geo_model)
-    gpv.plot_3d(simple_geo_model, ve=5, image=False)
+    gpv.plot_3d(simple_geo_model, ve=5, image=True)
 
 
     if PLOT:=True:

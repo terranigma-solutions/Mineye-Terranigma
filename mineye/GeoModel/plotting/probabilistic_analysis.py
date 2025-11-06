@@ -1,6 +1,7 @@
 from typing import Any
 
 import numpy as np
+from matplotlib import pyplot as plt
 from pandas import DataFrame
 
 from mineye.GeoModel.geophysics import compute_alignment_params, align_forward_to_observed
@@ -27,18 +28,22 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     )
     
     forward_norm = forward_norm.numpy()
-    
+
+    plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel)
+
+
+def plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel):
     observed_norm = observed_ugal
     unit_label = r'$\mu$Gal'
 
     residuals_norm = observed_norm - forward_norm
-    
+
     # Compute SHARED colorbar limits for observed and forward plots
     vmin_shared = min(np.min(observed_norm), np.min(forward_norm))
     vmax_shared = max(np.max(observed_norm), np.max(forward_norm))
-    
+
     # Create comparison plot with 4 subplots (add correlation plot)
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12), layout='constrained')
 
     # Plot 1: Observed gravity (with shared colorbar limits)
     scatter1 = ax1.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=observed_norm,
@@ -91,7 +96,6 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     ax4.text(0.05, 0.95, f'R = {correlation:.3f}', transform=ax4.transAxes,
              bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontsize=12)
 
-    plt.tight_layout()
     plt.show()
 
 

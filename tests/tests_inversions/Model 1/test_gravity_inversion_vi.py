@@ -17,6 +17,7 @@ from mineye.GeoModel.model_one.probabilistic_model_diagnostics import trace_pyro
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.visualization import plot, gempy_viz
+from mineye.GeoModel.plotting.probabilistic_analysis import _plot_comparison, plot_gravity_comparison
 # noinspection PyUnusedImports
 from tests import conftest
 import numpy as np
@@ -223,7 +224,7 @@ class TestProbabilisticInversionVI:
 
     def test_run_analysis_vi(self, simple_geo_model, geophysical_dir):
         """Analyze VI results."""
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_III.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
@@ -255,7 +256,15 @@ class TestProbabilisticInversionVI:
                 axes.set_yscale('log')
 
             plt.show()
-
+            
+        plot_gravity_comparison(
+            observed_ugal=observed_gravity_ugal, 
+            forward_norm=data.posterior[r'gravity_response'].mean(axis=1),
+            xy_ravel=xy_ravel,
+            normalization_method='align_to_reference'
+        )
+        
+        return 
         # Analysis inference
         if hasattr(data, 'prior') and r'gravity_response' in data.prior:
             gravity_samples_norm, unit_label = plot(
@@ -271,8 +280,9 @@ class TestProbabilisticInversionVI:
                 xy_ravel=xy_ravel
             )
 
-        # Analysis Gempy Model
-        gempy_viz(geo_model, data)
+        if False:
+            # Analysis Gempy Model
+            gempy_viz(geo_model, data)
 
 
 def set_priors(
