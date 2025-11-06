@@ -97,19 +97,25 @@ class TestProbabilisticInversionVI:
         # Set up the guide (variational distribution) using normalizing flows
         guide = AutoIAFNormal(
             prob_model,
-            [10],  # Hidden layer dimensions for the flow
+            [64],  # Hidden layer dimensions for the flow
             num_transforms=3
         )
 
         # Set up optimizer
-        optimizer = optim.ClippedAdam({"lr": 1e-4, "clip_norm": 10.0})
+        # optimizer = optim.ClippedAdam({"lr": 1e-4, "clip_norm": 10.0})
+        optimizer = optim.ClippedAdam({
+                "lr"       : 5e-3,  # Start higher, then anneal
+                "clip_norm": 1.0,  # Tighter clipping
+                "betas"    : (0.9, 0.999),
+                "lrd"      : 0.9996  # Learning rate decay
+        })
 
         # Set up SVI
         svi = SVI(
             model=prob_model,
             guide=guide,
             optim=optimizer,
-            loss=Trace_ELBO()
+            loss=Trace_ELBO(num_particles=5)
         )
 
         # Run SVI optimization
@@ -118,6 +124,9 @@ class TestProbabilisticInversionVI:
         print("Starting VI optimization...")
         for i in range(num_iterations):
             loss = svi.step(geo_model, gravity_observations_tensor)
+            if torch.isnan(torch.tensor(loss)) or torch.isinf(torch.tensor(loss)):
+                print(f"NaN/Inf at iteration {i}")
+                break
             losses.append(loss)
             if i % 500 == 0:
                 print(f"Iteration {i}/{num_iterations}, Loss: {loss:.4f}")
@@ -181,7 +190,7 @@ class TestProbabilisticInversionVI:
 
     def test_run_analysis_vi(self, simple_geo_model, geophysical_dir):
         """Analyze VI results."""
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_II.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
