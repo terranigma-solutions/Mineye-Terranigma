@@ -80,6 +80,18 @@ def get_gravity_data_path():
     return os.path.join(geophysical_dir, 'cleaned_gravity_data.geojson')
 
 
+def get_plutonic_data_dir():
+    """Get the directory containing plutonic data."""
+    data_dir = get_data_dir()
+    return os.path.join(data_dir, 'Plutonic_Data')
+
+
+def get_plutonic_contact_points_path():
+    """Get path to the original plutonic contact points CSV file."""
+    plutonic_dir = get_plutonic_data_dir()
+    return os.path.join(plutonic_dir, 'plutonic_contact_points.csv')
+
+
 def get_soricom_data_dir():
     """Get the directory containing Soricom data."""
     data_dir = get_data_dir()
