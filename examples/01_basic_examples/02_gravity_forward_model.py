@@ -11,6 +11,8 @@ We compute the gravity response of the geological structure at real measurement 
 # ----------------
 
 import numpy as np
+import torch
+
 import gempy as gp
 import geopandas as gpd
 
@@ -165,7 +167,7 @@ print(f"  Mean: {grav.mean():.2f} mGal")
 # -------------------------
 # Calculate residuals between observed and computed gravity
 
-residuals = observed_gravity - grav
+residuals = observed_gravity - grav.numpy()
 print(f"\nGravity residuals:")
 print(f"  Mean: {residuals.mean():.2f} mGal")
 print(f"  Std: {residuals.std():.2f} mGal")

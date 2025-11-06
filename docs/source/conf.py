@@ -22,9 +22,14 @@ import os
 import sys
 import warnings
 
+import dotenv
+import pykeops
+
 import sphinx_gallery
 from sphinx_gallery.sorting import FileNameSortKey
 import numpy as np
+
+dotenv.load_dotenv()
 
 # Try to import mineye for version info
 try:
