@@ -19,6 +19,8 @@ def generate_multigravity_likelihood_diagonal(norm_params):
         simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
         pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
         n_stations = simulated_geophysics.shape[0]
+        # ? Half normal is too unstable. Try with some prior that is somehow more stable
+        
         # Sample noise standard deviation
         # sigma = pyro.sample(
         #     "sigma",

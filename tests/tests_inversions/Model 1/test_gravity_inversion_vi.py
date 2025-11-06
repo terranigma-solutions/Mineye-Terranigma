@@ -191,7 +191,7 @@ class TestProbabilisticInversionVI:
     def test_run_analysis_vi(self, simple_geo_model, geophysical_dir):
         """Analyze VI results."""
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_II.nc"))
-
+        
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 

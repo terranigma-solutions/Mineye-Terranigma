@@ -5,6 +5,7 @@ import arviz
 import gempy as gp
 import gempy_viewer as gpv
 from gempy_probability.modules.plot.plot_gempy import plot_gempy
+from gempy_probability.modules.plot.plot_posterior import default_blue, default_red
 
 
 def plot(gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, Any]:
@@ -78,11 +79,23 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
 
     plot_gempy(
         geo_model=geo_model,
-        n_samples=20,
+        n_samples=100,
         samples=(prior_inference_data.prior[r'dips'].values[0, :]),
         update_model_fn=_update_model_for_plotting,
-        gempy_plot=p2d
+        gempy_plot=p2d,
+        contour_colors=[default_blue]
     )
+
+
+    if prior_inference_data.posterior is not None:
+        plot_gempy(
+            geo_model=geo_model,
+            n_samples=100,
+            samples=(prior_inference_data.posterior[r'dips'].values[0, :]),
+            update_model_fn=_update_model_for_plotting,
+            gempy_plot=p2d,
+            contour_colors=[default_red]
+        )
 
 
 def _update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float, sample_idx: int):
