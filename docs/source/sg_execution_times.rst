@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:00.002** total execution time for 2 files **from all galleries**:
+**00:00.037** total execution time for 3 files **from all galleries**:
 
 .. container::
 
@@ -32,9 +32,12 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_examples_basic_plot_simple_geological_model.py` (``../../examples/01_basic_examples/plot_simple_geological_model.py``)
-     - 00:00.001
+   * - :ref:`sphx_glr_examples_basic_plot_01_simple_tharsis_model.py` (``../../examples/01_basic_examples/plot_01_simple_tharsis_model.py``)
+     - 00:00.033
      - 0.0
-   * - :ref:`sphx_glr_examples_probabilistic_plot_gravity_forward_modeling.py` (``../../examples/02_probabilistic_modeling/plot_gravity_forward_modeling.py``)
+   * - :ref:`sphx_glr_examples_probabilistic_plot_01_gravity_forward_model.py` (``../../examples/02_probabilistic_modeling/plot_01_gravity_forward_model.py``)
+     - 00:00.004
+     - 0.0
+   * - :ref:`sphx_glr_examples_basic_plot_02_bayesian_segmentation.py` (``../../examples/01_basic_examples/plot_02_bayesian_segmentation.py``)
      - 00:00.000
      - 0.0

@@ -15,6 +15,7 @@ EXPECTED_VENV := $(shell readlink -f $(VENV))
 
 # Target to check and activate venv
 check-venv:
+ifndef SKIP_VENV_CHECK
 	@if [ "$(CHECK_VENV)" != "$(EXPECTED_VENV)" ]; then \
 		echo ""; \
 		echo "⚠️  Wrong virtual environment!"; \
@@ -25,8 +26,11 @@ check-venv:
 		echo "Please activate the correct environment:"; \
 		echo "  source $(VENV)/bin/activate"; \
 		echo ""; \
+		echo "Or skip this check with: SKIP_VENV_CHECK=1 make html"; \
+		echo ""; \
 		exit 1; \
 	fi
+endif
 
 # Put it first so that "make" without argument is like "make help".
 help:
