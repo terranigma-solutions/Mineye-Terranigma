@@ -27,7 +27,6 @@ def test_simple_model_sor():
     assert geo_model is not None
 
     gp.compute_model(geo_model)
-    gpv.plot_2d(geo_model)
     gpv.plot_3d(geo_model, image=False)
 
 
@@ -54,5 +53,5 @@ def test_model_with_fault_sor():
     assert geo_model is not None
 
     gp.compute_model(geo_model)
-    gpv.plot_2d(geo_model)
+
     gpv.plot_3d(geo_model, image=False)

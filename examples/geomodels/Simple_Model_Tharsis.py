@@ -10,12 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 
 def create_simple_model():
-    """
-    Create and compute a simple Tharsis geological model without topography or visualization.
 
-    Returns:
-        geo_model: Computed GemPy geological model
-    """
     geo_model = gp.create_geomodel(
         project_name=TharsisModelConfig.PROJECT_NAME,
         extent=TharsisModelConfig.EXTENT,
@@ -55,7 +50,8 @@ def test_simple_model_with_plots():
         mapping_object=TharsisModelConfig.SURFACE_MAPPING
     )
 
-    gp.set_topography_from_file(grid=geo_model.grid, filepath=paths.get_topography_path())
+    gp.set_topography_from_file(grid=geo_model.grid, filepath=paths.get_topography_path(), crop_to_extent=[-695558, geo_model.grid.extent[2],
+                    geo_model.grid.extent[1], geo_model.grid.extent[3]])
     gp.compute_model(geo_model)
 
     # ========== VISUALIZATION ==========
@@ -67,12 +63,6 @@ def test_simple_model_with_plots():
         show_boundaries=TharsisModelConfig.SHOW_BOUNDARIES,
         show_data=TharsisModelConfig.SHOW_DATA,
         legend=TharsisModelConfig.SHOW_LEGEND
-    )
-
-    Plotter.create_cross_section(
-        geo_model,
-        cross_section=TharsisModelConfig.VIZ_CROSS_SECTION_COUNT,
-        vertical_exaggeration=TharsisModelConfig.VIZ_VERTICAL_EXAGGERATION
     )
 
     gpv.plot_3d(
