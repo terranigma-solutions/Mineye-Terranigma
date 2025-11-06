@@ -40,22 +40,22 @@ class TestProbabilisticInversionVI:
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
         geo_model.interpolation_options.sigmoid_slope = 100
         baseline_fw_gravity_np = baseline(geo_model)
-        norm_params = normalize(baseline_fw_gravity_np, observed_gravity_ugal)
+        norm_params = normalize(baseline_fw_gravity_np, observed_gravity_ugal, method="align_to_reference")
 
         # * 3) Setup Priors
         model_priors = {
                 TestProbabilisticInversionVI.prior_key_dips   : dist.Normal(
 
-                    loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10),  # This is just dip 10 degrees
+                    loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 20),  # This is just dip 10 degrees
                     scale=torch.tensor(10, dtype=torch.float64),
                     validate_args=True
                 ).to_event(1),
                 TestProbabilisticInversionVI.prior_key_density: dist.Normal(
                     loc=(torch.tensor([
-                            2.9,  # plutonites
+                            3.2,  # plutonites
                             2.3  # host
                     ])),
-                    scale=torch.tensor(0.1),
+                    scale=torch.tensor(0.3),
                 ).to_event(1)
         }
 
@@ -100,11 +100,28 @@ class TestProbabilisticInversionVI:
                 plot_trace=True
             )
 
-            if False:
+            if True:
                 self._plot_prior_predictive(geo_model, observed_gravity_ugal, prior_inference_data, xy_ravel)
 
         # * 8) Run Variational Inference with Normalizing Flows
 
+        return 
+        guide, losses = self._run_vi(geo_model, gravity_observations_tensor, prob_model)
+
+        self._plot_loss_curve(losses)
+        # * 9) Sample from the variational posterior
+        data = self._get_posterior_predictive(geo_model, gravity_observations_tensor, guide, model_priors, observed_gravity_ugal, post_forward_dets, pre_forward_dets, prob_model)
+
+        if compute_prior_predictive:
+            data.extend(prior_inference_data)
+
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density.nc"))
+
+        print("VI inference completed and saved!")
+
+        return data
+
+    def _run_vi(self, geo_model, gravity_observations_tensor, prob_model):
         # Set up the guide (variational distribution) using normalizing flows
         guide = AutoIAFNormal(
             prob_model,
@@ -143,19 +160,7 @@ class TestProbabilisticInversionVI:
                 print(f"Iteration {i}/{num_iterations}, Loss: {loss:.4f}")
 
         print(f"Final loss: {losses[-1]:.4f}")
-
-        self._plot_loss_curve(losses)
-        # * 9) Sample from the variational posterior
-        data = self._get_posterior_predictive(geo_model, gravity_observations_tensor, guide, model_priors, observed_gravity_ugal, post_forward_dets, pre_forward_dets, prob_model)
-
-        if compute_prior_predictive:
-            data.extend(prior_inference_data)
-
-        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density.nc"))
-
-        print("VI inference completed and saved!")
-
-        return data
+        return guide, losses
 
     @staticmethod
     def _get_posterior_predictive(geo_model, gravity_observations_tensor, guide, model_priors, observed_gravity_ugal, post_forward_dets, pre_forward_dets, prob_model):
@@ -186,14 +191,22 @@ class TestProbabilisticInversionVI:
         return data
 
     @staticmethod
-    def _plot_prior_predictive(geo_model, observed_gravity_ugal, prior_inference_data, xy_ravel):
-        gravity_samples_norm = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
+    def _plot_prior_predictive(geo_model, observed_gravity_ugal, data, xy_ravel):
+        gravity_samples_norm = data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
+
+        plot_gravity_comparison(
+            observed_ugal=observed_gravity_ugal,
+            forward_norm=data.prior[r'gravity_response'].mean(axis=1),
+            xy_ravel=xy_ravel,
+            normalization_method='align_to_reference'
+        )
+
         gravity_samples_norm, unit_label = plot(
             gravity_samples_norm=gravity_samples_norm,
             observed_gravity_ugal=observed_gravity_ugal,
             xy_ravel=xy_ravel
         )
-        gempy_viz(geo_model, prior_inference_data)
+        # gempy_viz(geo_model, prior_inference_data)
 
         baseline_fw_gravity_np = baseline(geo_model)
 

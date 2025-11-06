@@ -8,12 +8,14 @@ import gempy as gp
 from gempy_engine.core.data.interpolation_input import InterpolationInput
 
 
-def normalize(baseline_fw_gravity_np, observed_gravity):
+def normalize(baseline_fw_gravity_np, observed_gravity, method="quantile_align", extrapolation_buffer=0.3):
     # Convert observed gravity from mGal to μGal for comparison
     from mineye.GeoModel.geophysics import compute_alignment_params
     norm_params = compute_alignment_params(
         observed=observed_gravity,
-        baseline_forward=baseline_fw_gravity_np
+        baseline_forward=baseline_fw_gravity_np,
+        method=method,
+        extrapolation_buffer=extrapolation_buffer
     )
 
     return norm_params
