@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Error Propagation in Geological Models &#8212; Mineye-Terranigma 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=8858d845" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Error Propagation for Dip Angles" href="03_error_propagation_dips.html" />
+    <link rel="prev" title="Probabilistic Modeling Examples" href="index.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-examples-probabilistic-02-error-propagation-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code.</p>
+</div>
+<section class="sphx-glr-example-title" id="error-propagation-in-geological-models">
+<span id="sphx-glr-examples-probabilistic-02-error-propagation-py"></span><h1>Error Propagation in Geological Models<a class="headerlink" href="#error-propagation-in-geological-models" title="Link to this heading">¶</a></h1>
+<p>This example demonstrates uncertainty quantification through error propagation.
+We perturb a surface point’s Z-coordinate and propagate the uncertainty through the model.</p>
+<section id="import-libraries">
+<h2>Import Libraries<a class="headerlink" href="#import-libraries" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy_viewer</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpv</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy_probability</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpp</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyro</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyro.distributions</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyro.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Distribution</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gempy_engine.core.backend_tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">BackendTensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gempy_engine.core.data.interpolation_input</span><span class="w"> </span><span class="kn">import</span> <span class="n">InterpolationInput</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gempy_probability.modules.plot.plot_gempy</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_gempy</span>
+
+<span class="c1"># Set random seeds for reproducibility</span>
+<span class="n">seed</span> <span class="o">=</span> <span class="mi">4003</span>
+<span class="n">pyro</span><span class="o">.</span><span class="n">set_rng_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1234</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+</pre></div>
+</div>
+<p>Import paths configuration</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">mineye.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">paths</span>
+</pre></div>
+</div>
+</section>
+<section id="define-model-extent-and-resolution">
+<h2>Define Model Extent and Resolution<a class="headerlink" href="#define-model-extent-and-resolution" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">min_x</span> <span class="o">=</span> <span class="o">-</span><span class="mi">709521</span>
+<span class="n">max_x</span> <span class="o">=</span> <span class="o">-</span><span class="mi">675558</span>
+<span class="n">min_y</span> <span class="o">=</span> <span class="mi">4526832</span>
+<span class="n">max_y</span> <span class="o">=</span> <span class="mi">4551949</span>
+<span class="n">max_z</span> <span class="o">=</span> <span class="mi">505</span>
+<span class="n">model_depth</span> <span class="o">=</span> <span class="o">-</span><span class="mi">500</span>
+<span class="n">extent</span> <span class="o">=</span> <span class="p">[</span><span class="n">min_x</span><span class="p">,</span> <span class="n">max_x</span><span class="p">,</span> <span class="n">min_y</span><span class="p">,</span> <span class="n">max_y</span><span class="p">,</span> <span class="n">model_depth</span><span class="p">,</span> <span class="n">max_z</span><span class="p">]</span>
+
+<span class="c1"># Model resolution: use octree with refinement level 5</span>
+<span class="n">resolution</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">refinement</span> <span class="o">=</span> <span class="mi">5</span>
+</pre></div>
+</div>
+</section>
+<section id="get-data-paths">
+<h2>Get Data Paths<a class="headerlink" href="#get-data-paths" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">mod_or_path</span> <span class="o">=</span> <span class="n">paths</span><span class="o">.</span><span class="n">get_orientations_path</span><span class="p">()</span>
+<span class="n">mod_pts_path</span> <span class="o">=</span> <span class="n">paths</span><span class="o">.</span><span class="n">get_points_path</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Orientations: </span><span class="si">{</span><span class="n">mod_or_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Points: </span><span class="si">{</span><span class="n">mod_pts_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Orientations: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Output_Data/Simple-Models/temp_inputs/orientations_mod.csv
+Points: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Output_Data/Simple-Models/temp_inputs/points_mod.csv
+</pre></div>
+</div>
+</section>
+<section id="create-gempy-geological-model">
+<h2>Create GemPy Geological Model<a class="headerlink" href="#create-gempy-geological-model" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">geo_model</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">create_geomodel</span><span class="p">(</span>
+    <span class="n">project_name</span><span class="o">=</span><span class="s1">&#39;error_propagation_model&#39;</span><span class="p">,</span>
+    <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">,</span>
+    <span class="n">refinement</span><span class="o">=</span><span class="n">refinement</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span>
+    <span class="n">importer_helper</span><span class="o">=</span><span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ImporterHelper</span><span class="p">(</span>
+        <span class="n">path_to_orientations</span><span class="o">=</span><span class="n">mod_or_path</span><span class="p">,</span>
+        <span class="n">path_to_surface_points</span><span class="o">=</span><span class="n">mod_pts_path</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="map-geological-units">
+<h2>Map Geological Units<a class="headerlink" href="#map-geological-units" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gp</span><span class="o">.</span><span class="n">map_stack_to_surfaces</span><span class="p">(</span>
+    <span class="n">gempy_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+    <span class="n">mapping_object</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;Tournaisian_Plutonites&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Tournaisian Plutonites&quot;</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="output_subarea output_html rendered_html output_result">
+
+        <table>
+          <tr><td>Structural Groups:</td><td>
+    <table style="border-left:1.2px solid black;>
+      <tr><th colspan="2"><b>StructuralGroup:</b></th></tr>
+      <tr><td>Name:</td><td>Tournaisian_Plutonites</td></tr>
+      <tr><td>Structural Relation:</td><td>StackRelationType.ERODE</td></tr>
+      <tr><td>Elements:</td><td>
+    <table width="50%" style="border-left:15px solid #015482;">
+      <tr><th colspan="2"><b>StructuralElement:</b></th></tr>
+      <tr><td>Name:</td><td>Tournaisian Plutonites</td></tr>
+    </table>
+        </td></tr>
+    </table>
+        </td></tr>
+          <tr><td>Fault Relations:</td><td><table style="border-collapse: collapse; table-layout: fixed;"><th></th><th style="transform: rotate(-35deg); height:150px; vertical-align: bottom; text-align: center;">Tournaisia...</th><tr><th>Tournaisian_Plutonites</th><td style="background-color: #FFB6C1; width: 20px; height: 20px; border: 1px solid black;"></td></tr></table></td></tr>
+          <tr><td></td><td>
+        <table>
+          <tr>
+            <td><div style="display: inline-block; background-color: #527682; width: 20px; height: 20px; border: 1px solid black;"></div> True</td>
+            <td><div style="display: inline-block; background-color: #FFB6C1; width: 20px; height: 20px; border: 1px solid black;"></div> False</td>
+          </tr>
+        </table>
+        </td></tr>
+        </table>
+
+</div>
+<br />
+<br /></section>
+<section id="switch-to-pytorch-backend">
+<h2>Switch to PyTorch Backend<a class="headerlink" href="#switch-to-pytorch-backend" title="Link to this heading">¶</a></h2>
+<p>Required for probabilistic modeling</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">BackendTensor</span><span class="o">.</span><span class="n">change_backend_gempy</span><span class="p">(</span><span class="n">engine_backend</span><span class="o">=</span><span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">AvailableBackends</span><span class="o">.</span><span class="n">PYTORCH</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✓ Switched to PyTorch backend&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+✓ Switched to PyTorch backend
+</pre></div>
+</div>
+</section>
+<section id="define-prior-distribution">
+<h2>Define Prior Distribution<a class="headerlink" href="#define-prior-distribution" title="Link to this heading">¶</a></h2>
+<p>We’ll add uncertainty to the Z-coordinate of the first surface point</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">modify_z_for_surface_point1</span><span class="p">(</span>
+    <span class="n">samples</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Distribution</span><span class="p">],</span>
+    <span class="n">geo_model</span><span class="p">:</span> <span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">GeoModel</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InterpolationInput</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Modify the Z-coordinate of the first surface point based on samples.&quot;&quot;&quot;</span>
+    <span class="n">prior_key</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{top}</span><span class="s1">$&#39;</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">gempy.modules.data_manipulation</span><span class="w"> </span><span class="kn">import</span> <span class="n">interpolation_input_from_structural_frame</span>
+    <span class="n">interp_input</span> <span class="o">=</span> <span class="n">interpolation_input_from_structural_frame</span><span class="p">(</span><span class="n">geo_model</span><span class="p">)</span>
+
+    <span class="n">new_tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">index_put</span><span class="p">(</span>
+        <span class="nb">input</span><span class="o">=</span><span class="n">interp_input</span><span class="o">.</span><span class="n">surface_points</span><span class="o">.</span><span class="n">sp_coords</span><span class="p">,</span>
+        <span class="n">indices</span><span class="o">=</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">2</span><span class="p">])),</span>
+        <span class="n">values</span><span class="o">=</span><span class="p">(</span><span class="n">samples</span><span class="p">[</span><span class="n">prior_key</span><span class="p">])</span>
+    <span class="p">)</span>
+    <span class="n">interp_input</span><span class="o">.</span><span class="n">surface_points</span><span class="o">.</span><span class="n">sp_coords</span> <span class="o">=</span> <span class="n">new_tensor</span>
+    <span class="k">return</span> <span class="n">interp_input</span>
+</pre></div>
+</div>
+</section>
+<section id="set-prior-parameters">
+<h2>Set Prior Parameters<a class="headerlink" href="#set-prior-parameters" title="Link to this heading">¶</a></h2>
+<p>Normal distribution around the original point location</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">original_z</span> <span class="o">=</span> <span class="n">geo_model</span><span class="o">.</span><span class="n">surface_points_copy_transformed</span><span class="o">.</span><span class="n">xyz</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Original Z-coordinate: </span><span class="si">{</span><span class="n">original_z</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="n">model_priors</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{top}</span><span class="s1">$&#39;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span>
+        <span class="n">loc</span><span class="o">=</span><span class="n">original_z</span><span class="p">,</span>
+        <span class="n">scale</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+    <span class="p">)</span>
+<span class="p">}</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prior: Normal(loc=</span><span class="si">{</span><span class="n">original_z</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, scale=0.001)&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Original Z-coordinate: 0.00
+Prior: Normal(loc=0.00, scale=0.001)
+</pre></div>
+</div>
+</section>
+<section id="create-probabilistic-model">
+<h2>Create Probabilistic Model<a class="headerlink" href="#create-probabilistic-model" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">prob_model</span><span class="p">:</span> <span class="n">gpp</span><span class="o">.</span><span class="n">GemPyPyroModel</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">make_gempy_pyro_model</span><span class="p">(</span>
+    <span class="n">priors</span><span class="o">=</span><span class="n">model_priors</span><span class="p">,</span>
+    <span class="n">set_interp_input_fn</span><span class="o">=</span><span class="n">modify_z_for_surface_point1</span><span class="p">,</span>
+    <span class="n">likelihood_fn</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">obs_name</span><span class="o">=</span><span class="kc">None</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✓ Probabilistic model created&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+✓ Probabilistic model created
+</pre></div>
+</div>
+</section>
+<section id="run-prior-predictive-sampling">
+<h2>Run Prior Predictive Sampling<a class="headerlink" href="#run-prior-predictive-sampling" title="Link to this heading">¶</a></h2>
+<p>Sample from the prior distribution and propagate through the model</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">n_samples</span> <span class="o">=</span> <span class="mi">50</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running </span><span class="si">{</span><span class="n">n_samples</span><span class="si">}</span><span class="s2"> prior predictive samples...&quot;</span><span class="p">)</span>
+
+<span class="n">prior_inference_data</span><span class="p">:</span> <span class="n">az</span><span class="o">.</span><span class="n">InferenceData</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">run_predictive</span><span class="p">(</span>
+    <span class="n">prob_model</span><span class="o">=</span><span class="n">prob_model</span><span class="p">,</span>
+    <span class="n">geo_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+    <span class="n">y_obs_list</span><span class="o">=</span><span class="p">[],</span>
+    <span class="n">n_samples</span><span class="o">=</span><span class="n">n_samples</span><span class="p">,</span>
+    <span class="n">plot_trace</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✓ Prior predictive sampling complete&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_02_error_propagation_001.png" srcset="../_images/sphx_glr_02_error_propagation_001.png" alt="$\mu_{top}$, $\mu_{top}$" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Running 50 prior predictive samples...
+Using sequential processing for 1 surfaces
+/home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:103: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:63.)
+  return func(*args, **kwargs)
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+/home/leguark/PycharmProjects/gempy_probability/gempy_probability/api/model_runner/_pyro_runner.py:115: UserWarning: The figure layout has changed to tight
+  plt.tight_layout()
+✓ Prior predictive sampling complete
+</pre></div>
+</div>
+</section>
+<section id="visualize-uncertainty">
+<h2>Visualize Uncertainty<a class="headerlink" href="#visualize-uncertainty" title="Link to this heading">¶</a></h2>
+<p>Plot the model with sampled surface points</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">update_model_for_plotting</span><span class="p">(</span><span class="n">geo_model</span><span class="p">:</span> <span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">GeoModel</span><span class="p">,</span> <span class="n">sample_value</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">sample_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Update model with a sampled Z-coordinate value.&quot;&quot;&quot;</span>
+    <span class="n">xyz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+    <span class="n">xyz</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">sample_value</span>
+    <span class="n">world_coord</span> <span class="o">=</span> <span class="n">geo_model</span><span class="o">.</span><span class="n">input_transform</span><span class="o">.</span><span class="n">apply_inverse</span><span class="p">(</span><span class="n">xyz</span><span class="p">)</span>
+
+    <span class="c1"># Modify the surface point</span>
+    <span class="n">gp</span><span class="o">.</span><span class="n">modify_surface_points</span><span class="p">(</span>
+        <span class="n">geo_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+        <span class="nb">slice</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">Z</span><span class="o">=</span><span class="n">world_coord</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+    <span class="p">)</span>
+
+<span class="c1"># Create base plot</span>
+<span class="n">p2d</span> <span class="o">=</span> <span class="n">gpv</span><span class="o">.</span><span class="n">plot_2d</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+    <span class="n">show_topography</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_lith</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+
+<span class="c1"># Overlay sampled models</span>
+<span class="n">plot_gempy</span><span class="p">(</span>
+    <span class="n">geo_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+    <span class="n">n_samples</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+    <span class="n">samples</span><span class="o">=</span><span class="p">(</span><span class="n">prior_inference_data</span><span class="o">.</span><span class="n">prior</span><span class="p">[</span><span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{top}</span><span class="s1">$&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]),</span>
+    <span class="n">update_model_fn</span><span class="o">=</span><span class="n">update_model_for_plotting</span><span class="p">,</span>
+    <span class="n">gempy_plot</span><span class="o">=</span><span class="n">p2d</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✓ Visualization complete&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_02_error_propagation_002.png" srcset="../_images/sphx_glr_02_error_propagation_002.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+/home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: &#39;linewidth&#39;, &#39;contour_colors&#39;
+  contour_set = ax.contour(
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+✓ Visualization complete
+</pre></div>
+</div>
+</section>
+<section id="summary-statistics">
+<h2>Summary Statistics<a class="headerlink" href="#summary-statistics" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">samples</span> <span class="o">=</span> <span class="n">prior_inference_data</span><span class="o">.</span><span class="n">prior</span><span class="p">[</span><span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{top}</span><span class="s1">$&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Sampled Z-coordinate statistics:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">samples</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Std: </span><span class="si">{</span><span class="n">samples</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Min: </span><span class="si">{</span><span class="n">samples</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Max: </span><span class="si">{</span><span class="n">samples</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Original: </span><span class="si">{</span><span class="n">original_z</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Sampled Z-coordinate statistics:
+  Mean: 0.0020
+  Std: 0.0008
+  Min: 0.0004
+  Max: 0.0038
+  Original: 0.0017
+</pre></div>
+</div>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 26.530 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-examples-probabilistic-02-error-propagation-py">
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/b8a4d67f41afd3933869bc5961c7ac9f/02_error_propagation.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">02_error_propagation.ipynb</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/3afa073e78b4f82985978bca55187abb/02_error_propagation.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">02_error_propagation.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-zip docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/09092616f3355505d19b47004013c900/02_error_propagation.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">zipped:</span> <span class="pre">02_error_propagation.zip</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="../index.html">
+    <img class="logo" src="../_static/logos/Terranigma.png" alt="Logo" />
+    
+  </a>
+</p>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=leguark&repo=Mineye-Terranigma&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Example Galleries</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../examples_basic/index.html">Basic Examples</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Probabilistic Modeling Examples</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Error Propagation in Geological Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_error_propagation_dips.html">Error Propagation for Dip Angles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_gravity_inversion.html">Gravity Inversion with NUTS Sampling</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Probabilistic Modeling Examples</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Probabilistic Modeling Examples</a></li>
+      <li>Next: <a href="03_error_propagation_dips.html" title="next chapter">Error Propagation for Dip Angles</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024-2025, Terranigma Solutions GmbH.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="../_sources/examples_probabilistic/02_error_propagation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

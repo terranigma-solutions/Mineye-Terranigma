@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Forward Gravity Modeling - Tharsis Region &#8212; Mineye-Terranigma 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=8858d845" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Bayesian Segmentation of Satellite Imagery" href="03_bayesian_segmentation.html" />
+    <link rel="prev" title="Simple Geological Model - Tharsis Region" href="01_simple_tharsis_model.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-examples-basic-02-gravity-forward-model-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code.</p>
+</div>
+<section class="sphx-glr-example-title" id="forward-gravity-modeling-tharsis-region">
+<span id="sphx-glr-examples-basic-02-gravity-forward-model-py"></span><h1>Forward Gravity Modeling - Tharsis Region<a class="headerlink" href="#forward-gravity-modeling-tharsis-region" title="Link to this heading">¶</a></h1>
+<p>This example demonstrates forward gravity modeling using a 3D geological model.
+We compute the gravity response of the geological structure at real measurement locations.</p>
+<section id="import-libraries">
+<h2>Import Libraries<a class="headerlink" href="#import-libraries" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
+
+<span class="c1"># Set random seed for reproducibility</span>
+<span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1234</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+</pre></div>
+</div>
+<p>Import paths configuration</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">mineye.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">paths</span>
+</pre></div>
+</div>
+</section>
+<section id="define-model-extent-and-resolution">
+<h2>Define Model Extent and Resolution<a class="headerlink" href="#define-model-extent-and-resolution" title="Link to this heading">¶</a></h2>
+<p>The model covers the Tharsis mining district</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">min_x</span> <span class="o">=</span> <span class="o">-</span><span class="mi">709521</span>
+<span class="n">max_x</span> <span class="o">=</span> <span class="o">-</span><span class="mi">675558</span>
+<span class="n">min_y</span> <span class="o">=</span> <span class="mi">4526832</span>
+<span class="n">max_y</span> <span class="o">=</span> <span class="mi">4551949</span>
+<span class="n">max_z</span> <span class="o">=</span> <span class="mi">505</span>
+<span class="n">model_depth</span> <span class="o">=</span> <span class="o">-</span><span class="mi">500</span>
+<span class="n">extent</span> <span class="o">=</span> <span class="p">[</span><span class="n">min_x</span><span class="p">,</span> <span class="n">max_x</span><span class="p">,</span> <span class="n">min_y</span><span class="p">,</span> <span class="n">max_y</span><span class="p">,</span> <span class="n">model_depth</span><span class="p">,</span> <span class="n">max_z</span><span class="p">]</span>
+
+<span class="c1"># Model resolution: use octree with refinement level 5</span>
+<span class="n">resolution</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Using octrees instead of regular grid</span>
+<span class="n">refinement</span> <span class="o">=</span> <span class="mi">5</span>
+</pre></div>
+</div>
+</section>
+<section id="get-data-paths">
+<h2>Get Data Paths<a class="headerlink" href="#get-data-paths" title="Link to this heading">¶</a></h2>
+<p>Load paths to structural and geophysical data</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">mod_or_path</span> <span class="o">=</span> <span class="n">paths</span><span class="o">.</span><span class="n">get_orientations_path</span><span class="p">()</span>
+<span class="n">mod_pts_path</span> <span class="o">=</span> <span class="n">paths</span><span class="o">.</span><span class="n">get_points_path</span><span class="p">()</span>
+<span class="n">gravity_data_path</span> <span class="o">=</span> <span class="n">paths</span><span class="o">.</span><span class="n">get_gravity_data_path</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Orientations: </span><span class="si">{</span><span class="n">mod_or_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Points: </span><span class="si">{</span><span class="n">mod_pts_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Gravity data: </span><span class="si">{</span><span class="n">gravity_data_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Orientations: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Output_Data/Simple-Models/temp_inputs/orientations_mod.csv
+Points: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Output_Data/Simple-Models/temp_inputs/points_mod.csv
+Gravity data: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Input_Data/Geophysical_Cleaned_Data/cleaned_gravity_data.geojson
+</pre></div>
+</div>
+</section>
+<section id="create-gempy-geological-model">
+<h2>Create GemPy Geological Model<a class="headerlink" href="#create-gempy-geological-model" title="Link to this heading">¶</a></h2>
+<p>Build the model structure with imported structural data</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">simple_geo_model</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">create_geomodel</span><span class="p">(</span>
+    <span class="n">project_name</span><span class="o">=</span><span class="s1">&#39;gravity_model&#39;</span><span class="p">,</span>
+    <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">,</span>
+    <span class="n">refinement</span><span class="o">=</span><span class="n">refinement</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span>
+    <span class="n">importer_helper</span><span class="o">=</span><span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ImporterHelper</span><span class="p">(</span>
+        <span class="n">path_to_orientations</span><span class="o">=</span><span class="n">mod_or_path</span><span class="p">,</span>
+        <span class="n">path_to_surface_points</span><span class="o">=</span><span class="n">mod_pts_path</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="map-geological-units">
+<h2>Map Geological Units<a class="headerlink" href="#map-geological-units" title="Link to this heading">¶</a></h2>
+<p>Define the stratigraphic stack</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gp</span><span class="o">.</span><span class="n">map_stack_to_surfaces</span><span class="p">(</span>
+    <span class="n">gempy_model</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="p">,</span>
+    <span class="n">mapping_object</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;Tournaisian_Plutonites&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Tournaisian Plutonites&quot;</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="output_subarea output_html rendered_html output_result">
+
+        <table>
+          <tr><td>Structural Groups:</td><td>
+    <table style="border-left:1.2px solid black;>
+      <tr><th colspan="2"><b>StructuralGroup:</b></th></tr>
+      <tr><td>Name:</td><td>Tournaisian_Plutonites</td></tr>
+      <tr><td>Structural Relation:</td><td>StackRelationType.ERODE</td></tr>
+      <tr><td>Elements:</td><td>
+    <table width="50%" style="border-left:15px solid #015482;">
+      <tr><th colspan="2"><b>StructuralElement:</b></th></tr>
+      <tr><td>Name:</td><td>Tournaisian Plutonites</td></tr>
+    </table>
+        </td></tr>
+    </table>
+        </td></tr>
+          <tr><td>Fault Relations:</td><td><table style="border-collapse: collapse; table-layout: fixed;"><th></th><th style="transform: rotate(-35deg); height:150px; vertical-align: bottom; text-align: center;">Tournaisia...</th><tr><th>Tournaisian_Plutonites</th><td style="background-color: #FFB6C1; width: 20px; height: 20px; border: 1px solid black;"></td></tr></table></td></tr>
+          <tr><td></td><td>
+        <table>
+          <tr>
+            <td><div style="display: inline-block; background-color: #527682; width: 20px; height: 20px; border: 1px solid black;"></div> True</td>
+            <td><div style="display: inline-block; background-color: #FFB6C1; width: 20px; height: 20px; border: 1px solid black;"></div> False</td>
+          </tr>
+        </table>
+        </td></tr>
+        </table>
+
+</div>
+<br />
+<br /></section>
+<section id="load-gravity-observations">
+<h2>Load Gravity Observations<a class="headerlink" href="#load-gravity-observations" title="Link to this heading">¶</a></h2>
+<p>Read actual gravity measurements from the field</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gravity_data</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="n">gravity_data_path</span><span class="p">)</span>
+<span class="n">observed_gravity</span> <span class="o">=</span> <span class="n">gravity_data</span><span class="p">[</span><span class="s1">&#39;VALU_BOU267&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>  <span class="c1"># in mGal</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of gravity observations: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">observed_gravity</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Gravity range: </span><span class="si">{</span><span class="n">observed_gravity</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">observed_gravity</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> mGal&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Number of gravity observations: 260
+Gravity range: 9.51 to 47.32 mGal
+</pre></div>
+</div>
+</section>
+<section id="set-up-gravity-measurement-locations">
+<h2>Set Up Gravity Measurement Locations<a class="headerlink" href="#set-up-gravity-measurement-locations" title="Link to this heading">¶</a></h2>
+<p>Create measurement grid at actual device locations</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">xy_ravel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">gravity_data</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">values</span><span class="p">),</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">gravity_data</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">values</span><span class="p">),</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">gravity_data</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>  <span class="c1"># Set Z to surface elevation</span>
+<span class="p">])</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">xy_ravel</span><span class="p">)</span><span class="si">}</span><span class="s2"> actual measurement points&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Using 260 actual measurement points
+</pre></div>
+</div>
+</section>
+<section id="configure-centered-grid-for-gravity-computation">
+<h2>Configure Centered Grid for Gravity Computation<a class="headerlink" href="#configure-centered-grid-for-gravity-computation" title="Link to this heading">¶</a></h2>
+<p>Set up centered grid around each measurement point</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gp</span><span class="o">.</span><span class="n">set_centered_grid</span><span class="p">(</span>
+    <span class="n">grid</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span>
+    <span class="n">centers</span><span class="o">=</span><span class="n">xy_ravel</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">15</span><span class="p">]),</span>
+    <span class="n">radius</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">5000</span><span class="p">,</span> <span class="mi">5000</span><span class="p">,</span> <span class="mi">5000</span><span class="p">])</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Active grids: GridTypes.OCTREE|CENTERED|NONE
+
+CenteredGrid(centers=array([[-704570.24986708, 4548244.44414697,       0.        ],
+       [-704382.53236132, 4532066.04358394,       0.        ],
+       [-690136.4724824 , 4544432.98054552,       0.        ],
+       [-707002.14761004, 4539093.63743575,       0.        ],
+       [-704699.53653821, 4531968.58617747,       0.        ],
+       [-700950.96131678, 4546793.53316535,       0.        ],
+       [-694189.65141922, 4548898.51589742,       0.        ],
+       [-704846.42954987, 4539110.03786957,       0.        ],
+       [-703528.05797201, 4536776.3870667 ,       0.        ],
+       [-697783.81633134, 4533690.43399615,       0.        ],
+       [-700701.90939908, 4532053.42842816,       0.        ],
+       [-689387.22332329, 4548886.66579413,       0.        ],
+       [-706356.82611551, 4543381.27949745,       0.        ],
+       [-699725.7913837 , 4539001.41911386,       0.        ],
+       [-704880.76103593, 4539722.44379962,       0.        ],
+       [-693539.73514154, 4533565.75191503,       0.        ],
+       [-689703.77835309, 4544115.49132514,       0.        ],
+       [-695657.88529586, 4548492.06016118,       0.        ],
+       [-701340.43666623, 4544538.11647535,       0.        ],
+       [-703113.49540005, 4544348.30865632,       0.        ],
+       [-696260.28828948, 4542539.04411041,       0.        ],
+       [-705269.75104386, 4539868.28697846,       0.        ],
+       [-702942.61676308, 4537427.18728719,       0.        ],
+       [-701668.40123045, 4538093.5417471 ,       0.        ],
+       [-696778.07863169, 4534563.24256096,       0.        ],
+       [-690189.58587604, 4535904.0438323 ,       0.        ],
+       [-694278.01439706, 4540390.13596727,       0.        ],
+       [-705932.22497261, 4541030.10467919,       0.        ],
+       [-694347.58951657, 4536690.92548209,       0.        ],
+       [-694530.80672662, 4538125.85458318,       0.        ],
+       [-706304.30027099, 4538569.75392141,       0.        ],
+       [-699847.47441095, 4530202.2711381 ,       0.        ],
+       [-700873.49686209, 4540481.10787182,       0.        ],
+       [-695459.41443812, 4535844.89301689,       0.        ],
+       [-707148.4887795 , 4540896.40251623,       0.        ],
+       [-697998.06389421, 4534191.07476687,       0.        ],
+       [-691595.18818509, 4538700.27101757,       0.        ],
+       [-706430.33734245, 4536222.729729  ,       0.        ],
+       [-699279.78891429, 4548646.73290409,       0.        ],
+       [-700033.658081  , 4528996.18227888,       0.        ],
+       [-705136.85138448, 4532988.1125985 ,       0.        ],
+       [-701343.7014084 , 4531466.97793333,       0.        ],
+       [-694948.02944618, 4537851.47846402,       0.        ],
+       [-702561.88529242, 4549053.3376305 ,       0.        ],
+       [-693552.41750856, 4541982.66026483,       0.        ],
+       [-699527.19558862, 4547735.80903946,       0.        ],
+       [-701848.42285282, 4544220.75518659,       0.        ],
+       [-701110.47954435, 4544428.29332502,       0.        ],
+       [-697729.20710813, 4544722.50145008,       0.        ],
+       [-697146.94815309, 4544651.57758211,       0.        ],
+       [-702279.94101085, 4545678.18325806,       0.        ],
+       [-702500.43356688, 4546199.36831356,       0.        ],
+       [-701558.23536429, 4545847.14893239,       0.        ],
+       [-702871.59134059, 4544687.98499131,       0.        ],
+       [-703700.81098756, 4544597.56615932,       0.        ],
+       [-704147.38331019, 4544402.78235669,       0.        ],
+       [-707131.68857475, 4544390.95653287,       0.        ],
+       [-706458.74372509, 4547058.90588169,       0.        ],
+       [-705366.72314986, 4548469.71541658,       0.        ],
+       [-705436.91099987, 4548062.41839713,       0.        ],
+       [-705547.07893248, 4547144.91490476,       0.        ],
+       [-692878.52088754, 4545345.66366485,       0.        ],
+       [-693672.24965566, 4544586.21239792,       0.        ],
+       [-694720.65304313, 4544915.12718891,       0.        ],
+       [-690842.08756099, 4545492.06550759,       0.        ],
+       [-691144.54917451, 4546099.48410509,       0.        ],
+       [-688911.82735255, 4545418.76949646,       0.        ],
+       [-692466.06604769, 4549121.98978402,       0.        ],
+       [-692675.20755951, 4548808.91576711,       0.        ],
+       [-694114.99107866, 4548382.09432244,       0.        ],
+       [-690032.79740524, 4547694.52712426,       0.        ],
+       [-690656.63715559, 4547943.35410694,       0.        ],
+       [-695358.04647964, 4548956.82044653,       0.        ],
+       [-693118.14696421, 4546915.61042547,       0.        ],
+       [-691034.22083437, 4548417.62758332,       0.        ],
+       [-701197.86219535, 4547959.70822538,       0.        ],
+       [-695771.04715357, 4547088.53711372,       0.        ],
+       [-695592.35978279, 4546525.09900636,       0.        ],
+       [-694909.12732201, 4546825.49563904,       0.        ],
+       [-694523.99375679, 4548040.48845199,       0.        ],
+       [-692347.60157262, 4546441.11859162,       0.        ],
+       [-698635.86231412, 4546199.00621817,       0.        ],
+       [-699251.24929839, 4544901.13563421,       0.        ],
+       [-700027.78585448, 4546984.76850401,       0.        ],
+       [-699853.91907011, 4547467.97469452,       0.        ],
+       [-698898.97131215, 4547873.41440277,       0.        ],
+       [-698433.2116758 , 4547488.84404426,       0.        ],
+       [-698246.16620834, 4547124.92612655,       0.        ],
+       [-698987.68654978, 4544660.52117282,       0.        ],
+       [-698034.30917751, 4544814.54348808,       0.        ],
+       [-703419.46537656, 4546430.54257178,       0.        ],
+       [-703097.29855282, 4547002.79572683,       0.        ],
+       [-702423.40210923, 4547956.81705048,       0.        ],
+       [-700026.69725194, 4548072.19712776,       0.        ],
+       [-703474.12458896, 4532887.7312197 ,       0.        ],
+       [-703810.66585574, 4532556.46470808,       0.        ],
+       [-704673.24662274, 4534363.0456991 ,       0.        ],
+       [-703698.42251713, 4534273.60186525,       0.        ],
+       [-705245.63815661, 4533280.7219314 ,       0.        ],
+       [-702630.88659027, 4539363.92902962,       0.        ],
+       [-703702.55587673, 4540037.08390116,       0.        ],
+       [-706361.4992164 , 4541348.20314748,       0.        ],
+       [-704223.67092922, 4538493.31829803,       0.        ],
+       [-704356.37876873, 4537677.27046708,       0.        ],
+       [-704665.01247886, 4539334.58278178,       0.        ],
+       [-706746.11239164, 4539242.29468153,       0.        ],
+       [-707058.64669513, 4542484.76656325,       0.        ],
+       [-706766.00399363, 4542707.08003892,       0.        ],
+       [-703396.64541143, 4541350.21234106,       0.        ],
+       [-706495.2178215 , 4542373.12309047,       0.        ],
+       [-702357.30149999, 4540271.31185934,       0.        ],
+       [-701650.51242413, 4540854.29318949,       0.        ],
+       [-702891.56092997, 4543571.07057342,       0.        ],
+       [-707191.49748101, 4541323.45188155,       0.        ],
+       [-706988.19588254, 4539729.32137543,       0.        ],
+       [-702039.30893243, 4542681.8347075 ,       0.        ],
+       [-703405.54716938, 4535665.38556894,       0.        ],
+       [-703266.9093116 , 4535312.91853802,       0.        ],
+       [-700236.26351608, 4542152.12812771,       0.        ],
+       [-703098.06443523, 4536752.3893394 ,       0.        ],
+       [-700548.76363513, 4540834.94527984,       0.        ],
+       [-701069.08788512, 4538174.33377539,       0.        ],
+       [-702545.84982516, 4536949.46102032,       0.        ],
+       [-701127.01557852, 4539537.68417828,       0.        ],
+       [-701413.47442146, 4537951.71435821,       0.        ],
+       [-701057.1669182 , 4537510.50236729,       0.        ],
+       [-700774.76423518, 4534206.17894973,       0.        ],
+       [-699526.04965556, 4536572.01998759,       0.        ],
+       [-698705.00188736, 4536553.99448347,       0.        ],
+       [-698738.61132779, 4535960.90348689,       0.        ],
+       [-698138.89062063, 4535410.35051641,       0.        ],
+       [-700814.35383024, 4532742.50977263,       0.        ],
+       [-701536.97573848, 4533164.24543296,       0.        ],
+       [-695709.21517765, 4533869.32382116,       0.        ],
+       [-696976.39341613, 4536898.49771136,       0.        ],
+       [-699658.44070864, 4533026.53474742,       0.        ],
+       [-696528.74804074, 4535089.01026027,       0.        ],
+       [-696655.90731212, 4534132.84213016,       0.        ],
+       [-695936.54873977, 4535554.51255691,       0.        ],
+       [-694863.55901825, 4533167.58628089,       0.        ],
+       [-695976.08013545, 4536004.33777941,       0.        ],
+       [-696879.19145567, 4533366.00488239,       0.        ],
+       [-696445.45921714, 4532974.40432503,       0.        ],
+       [-697873.96947401, 4533198.16120133,       0.        ],
+       [-694769.80339433, 4533815.82325936,       0.        ],
+       [-694221.24452652, 4538191.11315424,       0.        ],
+       [-693857.00013921, 4538648.7267923 ,       0.        ],
+       [-693360.40887111, 4534002.80230215,       0.        ],
+       [-693017.49292759, 4534048.87480443,       0.        ],
+       [-693705.28857102, 4537026.28493056,       0.        ],
+       [-692957.10914448, 4536741.62464528,       0.        ],
+       [-691953.38660152, 4536512.62784209,       0.        ],
+       [-694163.74847927, 4539601.64021984,       0.        ],
+       [-693028.81331842, 4542879.68446094,       0.        ],
+       [-693133.42730854, 4543462.03019846,       0.        ],
+       [-697132.62908901, 4542129.34665211,       0.        ],
+       [-697180.78549477, 4542607.0472654 ,       0.        ],
+       [-697719.24216226, 4542838.02734363,       0.        ],
+       [-690694.92534506, 4541585.44615389,       0.        ],
+       [-690350.44150586, 4541630.25557848,       0.        ],
+       [-689598.97851544, 4541293.35240538,       0.        ],
+       [-689177.71438932, 4540713.05256805,       0.        ],
+       [-692605.68299727, 4535068.05932206,       0.        ],
+       [-692447.82643207, 4535359.93364545,       0.        ],
+       [-689925.86846736, 4539803.63335059,       0.        ],
+       [-691488.42312198, 4534835.36543722,       0.        ],
+       [-691400.71719711, 4539290.16855225,       0.        ],
+       [-691219.303393  , 4538414.0191427 ,       0.        ],
+       [-690900.32022166, 4537352.52281954,       0.        ],
+       [-691760.8244483 , 4538892.34014133,       0.        ],
+       [-692013.57908457, 4538272.55865777,       0.        ],
+       [-693278.78772497, 4539383.80920215,       0.        ],
+       [-691108.6668279 , 4539759.19758837,       0.        ],
+       [-695312.40653945, 4542738.2459276 ,       0.        ],
+       [-696085.90121924, 4542973.80773645,       0.        ],
+       [-696506.01679654, 4541065.74413793,       0.        ],
+       [-689036.65019647, 4543737.52654683,       0.        ],
+       [-696502.8411063 , 4540354.49548519,       0.        ],
+       [-691995.89391311, 4543254.02680697,       0.        ],
+       [-695746.81027394, 4541093.51012951,       0.        ],
+       [-695624.72544536, 4542018.4251667 ,       0.        ],
+       [-692006.34323639, 4542378.54722423,       0.        ],
+       [-691133.13863778, 4542621.71242467,       0.        ],
+       [-690716.49557232, 4542514.29498803,       0.        ],
+       [-695074.93975426, 4543139.68622656,       0.        ],
+       [-699027.89611701, 4539515.37289281,       0.        ],
+       [-701022.09773344, 4544105.4338232 ,       0.        ],
+       [-700368.87131864, 4540024.72289765,       0.        ],
+       [-700069.02620731, 4539935.13935897,       0.        ],
+       [-698734.31438763, 4539966.92234925,       0.        ],
+       [-697556.32596059, 4543928.16983754,       0.        ],
+       [-696691.84132481, 4544021.8605408 ,       0.        ],
+       [-700005.63291632, 4543248.427023  ,       0.        ],
+       [-705393.05712697, 4542417.71750498,       0.        ],
+       [-703824.34931502, 4544161.89080804,       0.        ],
+       [-689313.75742799, 4535757.87160912,       0.        ],
+       [-689391.84552247, 4544005.68301675,       0.        ],
+       [-690158.38366982, 4543555.73879237,       0.        ],
+       [-698887.19241135, 4538304.5069895 ,       0.        ],
+       [-699887.21327075, 4538129.85749739,       0.        ],
+       [-706792.15611903, 4532631.09161122,       0.        ],
+       [-692886.93617681, 4544155.5016168 ,       0.        ],
+       [-692149.12489832, 4545478.71524173,       0.        ],
+       [-696750.1365093 , 4536962.17791224,       0.        ],
+       [-696729.66753301, 4546423.19841714,       0.        ],
+       [-680457.49902116, 4529960.92458436,       0.        ],
+       [-705624.39826725, 4548147.0565838 ,       0.        ],
+       [-703076.85222025, 4538119.61970237,       0.        ],
+       [-692756.56790738, 4530852.29730131,       0.        ],
+       [-688941.53885159, 4529095.83225476,       0.        ],
+       [-701749.40178779, 4531200.52117439,       0.        ],
+       [-705629.59827467, 4546836.18755086,       0.        ],
+       [-700662.44270029, 4537232.9027125 ,       0.        ],
+       [-694478.0798911 , 4540186.65169614,       0.        ],
+       [-689850.51051508, 4541523.13617614,       0.        ],
+       [-694523.99375679, 4548040.48845199,       0.        ],
+       [-706608.12955532, 4548130.76550664,       0.        ],
+       [-691079.20840052, 4545776.95573851,       0.        ],
+       [-706061.10514375, 4528815.13464428,       0.        ],
+       [-706724.22097719, 4531041.01420807,       0.        ],
+       [-704821.30555819, 4528850.56820019,       0.        ],
+       [-701080.48124779, 4530219.59965639,       0.        ],
+       [-697759.99913426, 4530207.1357154 ,       0.        ],
+       [-697560.9416204 , 4529378.07978783,       0.        ],
+       [-695454.34384941, 4529006.95443884,       0.        ],
+       [-694517.9195195 , 4529430.86265254,       0.        ],
+       [-693415.27782586, 4531373.02364906,       0.        ],
+       [-694228.48823523, 4531982.13272386,       0.        ],
+       [-695617.77795432, 4530088.07640873,       0.        ],
+       [-694136.67074351, 4529531.47852188,       0.        ],
+       [-693887.65833433, 4529993.58307241,       0.        ],
+       [-691133.79624357, 4529802.28694482,       0.        ],
+       [-694161.4863376 , 4531024.13533694,       0.        ],
+       [-689202.79320461, 4529212.30669748,       0.        ],
+       [-689300.43402256, 4530566.90616717,       0.        ],
+       [-701111.26194587, 4531242.08714209,       0.        ],
+       [-701611.92980549, 4529511.73491421,       0.        ],
+       [-699811.92988538, 4531243.56771176,       0.        ],
+       [-700231.84745044, 4530516.82438978,       0.        ],
+       [-703557.16546477, 4531593.72991249,       0.        ],
+       [-705055.27448741, 4530970.25809214,       0.        ],
+       [-706108.13846225, 4530033.21429594,       0.        ],
+       [-704459.35807063, 4530028.77819813,       0.        ],
+       [-704977.7589175 , 4532379.28773262,       0.        ],
+       [-695321.48820441, 4532140.5645316 ,       0.        ],
+       [-697282.73869209, 4531322.1578646 ,       0.        ],
+       [-697979.60211997, 4530827.77200875,       0.        ],
+       [-692196.40324904, 4530998.30395337,       0.        ],
+       [-703422.7166823 , 4542446.22742803,       0.        ],
+       [-706538.45692982, 4528903.1631414 ,       0.        ],
+       [-699215.40699524, 4535301.57505909,       0.        ],
+       [-689698.50635551, 4547042.39848429,       0.        ],
+       [-699284.12968756, 4536330.83715183,       0.        ],
+       [-696499.33902935, 4534531.15459867,       0.        ],
+       [-682972.38968699, 4548424.4631201 ,       0.        ],
+       [-687802.64357389, 4540676.33579163,       0.        ],
+       [-693430.25335438, 4542543.64103815,       0.        ],
+       [-701585.54515975, 4535985.98870548,       0.        ],
+       [-698010.14738312, 4530617.67880425,       0.        ],
+       [-700367.86757379, 4544287.12204097,       0.        ]]), resolution=array([10, 10, 15]), radius=array([5000, 5000, 5000]), kernel_grid_centers=array([[-5000.        , -5000.        ,  -300.        ],
+       [-5000.        , -5000.        ,  -360.        ],
+       [-5000.        , -5000.        ,  -383.36972966],
+       ...,
+       [ 5000.        ,  5000.        , -3407.68480754],
+       [ 5000.        ,  5000.        , -4618.11403801],
+       [ 5000.        ,  5000.        , -6300.        ]], shape=(1936, 3)), left_voxel_edges=array([[1709.43058496, 1709.43058496,  -30.        ],
+       [1709.43058496, 1709.43058496,  -30.        ],
+       [1709.43058496, 1709.43058496,  -11.68486483],
+       ...,
+       [1709.43058496, 1709.43058496, -435.56428767],
+       [1709.43058496, 1709.43058496, -605.21461523],
+       [1709.43058496, 1709.43058496, -840.942981  ]], shape=(1936, 3)), right_voxel_edges=array([[1709.43058496, 1709.43058496,  -30.        ],
+       [1709.43058496, 1709.43058496,  -11.68486483],
+       [1709.43058496, 1709.43058496,  -16.23606704],
+       ...,
+       [1709.43058496, 1709.43058496, -605.21461523],
+       [1709.43058496, 1709.43058496, -840.942981  ],
+       [1709.43058496, 1709.43058496, -840.942981  ]], shape=(1936, 3)))
+</pre></div>
+</div>
+</section>
+<section id="calculate-gravity-gradient">
+<h2>Calculate Gravity Gradient<a class="headerlink" href="#calculate-gravity-gradient" title="Link to this heading">¶</a></h2>
+<p>Compute the gravity gradient (tz component) for the centered grid</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gravity_gradient</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">calculate_gravity_gradient</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">centered_grid</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Gravity gradient tensor shape: </span><span class="si">{</span><span class="n">gravity_gradient</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Gravity gradient tensor shape: (1936,)
+</pre></div>
+</div>
+</section>
+<section id="set-density-values">
+<h2>Set Density Values<a class="headerlink" href="#set-density-values" title="Link to this heading">¶</a></h2>
+<p>Define densities for geological units</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">density_plutonites</span> <span class="o">=</span> <span class="mf">2.9</span>  <span class="c1"># kg/m³</span>
+<span class="n">density_sedimentary_host</span> <span class="o">=</span> <span class="mf">2.3</span>  <span class="c1"># kg/m³</span>
+
+<span class="n">simple_geo_model</span><span class="o">.</span><span class="n">geophysics_input</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">GeophysicsInput</span><span class="p">(</span>
+    <span class="n">tz</span><span class="o">=</span><span class="n">gravity_gradient</span><span class="p">,</span>
+    <span class="n">densities</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">density_plutonites</span><span class="p">,</span> <span class="n">density_sedimentary_host</span><span class="p">])</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Plutonite density: </span><span class="si">{</span><span class="n">density_plutonites</span><span class="si">}</span><span class="s2"> g/cm³&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sedimentary host density: </span><span class="si">{</span><span class="n">density_sedimentary_host</span><span class="si">}</span><span class="s2"> g/cm³&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Plutonite density: 2.9 g/cm³
+Sedimentary host density: 2.3 g/cm³
+</pre></div>
+</div>
+</section>
+<section id="compute-forward-gravity-model">
+<h2>Compute Forward Gravity Model<a class="headerlink" href="#compute-forward-gravity-model" title="Link to this heading">¶</a></h2>
+<p>Run the interpolation and gravity computation</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">simple_geo_model</span><span class="o">.</span><span class="n">interpolation_options</span><span class="o">.</span><span class="n">mesh_extraction</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">sol</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">compute_model</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✓ Forward gravity model computed successfully&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+✓ Forward gravity model computed successfully
+</pre></div>
+</div>
+</section>
+<section id="extract-gravity-results">
+<h2>Extract Gravity Results<a class="headerlink" href="#extract-gravity-results" title="Link to this heading">¶</a></h2>
+<p>Get the computed gravity response</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">grav</span> <span class="o">=</span> <span class="n">sol</span><span class="o">.</span><span class="n">gravity</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Computed gravity values:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Shape: </span><span class="si">{</span><span class="n">grav</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Range: </span><span class="si">{</span><span class="n">grav</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">grav</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> mGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">grav</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> mGal&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Computed gravity values:
+  Shape: torch.Size([260])
+  Range: -425.68 to -387.18 mGal
+  Mean: -391.60 mGal
+</pre></div>
+</div>
+</section>
+<section id="compare-with-observations">
+<h2>Compare with Observations<a class="headerlink" href="#compare-with-observations" title="Link to this heading">¶</a></h2>
+<p>Calculate residuals between observed and computed gravity</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">residuals</span> <span class="o">=</span> <span class="n">observed_gravity</span> <span class="o">-</span> <span class="n">grav</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Gravity residuals:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">residuals</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> mGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Std: </span><span class="si">{</span><span class="n">residuals</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> mGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  RMS: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">residuals</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> mGal&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Gravity residuals:
+  Mean: 417.18 mGal
+  Std: 9.75 mGal
+  RMS: 417.30 mGal
+</pre></div>
+</div>
+</section>
+<section id="visualize-the-model">
+<h2>Visualize the Model<a class="headerlink" href="#visualize-the-model" title="Link to this heading">¶</a></h2>
+<p>Create 2D and 3D visualizations of the geological model</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">gempy_viewer</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpv</span>
+
+<span class="n">gpv</span><span class="o">.</span><span class="n">plot_2d</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="p">)</span>
+<span class="n">gpv</span><span class="o">.</span><span class="n">plot_3d</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="p">,</span> <span class="n">ve</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">image</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_02_gravity_forward_model_001.png" srcset="../_images/sphx_glr_02_gravity_forward_model_001.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;gempy_viewer.modules.plot_3d.vista.GemPyToVista object at 0x7fc2209682f0&gt;
+</pre></div>
+</div>
+</section>
+<section id="visualize-gravity-results">
+<h2>Visualize Gravity Results<a class="headerlink" href="#visualize-gravity-results" title="Link to this heading">¶</a></h2>
+<p>Plot forward gravity and comparison with observations</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.plotting.probabilistic_analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">_plot_fw_gravity</span><span class="p">,</span> <span class="n">_plot_comparison</span>
+
+<span class="n">_plot_fw_gravity</span><span class="p">(</span><span class="n">grav</span><span class="p">,</span> <span class="n">gravity_data</span><span class="p">,</span> <span class="n">xy_ravel</span><span class="p">)</span>
+<span class="n">_plot_comparison</span><span class="p">(</span><span class="n">observed_gravity</span><span class="p">,</span> <span class="n">grav</span><span class="p">,</span> <span class="n">xy_ravel</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../_images/sphx_glr_02_gravity_forward_model_002.png" srcset="../_images/sphx_glr_02_gravity_forward_model_002.png" alt="Forward Gravity Model Results" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_02_gravity_forward_model_003.png" srcset="../_images/sphx_glr_02_gravity_forward_model_003.png" alt="Observed Gravity (align_to_reference), Forward Model Gravity (align_to_reference), Residuals (Observed - Forward Model) (align_to_reference), Observed vs Forward Model Correlation" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Plotting 260 actual measurement locations
+
+=== Observed vs Predicted Comparison ===
+Computing quantile_align alignment parameters...
+  Quantile alignment params ready (n_knots=11, buffer=20.0%): ranges [379.48,433.39] -&gt; [1945.00,54886.00]
+</pre></div>
+</div>
+</section>
+<section id="visualize-forward-model-results">
+<h2>Visualize Forward Model Results<a class="headerlink" href="#visualize-forward-model-results" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">grav_forward</span> <span class="o">=</span> <span class="n">sol</span><span class="o">.</span><span class="n">gravity</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✓ Forward model computed&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Gravity range: [</span><span class="si">{</span><span class="n">grav_forward</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">grav_forward</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">] µGal&quot;</span><span class="p">)</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+
+<span class="n">scatter</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">xy_ravel</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">xy_ravel</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">c</span><span class="o">=</span><span class="n">grav_forward</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+    <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;viridis_r&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span>
+    <span class="n">edgecolors</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span>
+<span class="p">)</span>
+
+<span class="n">cbar</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">scatter</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">cbar</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Forward Model Gravity (µGal)&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Forward Gravity Model&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s1">&#39;bold&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;X (m)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Y (m)&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_02_gravity_forward_model_004.png" srcset="../_images/sphx_glr_02_gravity_forward_model_004.png" alt="Forward Gravity Model" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>✓ Forward model computed
+  Gravity range: [-425.68, -387.18] µGal
+</pre></div>
+</div>
+</section>
+<section id="compare-with-observed-gravity">
+<h2>Compare with Observed Gravity<a class="headerlink" href="#compare-with-observed-gravity" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Convert observed from mGal to µGal</span>
+<span class="n">observed_ugal</span> <span class="o">=</span> <span class="n">observed_gravity</span> <span class="o">*</span> <span class="mi">1000</span>
+
+<span class="c1"># Create comparison plot</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+<span class="c1"># Observed</span>
+<span class="n">sc1</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">xy_ravel</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">xy_ravel</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">c</span><span class="o">=</span><span class="n">observed_ugal</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;viridis_r&#39;</span><span class="p">,</span>
+    <span class="n">edgecolors</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span>
+<span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Observed Gravity&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;X (m)&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Y (m)&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">sc1</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;µGal&#39;</span><span class="p">)</span>
+
+<span class="c1"># Forward model</span>
+<span class="n">sc2</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">xy_ravel</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">xy_ravel</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">c</span><span class="o">=</span><span class="n">grav_forward</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;viridis_r&#39;</span><span class="p">,</span>
+    <span class="n">edgecolors</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span>
+<span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Forward Model&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;X (m)&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">sc2</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;µGal&#39;</span><span class="p">)</span>
+
+<span class="c1"># Residuals</span>
+<span class="n">sc3</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+    <span class="n">xy_ravel</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">xy_ravel</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">c</span><span class="o">=</span><span class="n">residuals</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;RdBu_r&#39;</span><span class="p">,</span>
+    <span class="n">edgecolors</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span>
+<span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Residuals (Obs - Model)&#39;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;X (m)&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">sc3</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;µGal&#39;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_02_gravity_forward_model_005.png" srcset="../_images/sphx_glr_02_gravity_forward_model_005.png" alt="Observed Gravity, Forward Model, Residuals (Obs - Model)" class = "sphx-glr-single-img"/></section>
+<section id="correlation-analysis">
+<h2>Correlation Analysis<a class="headerlink" href="#correlation-analysis" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">observed_ugal</span><span class="p">,</span> <span class="n">grav_forward</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+           <span class="n">edgecolors</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+<span class="c1"># 1:1 line</span>
+<span class="n">lims</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="nb">min</span><span class="p">(</span><span class="n">ax</span><span class="o">.</span><span class="n">get_xlim</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ax</span><span class="o">.</span><span class="n">get_ylim</span><span class="p">()[</span><span class="mi">0</span><span class="p">]),</span>
+        <span class="nb">max</span><span class="p">(</span><span class="n">ax</span><span class="o">.</span><span class="n">get_xlim</span><span class="p">()[</span><span class="mi">1</span><span class="p">],</span> <span class="n">ax</span><span class="o">.</span><span class="n">get_ylim</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+<span class="p">]</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">lims</span><span class="p">,</span> <span class="n">lims</span><span class="p">,</span> <span class="s1">&#39;r--&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;1:1 line&#39;</span><span class="p">)</span>
+
+<span class="c1"># Calculate statistics</span>
+<span class="n">correlation</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">corrcoef</span><span class="p">(</span><span class="n">observed_ugal</span><span class="p">,</span> <span class="n">grav_forward</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="n">rmse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">residuals</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Observed (µGal)&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Forward Model (µGal)&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s1">&#39;Observed vs Modeled Gravity&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s1">&#39;bold&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+
+<span class="c1"># Add statistics text box</span>
+<span class="n">textstr</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;R = </span><span class="si">{</span><span class="n">correlation</span><span class="si">:</span><span class="s1">.3f</span><span class="si">}</span><span class="se">\n</span><span class="s1">R² = </span><span class="si">{</span><span class="n">correlation</span><span class="o">**</span><span class="mi">2</span><span class="si">:</span><span class="s1">.3f</span><span class="si">}</span><span class="se">\n</span><span class="s1">RMSE = </span><span class="si">{</span><span class="n">rmse</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1"> µGal&#39;</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">,</span> <span class="n">textstr</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="n">ax</span><span class="o">.</span><span class="n">transAxes</span><span class="p">,</span>
+        <span class="n">verticalalignment</span><span class="o">=</span><span class="s1">&#39;top&#39;</span><span class="p">,</span>
+        <span class="n">bbox</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">boxstyle</span><span class="o">=</span><span class="s1">&#39;round&#39;</span><span class="p">,</span> <span class="n">facecolor</span><span class="o">=</span><span class="s1">&#39;wheat&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.8</span><span class="p">),</span>
+        <span class="n">fontsize</span><span class="o">=</span><span class="mi">11</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_02_gravity_forward_model_006.png" srcset="../_images/sphx_glr_02_gravity_forward_model_006.png" alt="Observed vs Modeled Gravity" class = "sphx-glr-single-img"/></section>
+<section id="print-summary-statistics">
+<h2>Print Summary Statistics<a class="headerlink" href="#print-summary-statistics" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span><span class="o">*</span><span class="mi">50</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;GRAVITY COMPARISON STATISTICS&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="o">*</span><span class="mi">50</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of measurements: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">observed_ugal</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Observed gravity:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">observed_ugal</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> µGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Std:  </span><span class="si">{</span><span class="n">observed_ugal</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> µGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Range: [</span><span class="si">{</span><span class="n">observed_ugal</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">observed_ugal</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">] µGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Forward model:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">grav_forward</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> µGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Std:  </span><span class="si">{</span><span class="n">grav_forward</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> µGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Range: [</span><span class="si">{</span><span class="n">grav_forward</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">grav_forward</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">] µGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Residuals:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">residuals</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> µGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Std:  </span><span class="si">{</span><span class="n">residuals</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> µGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  RMSE: </span><span class="si">{</span><span class="n">rmse</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> µGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  MAE:  </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">residuals</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> µGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Correlation: </span><span class="si">{</span><span class="n">correlation</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> (R² = </span><span class="si">{</span><span class="n">correlation</span><span class="o">**</span><span class="mi">2</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="o">*</span><span class="mi">50</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>==================================================
+GRAVITY COMPARISON STATISTICS
+==================================================
+Number of measurements: 260
+
+Observed gravity:
+  Mean: 25587.18 µGal
+  Std:  8369.30 µGal
+  Range: [9508.00, 47323.00] µGal
+
+Forward model:
+  Mean: -391.60 µGal
+  Std:  8.52 µGal
+  Range: [-425.68, -387.18] µGal
+
+Residuals:
+  Mean: 417.18 µGal
+  Std:  9.75 µGal
+  RMSE: 417.30 µGal
+  MAE:  417.18 µGal
+
+Correlation: 0.3322 (R² = 0.1104)
+==================================================
+</pre></div>
+</div>
+</section>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h2>
+<p>This example demonstrated:</p>
+<ul class="simple">
+<li><p>Loading geological models and gravity data</p></li>
+<li><p>Setting up centered grids for gravity computation</p></li>
+<li><p>Computing forward gravity response</p></li>
+<li><p>Comparing modeled with observed data</p></li>
+<li><p>Statistical analysis of model fit</p></li>
+</ul>
+<p><strong>Next steps:</strong></p>
+<ul class="simple">
+<li><p>Use residuals for probabilistic inversion</p></li>
+<li><p>Uncertainty quantification with Bayesian methods</p></li>
+<li><p>Joint inversion with multiple data types</p></li>
+</ul>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 2.778 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-examples-basic-02-gravity-forward-model-py">
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/823ec821e1ce87ecc88b7d4cc08483bb/02_gravity_forward_model.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">02_gravity_forward_model.ipynb</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/ef03d68ed33b364efbcfedc405e5df61/02_gravity_forward_model.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">02_gravity_forward_model.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-zip docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/2850e64215bda6586e99023dfa035ae2/02_gravity_forward_model.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">zipped:</span> <span class="pre">02_gravity_forward_model.zip</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<p class="logo">
+  <a href="../index.html">
+    <img class="logo" src="../_static/logos/Terranigma.png" alt="Logo" />
+    
+  </a>
+</p>
+
+
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=leguark&repo=Mineye-Terranigma&type=star&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Example Galleries</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Basic Examples</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="01_simple_tharsis_model.html">Simple Geological Model - Tharsis Region</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Forward Gravity Modeling - Tharsis Region</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_bayesian_segmentation.html">Bayesian Segmentation of Satellite Imagery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../examples_probabilistic/index.html">Probabilistic Modeling Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Basic Examples</a><ul>
+      <li>Previous: <a href="01_simple_tharsis_model.html" title="previous chapter">Simple Geological Model - Tharsis Region</a></li>
+      <li>Next: <a href="03_bayesian_segmentation.html" title="next chapter">Bayesian Segmentation of Satellite Imagery</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024-2025, Terranigma Solutions GmbH.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="../_sources/examples_basic/02_gravity_forward_model.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
