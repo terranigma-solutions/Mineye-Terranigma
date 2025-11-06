@@ -42,8 +42,9 @@ def test_simple_model_gravity(simple_geo_model, geophysical_dir):
     assert simple_geo_model is not None
 
     grav = sol.gravity
-
-    gpv.plot_3d(simple_geo_model, ve=5, image=True)
+    
+    gpv.plot_2d(simple_geo_model)
+    gpv.plot_3d(simple_geo_model, ve=5, image=False)
 
 
     if PLOT:=True:
@@ -76,5 +77,5 @@ def _gravity_precomputations(density_plutonites: float, density_sedimentary_host
     print("Configuring geophysics input...")
     simple_geo_model.geophysics_input = gp.data.GeophysicsInput(
         tz=gravity_gradient,
-        densities=np.array([density_sedimentary_host, density_plutonites])  # kg/m³ for different formations,
+        densities=np.array([density_plutonites, density_sedimentary_host])  # kg/m³ for different formations,
     )
