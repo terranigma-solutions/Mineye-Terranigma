@@ -236,7 +236,7 @@ class TestProbabilisticInversionVI:
 
     def test_run_analysis_vi(self, simple_geo_model, geophysical_dir):
         """Analyze VI results."""
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density_II.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
@@ -254,7 +254,7 @@ class TestProbabilisticInversionVI:
                 data=[data, data.prior],
                 var_names=["dips"],
                 filter_vars="like",
-                hdi_prob=0.95,
+                hdi_prob=0.999,
                 shade=.2,
                 data_labels=["Posterior (VI)", "Prior"],
                 colors=[default_red, default_blue],
@@ -276,7 +276,6 @@ class TestProbabilisticInversionVI:
             normalization_method='align_to_reference'
         )
         
-        return 
         # Analysis inference
         if hasattr(data, 'prior') and r'gravity_response' in data.prior:
             gravity_samples_norm, unit_label = plot(
