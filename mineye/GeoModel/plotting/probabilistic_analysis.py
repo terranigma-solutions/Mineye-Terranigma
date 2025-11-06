@@ -1,6 +1,7 @@
 from typing import Any
 
 import numpy as np
+from matplotlib import pyplot as plt
 from pandas import DataFrame
 
 from mineye.GeoModel.geophysics import compute_alignment_params, align_forward_to_observed
@@ -27,18 +28,22 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     )
     
     forward_norm = forward_norm.numpy()
-    
+
+    plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel)
+
+
+def plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel):
     observed_norm = observed_ugal
     unit_label = r'$\mu$Gal'
 
     residuals_norm = observed_norm - forward_norm
-    
+
     # Compute SHARED colorbar limits for observed and forward plots
     vmin_shared = min(np.min(observed_norm), np.min(forward_norm))
     vmax_shared = max(np.max(observed_norm), np.max(forward_norm))
-    
+
     # Create comparison plot with 4 subplots (add correlation plot)
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12), layout='constrained')
 
     # Plot 1: Observed gravity (with shared colorbar limits)
     scatter1 = ax1.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=observed_norm,
@@ -91,7 +96,6 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     ax4.text(0.05, 0.95, f'R = {correlation:.3f}', transform=ax4.transAxes,
              bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontsize=12)
 
-    plt.tight_layout()
     plt.show()
 
 
@@ -148,7 +152,7 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
     upper_ci = np.percentile(gravity_samples, upper_percentile, axis=0)
 
     # Create figure with subplots
-    fig, axes = plt.subplots(2, 2, figsize=(18, 14))
+    fig, axes = plt.subplots(2, 2, figsize=(18, 14), layout='constrained')
 
     # ============ Plot 1: Mean gravity with uncertainty visualization ============
     ax1 = axes[0, 0]
@@ -226,10 +230,12 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
 
     if observed_data is not None:
         # Scatter plot with error bars
-        ax4.errorbar(observed_data, mean_gravity, yerr=[mean_gravity - lower_ci, upper_ci - mean_gravity],
-                    fmt='o', alpha=0.6, ecolor='gray', capsize=4, markersize=6,
-                    label='Predictions with CI')
+        yerr_lower = np.abs(mean_gravity - lower_ci)
+        yerr_upper = np.abs(upper_ci - mean_gravity)
 
+        ax4.errorbar(observed_data, mean_gravity, yerr=[yerr_lower, yerr_upper],
+                     fmt='o', alpha=0.6, ecolor='gray', capsize=4, markersize=6,
+                     label='Predictions with CI')
         # 1:1 line
         lims = [min(np.min(observed_data), np.min(lower_ci)), 
                 max(np.max(observed_data), np.max(upper_ci))]
@@ -266,7 +272,6 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
         ax4.grid(True, alpha=0.3, axis='y')
 
     plt.suptitle(title, fontsize=16, fontweight='bold', y=0.995)
-    plt.tight_layout()
     plt.show()
 
     # Print summary statistics
@@ -307,7 +312,7 @@ def plot_gravity_uncertainty_profiles(gravity_samples: np.ndarray, xy_coords: np
     lower_ci = np.percentile(gravity_samples, lower_percentile, axis=0)
     upper_ci = np.percentile(gravity_samples, upper_percentile, axis=0)
 
-    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10), layout='constrained')
     axes = axes.flatten()
 
     # Create profiles along different directions
@@ -362,7 +367,6 @@ def plot_gravity_uncertainty_profiles(gravity_samples: np.ndarray, xy_coords: np
         ax.grid(True, alpha=0.3)
 
     plt.suptitle('Gravity Profiles with Uncertainty', fontsize=14, fontweight='bold')
-    plt.tight_layout()
     plt.show()
 
 
@@ -395,7 +399,7 @@ def plot_gravity_uncertainty_map_interpolated(gravity_samples: np.ndarray, xy_co
     std_interp = griddata(xy_coords[:, :2], std_gravity, (xi_grid, yi_grid), method='cubic')
 
     # Create figure
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6), layout='constrained')
 
     # Plot 1: Mean gravity (interpolated)
     ax1 = axes[0]
@@ -426,5 +430,4 @@ def plot_gravity_uncertainty_map_interpolated(gravity_samples: np.ndarray, xy_co
     cbar2.set_label(r'Std. Dev. ($\mu$Gal)', fontsize=10)
     ax2.legend(fontsize=9)
 
-    plt.tight_layout()
     plt.show()

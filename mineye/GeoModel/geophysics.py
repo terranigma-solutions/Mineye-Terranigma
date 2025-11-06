@@ -1,6 +1,6 @@
-# ... existing code ...
+from typing import Dict, Optional, Literal
+
 import numpy as np
-from typing import Dict, Optional, Literal, Tuple
 import torch
 
 
@@ -9,13 +9,16 @@ def compute_alignment_params(
         baseline_forward: Optional[np.ndarray] = None,
         verbose: bool = True,
         method: Literal["align_to_reference", "quantile_align"] = "quantile_align",
-        n_quantiles: int = 11
+        n_quantiles: int = 11,
+        extrapolation_buffer: float = 0.2
 ) -> Dict[str, np.ndarray | float | str]:
     """
     Compute parameters to align forward gravity fields to observed distribution.
     method:
       - "align_to_reference": linear mean/std alignment (assumes near-normal)
       - "quantile_align": robust monotonic alignment via piecewise linear quantile mapping
+
+    extrapolation_buffer: fraction to extend the quantile range beyond baseline (e.g., 0.2 = 20%)
     """
     if verbose:
         print(f"Computing {method} alignment parameters...")
@@ -49,6 +52,28 @@ def compute_alignment_params(
             if arr[i] <= arr[i-1]:
                 arr[i] = arr[i-1] + eps
 
+    # Add extrapolation buffer to allow exploration beyond baseline range
+    if extrapolation_buffer > 0:
+        base_range = base_qv[-1] - base_qv[0]
+        obs_range = obs_qv[-1] - obs_qv[0]
+
+        # Extend baseline quantiles
+        base_qv_extended = np.concatenate([
+            [base_qv[0] - extrapolation_buffer * base_range],
+            base_qv,
+            [base_qv[-1] + extrapolation_buffer * base_range]
+        ])
+
+        # Extend observed quantiles (linear extrapolation)
+        obs_qv_extended = np.concatenate([
+            [obs_qv[0] - extrapolation_buffer * obs_range],
+            obs_qv,
+            [obs_qv[-1] + extrapolation_buffer * obs_range]
+        ])
+
+        base_qv = base_qv_extended
+        obs_qv = obs_qv_extended
+
     params = {
         "method": "quantile_align",
         "quantiles": q,
@@ -57,7 +82,7 @@ def compute_alignment_params(
     }
     if verbose:
         print("  Quantile alignment params ready "
-              f"(n_knots={n_quantiles}): ranges "
+              f"(n_knots={n_quantiles}, buffer={extrapolation_buffer:.1%}): ranges "
               f"[{base_qv[0]:.2f},{base_qv[-1]:.2f}] -> [{obs_qv[0]:.2f},{obs_qv[-1]:.2f}]")
     return params
 
@@ -90,17 +115,13 @@ def align_forward_to_observed(
     base_qv = torch.tensor(params["baseline_quantile_values"], dtype=x.dtype, device=x.device)
     obs_qv = torch.tensor(params["observed_quantile_values"], dtype=x.dtype, device=x.device)
 
-    # Clip to baseline support to avoid extrapolation blow-ups
-    x_clipped = torch.clamp(x, min=base_qv[0].item(), max=base_qv[-1].item())
-
-    # Piecewise-linear interpolation: map baseline value -> observed value
-    # Find segment indices
-    idx = torch.searchsorted(base_qv, x_clipped, right=True).clamp(min=1, max=base_qv.numel()-1)
+    # Piecewise-linear interpolation/extrapolation: map baseline value -> observed value
+    # Extended quantiles allow exploration beyond baseline range
+    idx = torch.searchsorted(base_qv, x, right=True).clamp(min=1, max=base_qv.numel()-1)
     x0 = base_qv[idx - 1]
     x1 = base_qv[idx]
     y0 = obs_qv[idx - 1]
     y1 = obs_qv[idx]
-    w = (x_clipped - x0) / torch.clamp(x1 - x0, min=eps)
+    w = (x - x0) / torch.clamp(x1 - x0, min=eps)
     y = y0 + w * (y1 - y0)
     return y
-# ... existing code ...
