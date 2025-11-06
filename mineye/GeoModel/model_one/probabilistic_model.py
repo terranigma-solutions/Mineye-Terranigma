@@ -19,6 +19,15 @@ def normalize(baseline_fw_gravity_np, observed_gravity):
     return norm_params
 
 
+def _modify_densities(
+        samples: dict[str, Distribution],
+        geo_model: gp.data.GeoModel,
+        key: str
+) -> None:
+    """Modify densities for different keys."""
+    geo_model.geophysics_input.densities = samples[key]
+    
+
 def create_orientation_modifier(key: str):
     """Factory function that creates orientation modifier functions for different keys."""
     return partial(_modify_orientations, key=key)

@@ -4,6 +4,7 @@ import arviz as az
 import torch
 from matplotlib import pyplot as plt
 from pyro import distributions as dist, optim
+from pyro.distributions import Distribution
 from pyro.infer import SVI, Trace_ELBO
 from pyro.infer.autoguide import AutoIAFNormal
 from pyro.optim import Adam
@@ -11,7 +12,7 @@ from pyro.optim import Adam
 import gempy_probability as gpp
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.geophysics import align_forward_to_observed
-from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
+from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, _modify_orientations, _modify_densities
 from mineye.GeoModel.model_one.probabilistic_model_diagnostics import trace_pyro_model, _plot_probability_model_graph
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
@@ -20,9 +21,12 @@ from mineye.GeoModel.model_one.visualization import plot, gempy_viz
 from tests import conftest
 import numpy as np
 
+import gempy as gp
+
 
 class TestProbabilisticInversionVI:
-    prior_key = r'dips'
+    prior_key_dips = r'dips'
+    prior_key_density = r'density'
 
     def test_gravity_inversion_vi(self, simple_geo_model, geophysical_dir, n_samples=50):
         """Test reading and computing a geological model with Variational Inference using Normalizing Flows."""
@@ -39,17 +43,25 @@ class TestProbabilisticInversionVI:
 
         # * 3) Setup Priors
         model_priors = {
-                r'dips': dist.Normal(
+                TestProbabilisticInversionVI.prior_key_dips   : dist.Normal(
+
                     loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10),  # This is just dip 10 degrees
                     scale=torch.tensor(10, dtype=torch.float64),
                     validate_args=True
+                ).to_event(1),
+                TestProbabilisticInversionVI.prior_key_density: dist.Normal(
+                    loc=(torch.tensor([
+                            2.9,  # plutonites
+                            2.3  # host
+                    ])),
+                    scale=torch.tensor(0.1),
                 ).to_event(1)
         }
 
         # TODO: Here we could add density and range
         # * 4) Set up Deterministics
         pre_forward_dets = {
-                "dips_degrees": lambda samples, gm: samples["dips"],  # Just pass through
+                "orientation_degrees": lambda samples, gm: samples["dips"],  # Just pass through
         }
 
         post_forward_dets = {
@@ -67,7 +79,7 @@ class TestProbabilisticInversionVI:
         # * 6) Set up Pyro model
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
             priors=model_priors,
-            set_interp_input_fn=create_orientation_modifier(key=TestProbabilisticInversionVI.prior_key),
+            set_interp_input_fn=create_orientation_modifier(key=TestProbabilisticInversionVI.prior_key_dips),
             likelihood_fn=likelihood_fn,
             pre_forward_deterministics=pre_forward_dets,
             post_forward_deterministics=post_forward_dets,
@@ -75,13 +87,8 @@ class TestProbabilisticInversionVI:
         )
 
         # Exploring model dependencies
-
-        if False:
-            _plot_probability_model_graph(prob_model, geo_model, torch.tensor(observed_gravity_ugal))
-
         # * 7) Run predictive
         gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
-        trace = trace_pyro_model(prob_model, geo_model, torch.tensor(observed_gravity_ugal, dtype=torch.float64))
         compute_prior_predictive = True
         if compute_prior_predictive:
             prior_inference_data: az.InferenceData = gpp.run_predictive(
@@ -93,15 +100,7 @@ class TestProbabilisticInversionVI:
             )
 
             if False:
-                gravity_samples_norm = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
-                gravity_samples_norm, unit_label = plot(
-                    gravity_samples_norm=gravity_samples_norm,
-                    observed_gravity_ugal=observed_gravity_ugal,
-                    xy_ravel=xy_ravel
-                )
-                gempy_viz(geo_model, prior_inference_data)
-
-                baseline_fw_gravity_np = baseline(geo_model)
+                self._plot_prior_predictive(geo_model, observed_gravity_ugal, prior_inference_data, xy_ravel)
 
         # * 8) Run Variational Inference with Normalizing Flows
 
@@ -146,6 +145,19 @@ class TestProbabilisticInversionVI:
 
         self._plot_loss_curve(losses)
         # * 9) Sample from the variational posterior
+        data = self._get_posterior_predictive(geo_model, gravity_observations_tensor, guide, model_priors, observed_gravity_ugal, post_forward_dets, pre_forward_dets, prob_model)
+
+        if compute_prior_predictive:
+            data.extend(prior_inference_data)
+
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density.nc"))
+
+        print("VI inference completed and saved!")
+
+        return data
+
+    @staticmethod
+    def _get_posterior_predictive(geo_model, gravity_observations_tensor, guide, model_priors, observed_gravity_ugal, post_forward_dets, pre_forward_dets, prob_model):
         from pyro.infer import Predictive
 
         num_samples = 1000
@@ -170,17 +182,22 @@ class TestProbabilisticInversionVI:
             posterior=posterior_dict,
             observed_data={"Gravity Measurement": observed_gravity_ugal}
         )
-
-        if compute_prior_predictive:
-            data.extend(prior_inference_data)
-
-        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_III.nc"))
-
-        print("VI inference completed and saved!")
-
         return data
 
-    def _plot_loss_curve(self, losses):
+    @staticmethod
+    def _plot_prior_predictive(geo_model, observed_gravity_ugal, prior_inference_data, xy_ravel):
+        gravity_samples_norm = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
+        gravity_samples_norm, unit_label = plot(
+            gravity_samples_norm=gravity_samples_norm,
+            observed_gravity_ugal=observed_gravity_ugal,
+            xy_ravel=xy_ravel
+        )
+        gempy_viz(geo_model, prior_inference_data)
+
+        baseline_fw_gravity_np = baseline(geo_model)
+
+    @staticmethod
+    def _plot_loss_curve(losses):
         plt.figure(figsize=(10, 6))
 
         # Filter out extreme values for better visualization
@@ -206,7 +223,7 @@ class TestProbabilisticInversionVI:
 
     def test_run_analysis_vi(self, simple_geo_model, geophysical_dir):
         """Analyze VI results."""
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_II.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_III.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
@@ -256,3 +273,21 @@ class TestProbabilisticInversionVI:
 
         # Analysis Gempy Model
         gempy_viz(geo_model, data)
+
+
+def set_priors(
+        samples: dict[str, Distribution],
+        geo_model: gp.data.GeoModel,
+):
+    _modify_orientations(
+        samples=samples,
+        geo_model=geo_model,
+        key=TestProbabilisticInversionVI.prior_key_dips
+    )
+
+    _modify_densities(
+        samples=samples,
+        geo_model=geo_model,
+        key=TestProbabilisticInversionVI.prior_key_density
+
+    )
