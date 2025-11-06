@@ -21,6 +21,16 @@ The model includes plutonitic intrusions and sedimentary host rocks.
 # Import Libraries
 # ----------------
 
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+
+# Set random seed for reproducibility
+np.random.seed(1234)
+
+# Configure matplotlib for non-interactive environments
+matplotlib.use('Agg')
+
 try:
     import gempy as gp
     import gempy_viewer as gpv
@@ -45,10 +55,9 @@ except ImportError:
 
 if MINEYE_AVAILABLE and GEMPY_AVAILABLE:
     try:
-        BASE_DIR = paths.get_base_dir()
-        topography_path = paths.get_topography_path(BASE_DIR)
-        mod_or_path = paths.get_orientations_path(BASE_DIR)
-        mod_pts_path = paths.get_points_path(BASE_DIR)
+        topography_path = paths.get_topography_path()
+        mod_or_path = paths.get_orientations_path()
+        mod_pts_path = paths.get_points_path()
         DATA_AVAILABLE = True
     except Exception as e:
         DATA_AVAILABLE = False
@@ -136,6 +145,7 @@ if DATA_AVAILABLE:
         legend=False
     )
     print("✓ 2D geological map created")
+    plt.close('all')  # Clean up matplotlib figures
 
 # %%
 # Visualization: Cross-Section
@@ -145,6 +155,7 @@ if DATA_AVAILABLE:
 if DATA_AVAILABLE:
     Plotter.create_cross_section(simple_geo_model, cross_section=5)
     print("✓ Cross-section created")
+    plt.close('all')  # Clean up matplotlib figures
 
 # %%
 # Summary
