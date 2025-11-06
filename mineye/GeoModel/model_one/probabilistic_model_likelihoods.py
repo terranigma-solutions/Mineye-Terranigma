@@ -18,13 +18,14 @@ def generate_multigravity_likelihood_diagonal(norm_params):
     def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
         simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
         pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
-
+        n_stations = simulated_geophysics.shape[0]
         # Sample noise standard deviation
-        sigma = pyro.sample(
-            "sigma",
-            dist.HalfNormal(torch.tensor(500.0, dtype=torch.float64))  # 100 µGal noise
-        )
+        # sigma = pyro.sample(
+        #     "sigma",
+        #     dist.HalfNormal(torch.tensor(5_000.0, dtype=torch.float64)).expand([n_stations]).to_event(1)  # 100 µGal noise
+        # )
 
+        sigma = torch.tensor(2000.0, dtype=torch.float64)
         # Independent Normal likelihood (much more stable!)
         return dist.Normal(simulated_geophysics, sigma).to_event(1)
 
