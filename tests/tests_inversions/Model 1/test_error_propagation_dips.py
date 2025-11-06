@@ -89,6 +89,7 @@ class TestErrorPropagationDips:
         # CRITICAL: Compute forward model with INITIAL/MEAN parameters before inference
         # This provides the baseline statistics needed to preserve prior variability
         baseline_fw_gravity_np = baseline(geo_model)
+        geo_model.interpolation_options.sigmoid_slope = 100
 
         observed_gravity_ugal = observed_gravity * 1000
         norm_params = normalize(baseline_fw_gravity_np, observed_gravity_ugal)
@@ -100,7 +101,7 @@ class TestErrorPropagationDips:
                     loc=mean_orientations,
                     scale=torch.tensor(10, dtype=torch.float64),
                     validate_args=True
-                )
+                ).to_event(1)
         }
 
         # Pre-forward deterministics (parameter transformations)

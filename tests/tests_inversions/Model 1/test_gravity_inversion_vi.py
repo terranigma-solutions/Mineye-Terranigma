@@ -75,7 +75,7 @@ class TestProbabilisticInversionVI:
         )
 
         # Exploring model dependencies
-        
+
         if False:
             _plot_probability_model_graph(prob_model, geo_model, torch.tensor(observed_gravity_ugal))
 
@@ -91,6 +91,17 @@ class TestProbabilisticInversionVI:
                 n_samples=100,
                 plot_trace=True
             )
+
+            if False:
+                gravity_samples_norm = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
+                gravity_samples_norm, unit_label = plot(
+                    gravity_samples_norm=gravity_samples_norm,
+                    observed_gravity_ugal=observed_gravity_ugal,
+                    xy_ravel=xy_ravel
+                )
+                gempy_viz(geo_model, prior_inference_data)
+
+                baseline_fw_gravity_np = baseline(geo_model)
 
         # * 8) Run Variational Inference with Normalizing Flows
 
@@ -147,18 +158,23 @@ class TestProbabilisticInversionVI:
         posterior_samples = predictive(geo_model, gravity_observations_tensor)
 
         # Convert to ArviZ InferenceData
+        posterior_dict = {}
+        for k, v in posterior_samples.items():
+            if k in model_priors or k in pre_forward_dets or k in post_forward_dets:
+                if v.dim() > 1:
+                    posterior_dict[k] = v.detach().cpu().numpy()[None, :, :]
+                else:
+                    posterior_dict[k] = v.detach().cpu().numpy()[None, :]
+
         data = az.from_dict(
-            posterior={k: v.detach().cpu().numpy()[None, :, :] if v.dim() > 1
-            else v.detach().cpu().numpy()[None, :]
-                       for k, v in posterior_samples.items()
-                       if k in model_priors or k in pre_forward_dets or k in post_forward_dets},
+            posterior=posterior_dict,
             observed_data={"Gravity Measurement": observed_gravity_ugal}
         )
 
         if compute_prior_predictive:
             data.extend(prior_inference_data)
 
-        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_II.nc"))
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_III.nc"))
 
         print("VI inference completed and saved!")
 
@@ -191,7 +207,7 @@ class TestProbabilisticInversionVI:
     def test_run_analysis_vi(self, simple_geo_model, geophysical_dir):
         """Analyze VI results."""
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_II.nc"))
-        
+
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
@@ -227,6 +243,13 @@ class TestProbabilisticInversionVI:
         if hasattr(data, 'prior') and r'gravity_response' in data.prior:
             gravity_samples_norm, unit_label = plot(
                 gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+                observed_gravity_ugal=observed_gravity_ugal,
+                xy_ravel=xy_ravel
+            )
+
+        if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
+            gravity_samples_norm, unit_label = plot(
+                gravity_samples_norm=data.posterior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
                 observed_gravity_ugal=observed_gravity_ugal,
                 xy_ravel=xy_ravel
             )
