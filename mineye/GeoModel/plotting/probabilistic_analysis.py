@@ -308,7 +308,7 @@ def plot_gravity_uncertainty_profiles(gravity_samples: np.ndarray, xy_coords: np
     lower_ci = np.percentile(gravity_samples, lower_percentile, axis=0)
     upper_ci = np.percentile(gravity_samples, upper_percentile, axis=0)
 
-    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10), layout='constrained')
     axes = axes.flatten()
 
     # Create profiles along different directions
@@ -363,7 +363,6 @@ def plot_gravity_uncertainty_profiles(gravity_samples: np.ndarray, xy_coords: np
         ax.grid(True, alpha=0.3)
 
     plt.suptitle('Gravity Profiles with Uncertainty', fontsize=14, fontweight='bold')
-    plt.tight_layout()
     plt.show()
 
 
@@ -396,7 +395,7 @@ def plot_gravity_uncertainty_map_interpolated(gravity_samples: np.ndarray, xy_co
     std_interp = griddata(xy_coords[:, :2], std_gravity, (xi_grid, yi_grid), method='cubic')
 
     # Create figure
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6), layout='constrained')
 
     # Plot 1: Mean gravity (interpolated)
     ax1 = axes[0]
@@ -427,5 +426,4 @@ def plot_gravity_uncertainty_map_interpolated(gravity_samples: np.ndarray, xy_co
     cbar2.set_label(r'Std. Dev. ($\mu$Gal)', fontsize=10)
     ax2.legend(fontsize=9)
 
-    plt.tight_layout()
     plt.show()
