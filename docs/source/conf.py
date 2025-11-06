@@ -148,7 +148,7 @@ sphinx_gallery_conf = {
         ],
 
         'ignore_pattern': r'__init__\.py',
-        "filename_pattern"       : r"plot_.*\.py",  # Only files starting with plot_
+        "filename_pattern"       : r"\d\d_.*\.py",  # Files starting with two digits
         "download_all_examples"  : False,
         "within_subsection_order": FileNameSortKey,
         "backreferences_dir"     : 'gen_modules/backreferences',
