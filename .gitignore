@@ -268,3 +268,5 @@ http-client.private.env.json
 # Temporary files for simple model inputs
 examples/Data/Output_Data/Simple-Models/temp_inputs/
 
+docs/source/examples*
+docs/source/gen_modules

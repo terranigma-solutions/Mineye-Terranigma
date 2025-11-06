@@ -1,0 +1,189 @@
+{
+ "matplotlib.pyplot.colorbar": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "matplotlib.pyplot.show": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "matplotlib.pyplot.subplots": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "matplotlib.pyplot.tight_layout": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "mineye.GeoModel.Plotter.create_cross_section": [
+  [
+   "plot_01_simple_tharsis_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/01_basic_examples",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_basic",
+   "This example creates a 3D geological model of the Tharsis region in Spain using GemPy. The model includes plutonitic intrusions and sedimentary host rocks.",
+   "Simple 3D Geological Model - Tharsis Region"
+  ]
+ ],
+ "mineye.config.paths.get_base_dir": [
+  [
+   "plot_01_simple_tharsis_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/01_basic_examples",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_basic",
+   "This example creates a 3D geological model of the Tharsis region in Spain using GemPy. The model includes plutonitic intrusions and sedimentary host rocks.",
+   "Simple 3D Geological Model - Tharsis Region"
+  ],
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "mineye.config.paths.get_geophysical_dir": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "mineye.config.paths.get_orientations_path": [
+  [
+   "plot_01_simple_tharsis_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/01_basic_examples",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_basic",
+   "This example creates a 3D geological model of the Tharsis region in Spain using GemPy. The model includes plutonitic intrusions and sedimentary host rocks.",
+   "Simple 3D Geological Model - Tharsis Region"
+  ]
+ ],
+ "mineye.config.paths.get_pickle_model_path": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "mineye.config.paths.get_points_path": [
+  [
+   "plot_01_simple_tharsis_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/01_basic_examples",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_basic",
+   "This example creates a 3D geological model of the Tharsis region in Spain using GemPy. The model includes plutonitic intrusions and sedimentary host rocks.",
+   "Simple 3D Geological Model - Tharsis Region"
+  ]
+ ],
+ "mineye.config.paths.get_topography_path": [
+  [
+   "plot_01_simple_tharsis_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/01_basic_examples",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_basic",
+   "This example creates a 3D geological model of the Tharsis region in Spain using GemPy. The model includes plutonitic intrusions and sedimentary host rocks.",
+   "Simple 3D Geological Model - Tharsis Region"
+  ]
+ ],
+ "numpy._ArrayFunctionDispatcher": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "numpy.abs": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "numpy.array": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "numpy.column_stack": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "numpy.corrcoef": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "numpy.full": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "numpy.mean": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "numpy.sqrt": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ],
+ "numpy.ufunc": [
+  [
+   "plot_01_gravity_forward_model.py",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/../../examples/02_probabilistic_modeling",
+   "/home/leguark/PycharmProjects/Mineye-Terranigma/docs/source/examples_probabilistic",
+   "This example demonstrates forward modeling of gravity data using a 3D geological model. We compute the gravity response at measurement locations and compare with observed data.",
+   "Gravity Forward Modeling with GemPy"
+  ]
+ ]
+}
