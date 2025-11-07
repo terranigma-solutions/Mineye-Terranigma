@@ -24,8 +24,8 @@ def normalize(baseline_fw_gravity_np, observed_gravity, method="quantile_align",
 def set_priors(
         samples: dict[str, Distribution],
         geo_model: gp.data.GeoModel,
-):
-    _modify_orientations(
+)-> InterpolationInput:
+    interpolation_input = _modify_orientations(
         samples=samples,
         geo_model=geo_model,
         key=r"dips"
@@ -34,8 +34,10 @@ def set_priors(
     _modify_densities(
         samples=samples,
         geo_model=geo_model,
-        key=r"depnsity"
+        key=r"density"
     )
+    
+    return interpolation_input
 
 
 def _modify_densities(

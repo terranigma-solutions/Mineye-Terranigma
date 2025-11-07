@@ -73,6 +73,7 @@ class TestProbabilisticInversion:
         # * 6) Set up Pyro model
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
             priors=model_priors,
+            # set_interp_input_fn=create_orientation_modifier(key=TestProbabilisticInversion.prior_key_dips),
             set_interp_input_fn=set_priors,
             likelihood_fn=likelihood_fn,
             pre_forward_deterministics=pre_forward_dets,
