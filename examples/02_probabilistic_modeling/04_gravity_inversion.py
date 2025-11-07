@@ -4,13 +4,20 @@ Gravity Inversion with NUTS Sampling
 
 This example demonstrates Bayesian inversion using gravity data.
 We use NUTS (No-U-Turn Sampler) to infer geological structure parameters from observed gravity.
+
+sphinx_gallery_thumbnail_num = 5
+
 """
+import sys
 
 # %%
 # Import Libraries
 # ----------------
 
 import numpy as np
+from whoami import whoami
+import multiprocessing as mp
+
 import gempy as gp
 import gempy_probability as gpp
 
@@ -20,6 +27,9 @@ import pyro.distributions as dist
 
 import arviz as az
 from gempy_probability.core.samplers_data import NUTSConfig
+from gempy_probability.modules.model_definition.prob_model_factory_v2 import GemPyPyroConfig, GemPyPyroModelExtended
+
+import dotenv
 
 # Set random seeds for reproducibility
 seed = 4003
@@ -33,8 +43,10 @@ from mineye.config import paths
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
-from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal
+from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, MultiGravityDiagonalLikelihood
 from mineye.GeoModel.model_one.probabilistic_model_diagnostics import trace_pyro_model
+
+dotenv.load_dotenv()
 
 # %%
 # Define Model Extent and Resolution
@@ -162,21 +174,27 @@ post_forward_dets = {
 # Set Up Likelihood Function
 # ---------------------------
 
-likelihood_fn = generate_multigravity_likelihood_diagonal(norm_params=norm_params)
+likelihood_fn = MultiGravityDiagonalLikelihood(
+    align_fn=align_forward_to_observed,
+    norm_params=norm_params,   # same dict you used before
+    sigma_value=5000.0
+)
 print("✓ Likelihood function created")
 
 # %%
 # Create Probabilistic Model
 # ---------------------------
 
-prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
+config = GemPyPyroConfig(
     priors=model_priors,
-    set_interp_input_fn=create_orientation_modifier(key=r'dips'),
+    set_interp_input_fn=create_orientation_modifier(key=r'dips'), 
     likelihood_fn=likelihood_fn,
     pre_forward_deterministics=pre_forward_dets,
     post_forward_deterministics=post_forward_dets,
     obs_name="Gravity Measurement"
 )
+
+prob_model = GemPyPyroModelExtended(config)
 
 print("✓ Probabilistic model created")
 
@@ -212,7 +230,7 @@ print("✓ Prior predictive sampling complete")
 print("\nRunning NUTS inference...")
 print("  Warmup: 200 steps")
 print("  Sampling: 200 samples")
-print("  Chains: 2")
+print("  Chains: 1")
 
 data = gpp.run_nuts_inference(
     prob_model=prob_model,
@@ -226,7 +244,7 @@ data = gpp.run_nuts_inference(
         init_strategy='median',
         num_samples=200,
         warmup_steps=200,
-        num_chains=2
+        num_chains=1
     ),
     plot_trace=True,
     run_posterior_predictive=True

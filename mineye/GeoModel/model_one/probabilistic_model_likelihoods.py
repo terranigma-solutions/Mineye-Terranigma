@@ -9,6 +9,32 @@ import gempy as gp
 from mineye.GeoModel.geophysics import align_forward_to_observed
 
 
+from dataclasses import dataclass
+from typing import Callable
+import torch
+import pyro
+import pyro.distributions as dist
+import gempy as gp
+
+
+# ---- helper: align function is passed in instead of closed over ----
+@dataclass(frozen=True)
+class MultiGravityDiagonalLikelihood:
+    align_fn: Callable[[torch.Tensor, dict], torch.Tensor]
+    norm_params: dict
+    sigma_value: float = 5000.0  # µGal noise, same as before
+
+    def __call__(self, solutions: gp.data.Solutions) -> dist.Distribution:
+        # 1. Align simulated gravity to observed
+        simulated_geophysics = self.align_fn(-solutions.gravity, self.norm_params)
+
+        # 2. Register deterministic value for diagnostics
+        pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
+
+        # 3. Build diagonal Normal likelihood
+        sigma = torch.tensor(self.sigma_value, dtype=torch.float64)
+        return dist.Normal(simulated_geophysics, sigma).to_event(1)
+    
 def generate_multigravity_likelihood_diagonal(norm_params):
     """
     Use independent Normal distributions instead of multivariate.
