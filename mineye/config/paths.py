@@ -150,3 +150,18 @@ def get_soricom_formation_points():
     """Get path to the Soricom formation points CSV file with fault data included."""
     soricom_dir = get_soricom_data_dir()
     return os.path.join(soricom_dir, 'formation_points_with_fault.csv')
+
+def get_soricom_erosive_orientations():
+    """Get path to the Soricom erosive model orientation CSV file (with fault and underlying lithology)."""
+    soricom_dir = get_soricom_data_dir()
+    return os.path.join(soricom_dir, 'orientations_erosive.csv')
+
+def get_soricom_erosive_formation_points():
+    """Get path to the Soricom erosive model formation points CSV file (with fault and underlying lithology)."""
+    soricom_dir = get_soricom_data_dir()
+    return os.path.join(soricom_dir, 'formation_points_erosive.csv')
+
+def get_soricom_dem_path():
+    """Get path to the Soricom DEM (Digital Elevation Model) TIFF file."""
+    data_dir = get_data_dir()
+    return os.path.join(data_dir, 'Topographic_Data', 'soricom_dem.tif')
