@@ -90,7 +90,7 @@ class TestProbabilisticInversion:
                 prob_model=prob_model,
                 geo_model=geo_model,
                 y_obs_list=gravity_observations_tensor,
-                n_samples=10,
+                n_samples=100,
                 plot_trace=True
             )
 
@@ -106,10 +106,10 @@ class TestProbabilisticInversion:
                 target_accept_prob=0.65,
                 max_tree_depth=5,
                 init_strategy='median',
-                num_samples=20,
-                warmup_steps=5,
-                # num_samples=200,
-                # warmup_steps=200,
+                # num_samples=20,
+                # warmup_steps=5,
+                num_samples=200,
+                warmup_steps=200,
                 num_chains=1
             ),
             plot_trace=True,
