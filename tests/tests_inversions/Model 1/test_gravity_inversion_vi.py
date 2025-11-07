@@ -40,13 +40,13 @@ class TestProbabilisticInversionVI:
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
         geo_model.interpolation_options.sigmoid_slope = 100
         baseline_fw_gravity_np = baseline(geo_model)
-        norm_params = normalize(baseline_fw_gravity_np, observed_gravity_ugal)
+        norm_params = normalize(baseline_fw_gravity_np, observed_gravity_ugal, extrapolation_buffer=0.3)
 
         # * 3) Setup Priors
         model_priors = {
                 TestProbabilisticInversionVI.prior_key_dips   : dist.Normal(
 
-                    loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 40),  # This is just dip 10 degrees
+                    loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10),  # This is just dip 10 degrees
                     scale=torch.tensor(20, dtype=torch.float64),
                     validate_args=True
                 ).to_event(1),
@@ -102,6 +102,7 @@ class TestProbabilisticInversionVI:
 
             if False:
                 self._plot_prior_predictive(geo_model, observed_gravity_ugal, prior_inference_data, xy_ravel)
+                return 
 
         # * 8) Run Variational Inference with Normalizing Flows
 
@@ -114,7 +115,7 @@ class TestProbabilisticInversionVI:
         if compute_prior_predictive:
             data.extend(prior_inference_data)
 
-        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density_II.nc"))
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density_III.nc"))
 
         print("VI inference completed and saved!")
 
@@ -236,7 +237,7 @@ class TestProbabilisticInversionVI:
 
     def test_run_analysis_vi(self, simple_geo_model, geophysical_dir):
         """Analyze VI results."""
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density_II.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density_III.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)

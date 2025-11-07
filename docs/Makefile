@@ -1,51 +1,49 @@
+
 # Minimal makefile for Sphinx documentation
-#
 
-# You can set these variables from the command line.
-SPHINXOPTS    =
-SPHINXBUILD   = sphinx-build
-SPHINXPROJ    = mineye-terranigma
-SOURCEDIR     = source
-BUILDDIR      = build
-VENV          = ~/.venv/2025
+SHELL        := /usr/bin/env bash
 
-# Check if we're in the correct virtual environment
-CHECK_VENV := $(shell echo $$VIRTUAL_ENV)
-EXPECTED_VENV := $(shell readlink -f $(VENV))
+# CONFIG
+VENV         := $(HOME)/.venv/2025
+PYTHON       := $(VENV)/bin/python
+SPHINXBUILD  := $(PYTHON) -m sphinx       # ← module form guarantees venv python
+SPHINXOPTS   :=
+SPHINXPROJ   := mineye-terranigma
+SOURCEDIR    := source
+BUILDDIR     := build
 
-# Target to check and activate venv
+# Sanity check: print which Python will be used (helpful in logs)
+.PHONY: which-python
+which-python:
+	@echo "Using Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')"
+
+# Optional venv check (won't block build; we force the venv via $(PYTHON) anyway)
+.PHONY: check-venv
 check-venv:
 ifndef SKIP_VENV_CHECK
-	@if [ "$(CHECK_VENV)" != "$(EXPECTED_VENV)" ]; then \
+	@cur="$${VIRTUAL_ENV:-}"; exp="$$(readlink -f $(VENV))"; \
+	if [[ "$$cur" != "$$exp" ]]; then \
 		echo ""; \
-		echo "⚠️  Wrong virtual environment!"; \
+		echo "ℹ️  Not in expected venv. That's okay — this Makefile will still use:"; \
+		echo "    $(VENV)/bin/python"; \
+		echo "Current: $$cur"; \
+		echo "Expected: $$exp"; \
 		echo ""; \
-		echo "Current: $(CHECK_VENV)"; \
-		echo "Expected: $(EXPECTED_VENV)"; \
-		echo ""; \
-		echo "Please activate the correct environment:"; \
-		echo "  source $(VENV)/bin/activate"; \
-		echo ""; \
-		echo "Or skip this check with: SKIP_VENV_CHECK=1 make html"; \
-		echo ""; \
-		exit 1; \
 	fi
 endif
 
 # Put it first so that "make" without argument is like "make help".
-help:
+.PHONY: help
+help: which-python
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-.PHONY: help Makefile check-venv
-
-# Catch-all target: route all unknown targets to Sphinx using the new
-# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-%: Makefile check-venv
+.PHONY: Makefile
+%: Makefile check-venv which-python
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-html-noplot: export SPHX_GLR_THEME = $(theme)
-html-noplot: check-venv
-	$(SPHINXBUILD) -D plot_gallery=0 -b html $(ALLSPHINXOPTS) $(SOURCEDIR) $(BUILDDIR)/html
+# Build without running the gallery plots
+.PHONY: html-noplot
+html-noplot: check-venv which-python
+	@$(SPHINXBUILD) -D plot_gallery=0 -b html "$(SOURCEDIR)" "$(BUILDDIR)/html"
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
-

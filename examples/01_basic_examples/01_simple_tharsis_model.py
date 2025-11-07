@@ -99,3 +99,12 @@ gp.set_topography_from_file(
 # Recompute with topography
 gp.compute_model(simple_geo_model)
 print("✓ Model with topography computed successfully")
+
+# %%
+# Visualize the Model
+# -------------------
+# Create 3D visualization of the geological model
+
+import gempy_viewer as gpv
+
+gpv.plot_3d(simple_geo_model, ve=5, image=True)

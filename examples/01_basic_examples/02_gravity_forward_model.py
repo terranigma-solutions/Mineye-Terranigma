@@ -11,6 +11,9 @@ We compute the gravity response of the geological structure at real measurement 
 # ----------------
 
 import numpy as np
+import torch
+from matplotlib import pyplot as plt
+
 import gempy as gp
 import geopandas as gpd
 
@@ -165,8 +168,177 @@ print(f"  Mean: {grav.mean():.2f} mGal")
 # -------------------------
 # Calculate residuals between observed and computed gravity
 
-residuals = observed_gravity - grav
+residuals = observed_gravity - grav.numpy()
 print(f"\nGravity residuals:")
 print(f"  Mean: {residuals.mean():.2f} mGal")
 print(f"  Std: {residuals.std():.2f} mGal")
 print(f"  RMS: {np.sqrt(np.mean(residuals**2)):.2f} mGal")
+
+# %%
+# Visualize the Model
+# -------------------
+# Create 2D and 3D visualizations of the geological model
+
+import gempy_viewer as gpv
+
+gpv.plot_2d(simple_geo_model)
+gpv.plot_3d(simple_geo_model, ve=5, image=True)
+
+# %%
+# Visualize Gravity Results
+# --------------------------
+# Plot forward gravity and comparison with observations
+
+from mineye.GeoModel.plotting.probabilistic_analysis import _plot_fw_gravity, _plot_comparison
+
+_plot_fw_gravity(grav, gravity_data, xy_ravel)
+_plot_comparison(observed_gravity, grav, xy_ravel)
+
+# %%
+# Visualize Forward Model Results
+# --------------------------------
+grav_forward = sol.gravity
+print(f"✓ Forward model computed")
+print(f"  Gravity range: [{grav_forward.min():.2f}, {grav_forward.max():.2f}] µGal")
+
+fig, ax = plt.subplots(figsize=(10, 8))
+
+scatter = ax.scatter(
+    xy_ravel[:, 0], xy_ravel[:, 1],
+    c=grav_forward, s=50,
+    cmap='viridis_r', alpha=0.8,
+    edgecolors='black', linewidth=0.5
+)
+
+cbar = plt.colorbar(scatter, ax=ax)
+cbar.set_label(r'Forward Model Gravity (µGal)', fontsize=12)
+
+ax.set_title('Forward Gravity Model', fontsize=14, fontweight='bold')
+ax.set_xlabel('X (m)')
+ax.set_ylabel('Y (m)')
+ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+# %%
+# Compare with Observed Gravity
+# ------------------------------
+
+# Convert observed from mGal to µGal
+observed_ugal = observed_gravity * 1000
+
+# Create comparison plot
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+# Observed
+sc1 = axes[0].scatter(
+    xy_ravel[:, 0], xy_ravel[:, 1],
+    c=observed_ugal, s=50, cmap='viridis_r',
+    edgecolors='black', linewidth=0.5
+)
+axes[0].set_title('Observed Gravity')
+axes[0].set_xlabel('X (m)')
+axes[0].set_ylabel('Y (m)')
+plt.colorbar(sc1, ax=axes[0], label='µGal')
+
+# Forward model
+sc2 = axes[1].scatter(
+    xy_ravel[:, 0], xy_ravel[:, 1],
+    c=grav_forward, s=50, cmap='viridis_r',
+    edgecolors='black', linewidth=0.5
+)
+axes[1].set_title('Forward Model')
+axes[1].set_xlabel('X (m)')
+plt.colorbar(sc2, ax=axes[1], label='µGal')
+
+# Residuals
+sc3 = axes[2].scatter(
+    xy_ravel[:, 0], xy_ravel[:, 1],
+    c=residuals, s=50, cmap='RdBu_r',
+    edgecolors='black', linewidth=0.5
+)
+axes[2].set_title('Residuals (Obs - Model)')
+axes[2].set_xlabel('X (m)')
+plt.colorbar(sc3, ax=axes[2], label='µGal')
+
+plt.tight_layout()
+plt.show()
+
+# %%
+# Correlation Analysis
+# --------------------
+
+fig, ax = plt.subplots(figsize=(8, 8))
+
+ax.scatter(observed_ugal, grav_forward, alpha=0.6, s=60,
+           edgecolors='black', linewidth=0.5)
+
+# 1:1 line
+lims = [
+        min(ax.get_xlim()[0], ax.get_ylim()[0]),
+        max(ax.get_xlim()[1], ax.get_ylim()[1])
+]
+ax.plot(lims, lims, 'r--', alpha=0.75, linewidth=2, label='1:1 line')
+
+# Calculate statistics
+correlation = np.corrcoef(observed_ugal, grav_forward)[0, 1]
+rmse = np.sqrt(np.mean(residuals**2))
+
+ax.set_xlabel('Observed (µGal)', fontsize=12)
+ax.set_ylabel('Forward Model (µGal)', fontsize=12)
+ax.set_title('Observed vs Modeled Gravity', fontsize=14, fontweight='bold')
+ax.grid(True, alpha=0.3)
+ax.legend()
+
+# Add statistics text box
+textstr = f'R = {correlation:.3f}\nR² = {correlation**2:.3f}\nRMSE = {rmse:.2f} µGal'
+ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
+        verticalalignment='top',
+        bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8),
+        fontsize=11)
+
+plt.tight_layout()
+plt.show()
+
+# %%
+# Print Summary Statistics
+# -------------------------
+
+print("\n" + "="*50)
+print("GRAVITY COMPARISON STATISTICS")
+print("="*50)
+print(f"Number of measurements: {len(observed_ugal)}")
+print(f"\nObserved gravity:")
+print(f"  Mean: {observed_ugal.mean():.2f} µGal")
+print(f"  Std:  {observed_ugal.std():.2f} µGal")
+print(f"  Range: [{observed_ugal.min():.2f}, {observed_ugal.max():.2f}] µGal")
+print(f"\nForward model:")
+print(f"  Mean: {grav_forward.mean():.2f} µGal")
+print(f"  Std:  {grav_forward.std():.2f} µGal")
+print(f"  Range: [{grav_forward.min():.2f}, {grav_forward.max():.2f}] µGal")
+print(f"\nResiduals:")
+print(f"  Mean: {residuals.mean():.2f} µGal")
+print(f"  Std:  {residuals.std():.2f} µGal")
+print(f"  RMSE: {rmse:.2f} µGal")
+print(f"  MAE:  {np.abs(residuals).mean():.2f} µGal")
+print(f"\nCorrelation: {correlation:.4f} (R² = {correlation**2:.4f})")
+print("="*50)
+
+# %%
+# Summary
+# -------
+#
+# This example demonstrated:
+#
+# * Loading geological models and gravity data
+# * Setting up centered grids for gravity computation
+# * Computing forward gravity response
+# * Comparing modeled with observed data
+# * Statistical analysis of model fit
+#
+# **Next steps:**
+#
+# * Use residuals for probabilistic inversion
+# * Uncertainty quantification with Bayesian methods
+# * Joint inversion with multiple data types
