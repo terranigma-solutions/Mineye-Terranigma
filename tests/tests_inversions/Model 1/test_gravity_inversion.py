@@ -15,6 +15,7 @@ from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orie
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.visualization import plot, gempy_viz
+from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_comparison
 # noinspection PyUnusedImports
 from tests import conftest
 
@@ -141,7 +142,7 @@ class TestProbabilisticInversion:
             data=[data, data.prior],
             var_names=["dips"],
             filter_vars="like",
-            hdi_prob=0.95,
+            hdi_prob=0.9999,
             shade=.2,
             data_labels=["Posterior", "Prior"],
             colors=[default_red, default_blue],
@@ -157,12 +158,28 @@ class TestProbabilisticInversion:
 
         plt.show()
 
-        # * 9) Analysis inference
-        gravity_samples_norm, unit_label = plot(
-            gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
-            observed_gravity_ugal=observed_gravity_ugal,
-            xy_ravel=xy_ravel
+        plot_gravity_comparison(
+            observed_ugal=observed_gravity_ugal,
+            forward_norm=data.posterior_predictive[r'gravity_response'].mean(axis=1),
+            xy_ravel=xy_ravel,
+            normalization_method='align_to_reference'
         )
+
+            
+        # * 9) Analysis inference
+        if hasattr(data, 'prior') and r'gravity_response' in data.prior:
+            gravity_samples_norm, unit_label = plot(
+                gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+                observed_gravity_ugal=observed_gravity_ugal,
+                xy_ravel=xy_ravel
+            )
+
+        if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
+            gravity_samples_norm, unit_label = plot(
+                gravity_samples_norm=data.posterior_predictive[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+                observed_gravity_ugal=observed_gravity_ugal,
+                xy_ravel=xy_ravel
+            )
 
         # * 9) Analysis Gempy Model
         gempy_viz(geo_model, data)
