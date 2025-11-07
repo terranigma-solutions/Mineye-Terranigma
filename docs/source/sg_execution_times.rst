@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:01.689** total execution time for 7 files **from all galleries**:
+**00:03.112** total execution time for 6 files **from all galleries**:
 
 .. container::
 
@@ -32,24 +32,21 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_examples_basic_02_gravity_forward_model.py` (``../../examples/01_basic_examples/02_gravity_forward_model.py``)
-     - 00:00.956
-     - 0.0
-   * - :ref:`sphx_glr_examples_probabilistic_02_error_propagation.py` (``../../examples/02_probabilistic_modeling/02_error_propagation.py``)
-     - 00:00.551
-     - 0.0
-   * - :ref:`sphx_glr_examples_probabilistic_03_error_propagation_dips.py` (``../../examples/02_probabilistic_modeling/03_error_propagation_dips.py``)
-     - 00:00.101
-     - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_04_gravity_inversion.py` (``../../examples/02_probabilistic_modeling/04_gravity_inversion.py``)
-     - 00:00.081
+     - 00:03.112
      - 0.0
    * - :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py` (``../../examples/01_basic_examples/01_simple_tharsis_model.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_basic_02_gravity_forward_model.py` (``../../examples/01_basic_examples/02_gravity_forward_model.py``)
      - 00:00.000
      - 0.0
    * - :ref:`sphx_glr_examples_basic_03_bayesian_segmentation.py` (``../../examples/01_basic_examples/03_bayesian_segmentation.py``)
      - 00:00.000
      - 0.0
-   * - :ref:`sphx_glr_examples_probabilistic_01_gravity_forward_model.py` (``../../examples/02_probabilistic_modeling/01_gravity_forward_model.py``)
+   * - :ref:`sphx_glr_examples_probabilistic_02_error_propagation.py` (``../../examples/02_probabilistic_modeling/02_error_propagation.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_03_error_propagation_dips.py` (``../../examples/02_probabilistic_modeling/03_error_propagation_dips.py``)
      - 00:00.000
      - 0.0
