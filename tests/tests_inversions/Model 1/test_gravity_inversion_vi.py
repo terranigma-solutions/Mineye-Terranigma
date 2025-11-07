@@ -13,7 +13,6 @@ import gempy_probability as gpp
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, _modify_orientations, _modify_densities
-from mineye.GeoModel.model_one.probabilistic_model_diagnostics import trace_pyro_model, _plot_probability_model_graph
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.visualization import plot, gempy_viz
@@ -80,7 +79,7 @@ class TestProbabilisticInversionVI:
         # * 6) Set up Pyro model
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
             priors=model_priors,
-            set_interp_input_fn=create_orientation_modifier(key=TestProbabilisticInversionVI.prior_key_dips),
+            set_interp_input_fn=set_priors,
             likelihood_fn=likelihood_fn,
             pre_forward_deterministics=pre_forward_dets,
             post_forward_deterministics=post_forward_dets,

@@ -1,6 +1,7 @@
 import os
 
 import arviz as az
+import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from pyro import distributions as dist
@@ -10,8 +11,7 @@ from gempy_probability.core.samplers_data import NUTSConfig
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
-from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
-from mineye.GeoModel.model_one.probabilistic_model_diagnostics import trace_pyro_model
+from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, set_priors
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.visualization import plot, gempy_viz
@@ -20,7 +20,8 @@ from tests import conftest
 
 
 class TestProbabilisticInversion:
-    prior_key = r'dips'
+    prior_key_dips = r'dips'
+    prior_key_density = r'density'
 
     def test_gravity_inversion(self, simple_geo_model, geophysical_dir, n_samples=50):
         """Test reading and computing a geological model."""
@@ -37,17 +38,24 @@ class TestProbabilisticInversion:
 
         # * 3) Setup Priors
         model_priors = {
-                r'dips': dist.Normal(
+                TestProbabilisticInversion.prior_key_dips: dist.Normal(
                     loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10),  # This is just dip 10 degrees
                     scale=torch.tensor(10, dtype=torch.float64),
                     validate_args=True
-                )
+                ),
+                TestProbabilisticInversion.prior_key_density: dist.Normal(
+                    loc=(torch.tensor([
+                            2.9,  # plutonites
+                            2.3  # host
+                    ])),
+                    scale=torch.tensor(0.3),
+                ).to_event(1)
         }
 
         # TODO: Here we could add density and range
         # * 4) Set up Deterministics
         pre_forward_dets = {
-                "dips_degrees": lambda samples, gm: samples["dips"],  # Just pass through
+                
         }
 
         post_forward_dets = {
@@ -65,7 +73,7 @@ class TestProbabilisticInversion:
         # * 6) Set up Pyro model
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
             priors=model_priors,
-            set_interp_input_fn=create_orientation_modifier(key=TestProbabilisticInversion.prior_key),
+            set_interp_input_fn=set_priors,
             likelihood_fn=likelihood_fn,
             pre_forward_deterministics=pre_forward_dets,
             post_forward_deterministics=post_forward_dets,
@@ -74,7 +82,6 @@ class TestProbabilisticInversion:
 
         # * 7) Run predictive
         gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
-        trace = trace_pyro_model(prob_model, geo_model, torch.tensor(observed_gravity_ugal, dtype=torch.float64))
         compute_prior_predictive = True
         if compute_prior_predictive:
             prior_inference_data: az.InferenceData = gpp.run_predictive(
@@ -99,9 +106,9 @@ class TestProbabilisticInversion:
                 init_strategy='median',
                 num_samples=20,
                 warmup_steps=5,
-                num_samples=200,
-                warmup_steps=200,
-                num_chains=2
+                # num_samples=200,
+                # warmup_steps=200,
+                num_chains=1
             ),
             plot_trace=True,
             run_posterior_predictive=True
@@ -110,7 +117,7 @@ class TestProbabilisticInversion:
         if compute_prior_predictive:
             data.extend(prior_inference_data)
 
-        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov07.nc"))
 
     def test_run_diagnostics(self):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))

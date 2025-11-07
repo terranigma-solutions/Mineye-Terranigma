@@ -21,6 +21,23 @@ def normalize(baseline_fw_gravity_np, observed_gravity, method="quantile_align",
     return norm_params
 
 
+def set_priors(
+        samples: dict[str, Distribution],
+        geo_model: gp.data.GeoModel,
+):
+    _modify_orientations(
+        samples=samples,
+        geo_model=geo_model,
+        key=r"dips"
+    )
+
+    _modify_densities(
+        samples=samples,
+        geo_model=geo_model,
+        key=r"depnsity"
+    )
+
+
 def _modify_densities(
         samples: dict[str, Distribution],
         geo_model: gp.data.GeoModel,
@@ -28,7 +45,7 @@ def _modify_densities(
 ) -> None:
     """Modify densities for different keys."""
     geo_model.geophysics_input.densities = samples[key]
-    
+
 
 def create_orientation_modifier(key: str):
     """Factory function that creates orientation modifier functions for different keys."""
