@@ -49,7 +49,7 @@ class TestProbabilisticInversion:
                             2.9,  # plutonites
                             2.3  # host
                     ])),
-                    scale=torch.tensor(0.3),
+                    scale=torch.tensor(0.08),
                 ).to_event(1)
         }
 
@@ -119,7 +119,7 @@ class TestProbabilisticInversion:
         if compute_prior_predictive:
             data.extend(prior_inference_data)
 
-        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov07.nc"))
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov08_I.nc"))
 
     def test_run_diagnostics(self):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))
@@ -128,7 +128,7 @@ class TestProbabilisticInversion:
 
     def test_run_analysis(self, simple_geo_model, geophysical_dir):
 
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov07.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
@@ -140,7 +140,7 @@ class TestProbabilisticInversion:
         
         axes = az.plot_density(
             data=[data, data.prior],
-            var_names=["dips"],
+            var_names=["dips", "density"],
             filter_vars="like",
             hdi_prob=0.9999,
             shade=.2,

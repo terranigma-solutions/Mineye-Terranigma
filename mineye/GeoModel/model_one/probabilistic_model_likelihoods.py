@@ -48,12 +48,12 @@ def generate_multigravity_likelihood_diagonal(norm_params):
         # ? Half normal is too unstable. Try with some prior that is somehow more stable
         
         # Sample noise standard deviation
-        # sigma = pyro.sample(
-        #     "sigma",
-        #     dist.HalfNormal(torch.tensor(5_000.0, dtype=torch.float64)).expand([n_stations]).to_event(1)  # 100 µGal noise
-        # )
+        sigma = pyro.sample(
+            "sigma",
+            dist.HalfNormal(torch.tensor(5_000.0, dtype=torch.float64)).expand([n_stations]).to_event(1)  # 100 µGal noise
+        )
 
-        sigma = torch.tensor(5_000.0, dtype=torch.float64)
+        # sigma = torch.tensor(5_000.0, dtype=torch.float64)
         
         # Independent Normal likelihood (much more stable!)
         # sigma = pyro.sample(
