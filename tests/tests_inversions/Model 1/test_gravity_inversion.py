@@ -167,16 +167,43 @@ class TestProbabilisticInversion:
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
-        for val in data.posterior_predictive[r'gravity_response'].values[0, -20:]:
-            plot_gravity_comparison(
-                observed_ugal=observed_gravity_ugal,
-                forward_norm=val,
-                xy_ravel=xy_ravel,
-                normalization_method='align_to_reference',
-                show=False
-            )
+        # Plot 1: Observed gravity (with shared colorbar limits)
+        fig1, ax4 = plt.subplots(1, 1, figsize=(10, 10))
 
-        plt.show()
+        observed_norm = observed_gravity_ugal
+        forward_norm = data.prior[r'gravity_response'].mean(axis=1)
+        many_forward_norm = data.prior[r'gravity_response'].values[0, -20:]
+        
+        vmin_shared = min(np.min(observed_norm), np.min(forward_norm))
+        vmax_shared = max(np.max(observed_norm), np.max(forward_norm))
+        lims = [vmin_shared, vmax_shared]
+        unit_label = r'$\mu$Gal'
+
+        for fw in many_forward_norm:
+            ax4.scatter(observed_norm, fw, alpha=0.7, s=40, edgecolors='black', linewidth=0.5)
+            # ax4.plot(observed_norm, fw, 'r--', alpha=0.75, linewidth=2)
+
+
+        ax4.set_xlabel(f'Observed ({unit_label})')
+        ax4.set_ylabel(f'Forward Model ({unit_label})')
+        ax4.set_title('Observed vs Forward Model Correlation')
+
+        # Add 1:1 line with shared limits
+        lims = [vmin_shared, vmax_shared]
+        ax4.plot(lims, lims, 'r--', alpha=0.75, linewidth=2, label='1:1 line')
+        ax4.set_xlim(lims)
+        ax4.set_ylim(lims)
+        ax4.legend()
+        ax4.grid(True, alpha=0.3)
+        ax4.set_aspect('equal', adjustable='box')
+
+        # Calculate and display correlation coefficient
+        correlation = np.corrcoef(observed_norm, forward_norm)[0, 1]
+        ax4.text(0.05, 0.95, f'R = {correlation:.3f}', transform=ax4.transAxes,
+                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontsize=12)
+
+
+        fig1.show()
         
     def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
