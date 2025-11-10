@@ -477,6 +477,8 @@ prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
 
 print("✓ Probabilistic model created")
 
+# TODO: explain make_gempy_pyro_model_extended
+
 
 # %%
 # Step 9: Prior Predictive Checks

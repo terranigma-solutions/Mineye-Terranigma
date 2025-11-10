@@ -14,7 +14,7 @@ from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, set_priors
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, generate_multigravity_likelihood_hierarchical_per_station
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
-from mineye.GeoModel.model_one.visualization import plot, gempy_viz
+from mineye.GeoModel.model_one.visualization import plot, gempy_viz, plot_many_observed_vs_forward
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_comparison
 # noinspection PyUnusedImports
 from tests import conftest
@@ -160,52 +160,24 @@ class TestProbabilisticInversion:
         # Prepare data
         observed_norm = observed_gravity_ugal
         forward_norm = data.prior[r'gravity_response'].mean(axis=1)
-        if PRIOR:=True:
+        if PRIOR := True:
             many_forward_norm = data.prior[r'gravity_response'].values[0, -20:]
-        else:    
+        else:
             many_forward_norm = data.posterior_predictive[r'gravity_response'].values[0, -40:-20]
 
-        # Create figure
-        fig, ax = plt.subplots(figsize=(10, 10))
-
-        # Calculate shared limits once
-        vmin_shared = min(np.min(observed_norm), np.min(forward_norm))
-        vmax_shared = max(np.max(observed_norm), np.max(forward_norm))
-        lims = [vmin_shared, vmax_shared]
-
-        # Sort observed values once
-        sorted_indices = np.argsort(observed_norm)
-        sorted_observed = observed_norm[sorted_indices]
-
-        # Plot forward models
-        for fw in many_forward_norm:
-            sorted_fw = fw[sorted_indices]
-            ax.scatter(sorted_observed, sorted_fw, alpha=0.7, s=40,
-                       edgecolors='black', linewidth=0.5)
-            ax.plot(sorted_observed, sorted_fw, alpha=0.3, linewidth=1)
-
-        # Set up plot attributes
-        unit_label = r'$\mu$Gal'
-        ax.set_xlabel(f'Observed ({unit_label})')
-        ax.set_ylabel(f'Forward Model ({unit_label})')
-        ax.set_title('Observed vs Forward Model Correlation')
-
-        # Add 1:1 line and set limits
-        ax.plot(lims, lims, 'r--', alpha=0.75, linewidth=2, label='1:1 line')
-        ax.set(xlim=lims, ylim=lims, aspect='equal')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-
-        # Add correlation coefficient
-        correlation = np.corrcoef(observed_norm, forward_norm)[0, 1]
-        ax.text(0.05, 0.95, f'R = {correlation:.3f}', transform=ax.transAxes,
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), 
-                fontsize=12)
-    
-        fig.show()
-    def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
+        plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm)
+        
+    def test_run_kde_sections(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
         
+        gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
+        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
+        
+        gempy_viz(geo_model, data)
+
+    def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+
         posterior_sigmas = data.posterior_predictive["sigma_stations"].values  # shape: (chains, samples, 20)
 
         # Stations with consistently high σ are either:
@@ -226,9 +198,8 @@ class TestProbabilisticInversion:
             data_labels=["Posterior", "Prior"],
             colors=[default_red, default_blue],
         )
-        
-        plt.show()
 
+        plt.show()
 
     def test_run_analysis(self, simple_geo_model, geophysical_dir):
 
