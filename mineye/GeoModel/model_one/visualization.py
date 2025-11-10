@@ -60,8 +60,7 @@ def plot(gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, An
 
 
 def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.InferenceData,
-              n_samples=20):
-    
+              n_samples=20, ve=5):
     gp.set_active_grid(
         grid=geo_model.grid,
         grid_type=[geo_model.grid.GridTypes.OCTREE],
@@ -87,17 +86,21 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
         update_model_fn=_update_model_for_plotting,
         gempy_plot=p2d,
         contour_colors=[default_blue],
-        ve=10,
+        ve=ve,
         kde_kwargs={
-                'gridsize': 400,
-                # 'bw': 0.01,  # Smaller bandwidth = sharper
-                'alpha': 0.3,
-                'cmap': 'Blues',
-                # 'density_threshold': 50  # Mask bottom 50% of densities to reduce "painting everything"
+                'gridsize'         : 300,
+                'bw'               : 0.1,
+                # 'power_transform'  : 0.1,
+                'alpha'            : .8,
+                'cmap'             : 'Blues',
+                'lognorm'          : True,  # Use log normalization
+                'density_threshold': 0,  # Mask bottom 10%
+                'vmin_percentile'  : 20,  # Start color scale at 5th percentile
+                'vmax_percentile'  : 100  # End color scale at 95th percentile
         },
     )
 
-    if hasattr(prior_inference_data, 'posterior') and False:
+    if hasattr(prior_inference_data, 'posterior') and True:
         plot_gempy(
             geo_model=geo_model,
             n_samples=n_samples,
@@ -105,31 +108,36 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
             update_model_fn=_update_model_for_plotting,
             gempy_plot=p2d,
             contour_colors=[default_red],
-            ve=10,
+            ve=ve,
             kde_kwargs={
-                    'alpha': 0.2,
-                    'cmap': 'Reds'
+                    'gridsize'         : 300,
+                    'bw'               : 0.1,
+                    # 'power_transform'  : 0.1,
+                    'alpha'            : .8,
+                    'cmap'             : 'Reds',
+                    'lognorm'          : False,  # Use log normalization
+                    'density_threshold': 0,  # Mask bottom 10%
+                    'vmin_percentile'  : 20,  # Start color scale at 5th percentile
+                    'vmax_percentile'  : 100  # End color scale at 95th percentile
             }
         )
-        
+
     return p2d
 
 
 def gempy_viz_pro(geo_model: gp.data.GeoModel, prior_inference_data: arviz.InferenceData):
     p2d = gempy_viz(geo_model, prior_inference_data, n_samples=10)
-   
+
     if len(x_all):
         x_all = np.concatenate(x_all);
         z_all = np.concatenate(z_all)
         _draw_kde(ax, x_all, z_all, gridsize=400, bw=0.03, alpha=0.5, cmap="Blues", zorder=35, lognorm=True)
-        
+
     p2d.axes[0].set_title("Uncertainty: KDE background + representative realizations")
 
 
 import numpy as np
 from matplotlib.colors import LogNorm
-
-
 
 
 def plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm):
