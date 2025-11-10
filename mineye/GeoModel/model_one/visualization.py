@@ -90,12 +90,11 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
         kde_kwargs={
                 'gridsize'         : 300,
                 'bw'               : 0.1,
-                # 'power_transform'  : 0.1,
-                'alpha'            : .8,
+                'alpha'            : 1,
                 'cmap'             : 'Blues',
                 'lognorm'          : True,  # Use log normalization
                 'density_threshold': 0,  # Mask bottom 10%
-                'vmin_percentile'  : 20,  # Start color scale at 5th percentile
+                'vmin_percentile'  : 0,  # Start color scale at 5th percentile
                 'vmax_percentile'  : 100  # End color scale at 95th percentile
         },
     )
@@ -112,12 +111,11 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
             kde_kwargs={
                     'gridsize'         : 300,
                     'bw'               : 0.1,
-                    # 'power_transform'  : 0.1,
-                    'alpha'            : .8,
+                    'alpha'            : 1,
                     'cmap'             : 'Reds',
                     'lognorm'          : False,  # Use log normalization
-                    'density_threshold': 0,  # Mask bottom 10%
-                    'vmin_percentile'  : 20,  # Start color scale at 5th percentile
+                    'density_threshold': 40,  # Mask bottom 10%
+                    'vmin_percentile'  : 0,  # Start color scale at 5th percentile
                     'vmax_percentile'  : 100  # End color scale at 95th percentile
             }
         )
