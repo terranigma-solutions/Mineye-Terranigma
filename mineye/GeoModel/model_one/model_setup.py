@@ -2,6 +2,7 @@ import os
 from typing import Any
 
 import numpy as np
+import torch
 
 import gempy as gp
 from gempy_engine.core.backend_tensor import BackendTensor
@@ -108,5 +109,5 @@ def _gravity_precomputations(density_plutonites: float, density_sedimentary_host
     print("Configuring geophysics input...")
     simple_geo_model.geophysics_input = gp.data.GeophysicsInput(
         tz=gravity_gradient,
-        densities=np.array([density_plutonites, density_sedimentary_host])  # kg/m³ for different formations,
+        densities=torch.tensor([density_plutonites, density_sedimentary_host])  # kg/m³ for different formations,
     )

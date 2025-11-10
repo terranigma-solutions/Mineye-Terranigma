@@ -16,7 +16,7 @@ from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orie
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, generate_multigravity_likelihood_hierarchical_per_station, generate_multigravity_likelihood_per_station_stable
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.visualization import plot, gempy_viz
-from mineye.GeoModel.plotting.probabilistic_analysis import _plot_comparison, plot_gravity_comparison
+from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_gravity_comparison
 # noinspection PyUnusedImports
 from tests import conftest
 import numpy as np

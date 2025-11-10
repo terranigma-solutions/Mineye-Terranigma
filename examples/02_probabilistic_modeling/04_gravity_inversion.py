@@ -78,12 +78,19 @@ import sys
 # Import Libraries
 # ----------------
 
+import dotenv
+
+dotenv.load_dotenv()
+
+from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_gravity_comparison
+
 import numpy as np
 from whoami import whoami
 import multiprocessing as mp
 
 import gempy as gp
 import gempy_probability as gpp
+import gempy_viewer as gpv
 
 import torch
 import pyro
@@ -91,9 +98,6 @@ import pyro.distributions as dist
 
 import arviz as az
 from gempy_probability.core.samplers_data import NUTSConfig
-from gempy_probability.modules.model_definition.prob_model_factory_v2 import GemPyPyroConfig, GemPyPyroModelExtended
-
-import dotenv
 
 # Set random seeds for reproducibility
 seed = 4003
@@ -108,9 +112,6 @@ from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, MultiGravityDiagonalLikelihood
-from mineye.GeoModel.model_one.probabilistic_model_diagnostics import trace_pyro_model
-
-dotenv.load_dotenv()
 
 # %%
 # Define Model Extent and Resolution
@@ -158,7 +159,7 @@ simple_geo_model = gp.create_geomodel(
 gp.map_stack_to_surfaces(
     gempy_model=simple_geo_model,
     mapping_object={
-        "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
+            "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
     }
 )
 
@@ -202,6 +203,22 @@ print(f"  Mean: {observed_gravity_ugal.mean():.1f} µGal")
 # interfaces between rock units. This affects gravity computation since density contrasts
 # are strongest at sharp boundaries.
 
+gp.compute_model(simple_geo_model)
+gpv.plot_2d(simple_geo_model)
+gpv.plot_3d(
+    model=simple_geo_model,
+    ve=5,
+    image=True,
+    kwargs_pyvista_bounds={
+            'show_xlabels': False,
+            'show_ylabels': False,
+            'show_zlabels': False,
+            'show_bounds': False,
+            
+    }
+)
+
+# %%
 geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 geo_model.interpolation_options.sigmoid_slope = 100
 
@@ -264,6 +281,13 @@ print(f"\nNormalization parameters:")
 print(f"  Method: {norm_params['method']}")
 print(f"  Parameters: {norm_params}")
 
+plot_gravity_comparison(
+    forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
+    normalization_method="align_to_reference",
+    observed_ugal=observed_gravity_ugal,
+    xy_ravel=xy_ravel
+)
+
 # %%
 # Step 5: Define Prior Distributions
 # -----------------------------------
@@ -305,11 +329,11 @@ print(f"  Parameters: {norm_params}")
 
 n_orientations = geo_model.orientations_copy.xyz.shape[0]
 model_priors = {
-    r'dips': dist.Normal(
-        loc=(torch.ones(n_orientations) * 10.0),
-        scale=torch.tensor(10.0, dtype=torch.float64),
-        validate_args=True
-    )
+        r'dips': dist.Normal(
+            loc=(torch.ones(n_orientations) * 10.0),
+            scale=torch.tensor(10.0, dtype=torch.float64),
+            validate_args=True
+        )
 }
 
 print(f"\nPrior on dips:")
@@ -339,14 +363,14 @@ print(f"  Std: 10°")
 # 3. Diagnostics: Check if normalized values are reasonable
 
 pre_forward_dets = {
-    "dips_degrees": lambda samples, gm: samples["dips"],
+        "dips_degrees": lambda samples, gm: samples["dips"],
 }
 
 post_forward_dets = {
-    "gravity_response_raw": lambda samples, gm, sol: sol.gravity,
-    "gravity_response": lambda samples, gm, sol: align_forward_to_observed(-sol.gravity, norm_params),
-    "mean_gravity": lambda samples, gm, sol: torch.mean(align_forward_to_observed(-sol.gravity, norm_params)),
-    "max_gravity": lambda samples, gm, sol: torch.max(align_forward_to_observed(-sol.gravity, norm_params), 0),
+        "gravity_response_raw": lambda samples, gm, sol: sol.gravity,
+        "gravity_response"    : lambda samples, gm, sol: align_forward_to_observed(-sol.gravity, norm_params),
+        "mean_gravity"        : lambda samples, gm, sol: torch.mean(align_forward_to_observed(-sol.gravity, norm_params)),
+        "max_gravity"         : lambda samples, gm, sol: torch.max(align_forward_to_observed(-sol.gravity, norm_params), 0),
 }
 
 # %%
@@ -680,7 +704,7 @@ print(f"  Std: {observed_gravity_ugal.std():.1f} µGal")
 residuals = posterior_gravity.mean(axis=(0, 1)) - observed_gravity_ugal
 print(f"\nResiduals (posterior mean - observed):")
 print(f"  Mean: {residuals.mean():.2f} µGal (bias)")
-print(f"  RMS: {np.sqrt((residuals**2).mean()):.2f} µGal (fit quality)")
+print(f"  RMS: {np.sqrt((residuals ** 2).mean()):.2f} µGal (fit quality)")
 print(f"  Max absolute: {np.abs(residuals).max():.2f} µGal")
 
 # %%

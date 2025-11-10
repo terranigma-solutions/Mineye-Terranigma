@@ -189,10 +189,10 @@ gpv.plot_3d(simple_geo_model, ve=5, image=True)
 # --------------------------
 # Plot forward gravity and comparison with observations
 
-from mineye.GeoModel.plotting.probabilistic_analysis import _plot_fw_gravity, _plot_comparison
+from mineye.GeoModel.plotting.probabilistic_analysis import _plot_fw_gravity, plot_comparison
 
 _plot_fw_gravity(grav, gravity_data, xy_ravel)
-_plot_comparison(observed_gravity, grav, xy_ravel)
+plot_comparison(observed_gravity, grav, xy_ravel)
 
 # %%
 # Visualize Forward Model Results

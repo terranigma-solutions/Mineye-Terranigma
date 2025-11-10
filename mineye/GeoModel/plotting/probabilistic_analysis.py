@@ -1,13 +1,14 @@
 from typing import Any
 
 import numpy as np
+import torch
 from matplotlib import pyplot as plt
 from pandas import DataFrame
 
 from mineye.GeoModel.geophysics import compute_alignment_params, align_forward_to_observed
 
 
-def _plot_comparison(observed_gravity, grav, xy_ravel,
+def plot_comparison(observed_gravity, grav, xy_ravel,
                      normalization_method='align_to_reference'):
     import matplotlib.pyplot as plt
     print("\n=== Observed vs Predicted Comparison ===")
@@ -19,15 +20,17 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     
     params = compute_alignment_params(
         observed=observed_ugal,
-        baseline_forward=forward_model
+        baseline_forward=forward_model,
+        method=normalization_method
     )
 
     forward_norm = align_forward_to_observed(
         forward=forward_model,
-        params=params
+        params=params,
     )
     
-    forward_norm = forward_norm.numpy()
+    if isinstance(forward_norm, torch.Tensor):
+        forward_norm = forward_norm.numpy()
 
     plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel)
 
