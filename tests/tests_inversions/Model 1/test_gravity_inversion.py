@@ -161,50 +161,54 @@ class TestProbabilisticInversion:
         check_mcmc_quality(data, verbose=True, plot=True)
 
     def test_run_prior_predictive_analysis(self, simple_geo_model, geophysical_dir):
-
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
-
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
-        # Plot 1: Observed gravity (with shared colorbar limits)
-        fig1, ax4 = plt.subplots(1, 1, figsize=(10, 10))
-
+        # Prepare data
         observed_norm = observed_gravity_ugal
         forward_norm = data.prior[r'gravity_response'].mean(axis=1)
-        many_forward_norm = data.prior[r'gravity_response'].values[0, -20:]
-        
+        # many_forward_norm = data.prior[r'gravity_response'].values[0, -20:]
+        many_forward_norm = data.posterior_predictive[r'gravity_response'].values[0, -40:-20]
+
+        # Create figure
+        fig, ax = plt.subplots(figsize=(10, 10))
+
+        # Calculate shared limits once
         vmin_shared = min(np.min(observed_norm), np.min(forward_norm))
         vmax_shared = max(np.max(observed_norm), np.max(forward_norm))
         lims = [vmin_shared, vmax_shared]
-        unit_label = r'$\mu$Gal'
 
+        # Sort observed values once
+        sorted_indices = np.argsort(observed_norm)
+        sorted_observed = observed_norm[sorted_indices]
+
+        # Plot forward models
         for fw in many_forward_norm:
-            ax4.scatter(observed_norm, fw, alpha=0.7, s=40, edgecolors='black', linewidth=0.5)
-            # ax4.plot(observed_norm, fw, 'r--', alpha=0.75, linewidth=2)
+            sorted_fw = fw[sorted_indices]
+            ax.scatter(sorted_observed, sorted_fw, alpha=0.7, s=40,
+                       edgecolors='black', linewidth=0.5)
+            ax.plot(sorted_observed, sorted_fw, alpha=0.3, linewidth=1)
 
+        # Set up plot attributes
+        unit_label = r'$\mu$Gal'
+        ax.set_xlabel(f'Observed ({unit_label})')
+        ax.set_ylabel(f'Forward Model ({unit_label})')
+        ax.set_title('Observed vs Forward Model Correlation')
 
-        ax4.set_xlabel(f'Observed ({unit_label})')
-        ax4.set_ylabel(f'Forward Model ({unit_label})')
-        ax4.set_title('Observed vs Forward Model Correlation')
+        # Add 1:1 line and set limits
+        ax.plot(lims, lims, 'r--', alpha=0.75, linewidth=2, label='1:1 line')
+        ax.set(xlim=lims, ylim=lims, aspect='equal')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
 
-        # Add 1:1 line with shared limits
-        lims = [vmin_shared, vmax_shared]
-        ax4.plot(lims, lims, 'r--', alpha=0.75, linewidth=2, label='1:1 line')
-        ax4.set_xlim(lims)
-        ax4.set_ylim(lims)
-        ax4.legend()
-        ax4.grid(True, alpha=0.3)
-        ax4.set_aspect('equal', adjustable='box')
-
-        # Calculate and display correlation coefficient
+        # Add correlation coefficient
         correlation = np.corrcoef(observed_norm, forward_norm)[0, 1]
-        ax4.text(0.05, 0.95, f'R = {correlation:.3f}', transform=ax4.transAxes,
-                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontsize=12)
-
-
-        fig1.show()
-        
+        ax.text(0.05, 0.95, f'R = {correlation:.3f}', transform=ax.transAxes,
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), 
+                fontsize=12)
+    
+        fig.show()
     def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
         
