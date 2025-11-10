@@ -123,10 +123,6 @@ class TestProbabilisticInversion:
 
         # TODO: Here we could add density and range
         # * 4) Set up Deterministics
-        pre_forward_dets = {
-
-        }
-
         post_forward_dets = {
                 "gravity_response_raw": lambda samples, gm, sol: sol.gravity,  # Store raw gravity
                 "gravity_response"    : lambda samples, gm, sol: align_forward_to_observed(-sol.gravity, norm_params),  # Normalized!
@@ -149,7 +145,7 @@ class TestProbabilisticInversion:
             # set_interp_input_fn=create_orientation_modifier(key=TestProbabilisticInversion.prior_key_dips),
             set_interp_input_fn=set_priors,
             likelihood_fn=likelihood_fn,
-            pre_forward_deterministics=pre_forward_dets,
+            pre_forward_deterministics={},
             post_forward_deterministics=post_forward_dets,
             obs_name="Gravity Measurement"
         )

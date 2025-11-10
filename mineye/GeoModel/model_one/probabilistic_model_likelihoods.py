@@ -112,6 +112,38 @@ def generate_multigravity_likelihood_hierarchical_per_station(norm_params):
     return likelihood_fn
 
 
+def generate_multigravity_likelihood_per_station_stable(norm_params):
+    """
+    Per-station noise with strict bounds for VI stability.
+    """
+    def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
+        simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
+        pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
+        n_stations = simulated_geophysics.shape[0]
+
+        # Sample on a transformed scale that's bounded
+        # Transform: sigma = min + (max - min) * sigmoid(raw_param)
+        sigma_raw = pyro.sample(
+            "sigma_raw",
+            dist.Normal(
+                torch.zeros(n_stations, dtype=torch.float64),
+                torch.ones(n_stations, dtype=torch.float64)
+            ).to_event(1)
+        )
+
+        # Map to reasonable range: 1,000 to 20,000 µGal
+        sigma_min = 1000.0
+        sigma_max = 20000.0
+        sigma_stations = sigma_min + (sigma_max - sigma_min) * torch.sigmoid(sigma_raw)
+        pyro.deterministic("sigma_stations", sigma_stations)
+
+        # Clamp for extra safety
+        sigma_clamped = torch.clamp(sigma_stations, min=500.0, max=30000.0)
+
+        return dist.Normal(simulated_geophysics, sigma_clamped).to_event(1)
+
+    return likelihood_fn
+
 def generate_multigravity_likelihood(covariance_matrix, norm_params):
     return partial(multigravity_likelihood, covariance_matrix=covariance_matrix, norm_params=norm_params)
 
