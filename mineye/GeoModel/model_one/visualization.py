@@ -89,12 +89,15 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
         contour_colors=[default_blue],
         ve=10,
         kde_kwargs={
-                'alpha': 0.2,
-                'cmap': 'Blues'
-        }
+                'gridsize': 400,
+                # 'bw': 0.01,  # Smaller bandwidth = sharper
+                'alpha': 0.3,
+                'cmap': 'Blues',
+                # 'density_threshold': 50  # Mask bottom 50% of densities to reduce "painting everything"
+        },
     )
 
-    if hasattr(prior_inference_data, 'posterior'):
+    if hasattr(prior_inference_data, 'posterior') and False:
         plot_gempy(
             geo_model=geo_model,
             n_samples=n_samples,

@@ -173,7 +173,7 @@ class TestProbabilisticInversion:
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
         
-        gempy_viz(geo_model, data, n_samples=10)
+        gempy_viz(geo_model, data, n_samples=20)
 
     def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
