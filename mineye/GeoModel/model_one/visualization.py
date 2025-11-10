@@ -87,7 +87,11 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
         update_model_fn=_update_model_for_plotting,
         gempy_plot=p2d,
         contour_colors=[default_blue],
-        ve=10
+        ve=10,
+        kde_kwargs={
+                'alpha': 0.2,
+                'cmap': 'Blues'
+        }
     )
 
     if hasattr(prior_inference_data, 'posterior'):
@@ -98,7 +102,11 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
             update_model_fn=_update_model_for_plotting,
             gempy_plot=p2d,
             contour_colors=[default_red],
-            ve=10
+            ve=10,
+            kde_kwargs={
+                    'alpha': 0.2,
+                    'cmap': 'Reds'
+            }
         )
         
     return p2d
