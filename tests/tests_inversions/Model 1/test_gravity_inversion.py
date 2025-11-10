@@ -24,63 +24,26 @@ class TestProbabilisticInversion:
     prior_key_dips = r'dips'
     prior_key_density = r'density'
 
+    def test_run_predictive(self, simple_geo_model, geophysical_dir, n_samples=50):
+        geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
+
+        # * 7) Run predictive
+        gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
+        compute_prior_predictive = True
+        if compute_prior_predictive:
+            prior_inference_data: az.InferenceData = gpp.run_predictive(
+                prob_model=prob_model,
+                geo_model=geo_model,
+                y_obs_list=gravity_observations_tensor,
+                n_samples=100,
+                plot_trace=True
+            )
+
     def test_gravity_inversion(self, simple_geo_model, geophysical_dir, n_samples=50):
         """Test reading and computing a geological model."""
         print("Test gravity inversion...")
         # Use actual gravity measurement device locations
-        # * 1) Read gravity data
-        gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
-
-        # * 2) Setup initial Geomodel and normalize forward gravity to the observed gravity
-        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
-        geo_model.interpolation_options.sigmoid_slope = 100
-        baseline_fw_gravity_np = baseline(geo_model)
-        norm_params = normalize(baseline_fw_gravity_np, observed_gravity_ugal)
-
-        # * 3) Setup Priors
-        model_priors = {
-                TestProbabilisticInversion.prior_key_dips: dist.Normal(
-                    loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10),  # This is just dip 10 degrees
-                    scale=torch.tensor(10, dtype=torch.float64),
-                    validate_args=True
-                ),
-                TestProbabilisticInversion.prior_key_density: dist.Normal(
-                    loc=(torch.tensor([
-                            2.9,  # plutonites
-                            2.3  # host
-                    ])),
-                    scale=torch.tensor(0.08),
-                ).to_event(1)
-        }
-
-        # TODO: Here we could add density and range
-        # * 4) Set up Deterministics
-        pre_forward_dets = {
-                
-        }
-
-        post_forward_dets = {
-                "gravity_response_raw": lambda samples, gm, sol: sol.gravity,  # Store raw gravity
-                "gravity_response"    : lambda samples, gm, sol: align_forward_to_observed(-sol.gravity, norm_params),  # Normalized!
-                "mean_gravity"        : lambda samples, gm, sol: torch.mean(align_forward_to_observed(-sol.gravity, norm_params)),
-                "max_gravity"         : lambda samples, gm, sol: torch.max(align_forward_to_observed(-sol.gravity, norm_params), 0),
-        }
-
-        # * 5) Set up likelihood functions
-        likelihood_fn = generate_multigravity_likelihood_diagonal(
-            norm_params=norm_params
-        )
-
-        # * 6) Set up Pyro model
-        prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
-            priors=model_priors,
-            # set_interp_input_fn=create_orientation_modifier(key=TestProbabilisticInversion.prior_key_dips),
-            set_interp_input_fn=set_priors,
-            likelihood_fn=likelihood_fn,
-            pre_forward_deterministics=pre_forward_dets,
-            post_forward_deterministics=post_forward_dets,
-            obs_name="Gravity Measurement"
-        )
+        geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
 
         # * 7) Run predictive
         gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
@@ -119,7 +82,68 @@ class TestProbabilisticInversion:
         if compute_prior_predictive:
             data.extend(prior_inference_data)
 
-        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov08_I.nc"))
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov08_II.nc"))
+
+    @staticmethod
+    def _create_probabilistic_model(geophysical_dir, simple_geo_model):
+        # * 1) Read gravity data
+        gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
+
+        # * 2) Setup initial Geomodel and normalize forward gravity to the observed gravity
+        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
+        geo_model.interpolation_options.sigmoid_slope = 100
+        norm_params = normalize(
+            baseline_fw_gravity_np=(baseline(geo_model)),
+            observed_gravity=observed_gravity_ugal,
+            method="align_to_reference",
+            extrapolation_buffer=0.3
+        )
+
+        # * 3) Setup Priors
+        model_priors = {
+                TestProbabilisticInversion.prior_key_dips   : dist.Normal(
+                    loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10),  # This is just dip 10 degrees
+                    scale=torch.tensor(10, dtype=torch.float64),
+                    validate_args=True
+                ),
+                TestProbabilisticInversion.prior_key_density: dist.Normal(
+                    loc=(torch.tensor([
+                            2.9,  # plutonites
+                            2.3  # host
+                    ])),
+                    scale=torch.tensor(0.08),
+                ).to_event(1)
+        }
+
+        # TODO: Here we could add density and range
+        # * 4) Set up Deterministics
+        pre_forward_dets = {
+
+        }
+
+        post_forward_dets = {
+                "gravity_response_raw": lambda samples, gm, sol: sol.gravity,  # Store raw gravity
+                "gravity_response"    : lambda samples, gm, sol: align_forward_to_observed(-sol.gravity, norm_params),  # Normalized!
+                "mean_gravity"        : lambda samples, gm, sol: torch.mean(align_forward_to_observed(-sol.gravity, norm_params)),
+                "max_gravity"         : lambda samples, gm, sol: torch.max(align_forward_to_observed(-sol.gravity, norm_params), 0),
+        }
+
+        # * 5) Set up likelihood functions
+        likelihood_fn = generate_multigravity_likelihood_diagonal(
+            norm_params=norm_params
+        )
+
+        # * 6) Set up Pyro model
+        prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
+            priors=model_priors,
+            # set_interp_input_fn=create_orientation_modifier(key=TestProbabilisticInversion.prior_key_dips),
+            set_interp_input_fn=set_priors,
+            likelihood_fn=likelihood_fn,
+            pre_forward_deterministics=pre_forward_dets,
+            post_forward_deterministics=post_forward_dets,
+            obs_name="Gravity Measurement"
+        )
+        return geo_model, observed_gravity_ugal, prob_model
 
     def test_run_diagnostics(self):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data.nc"))
@@ -128,7 +152,7 @@ class TestProbabilisticInversion:
 
     def test_run_analysis(self, simple_geo_model, geophysical_dir):
 
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov07.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov08_II.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
@@ -137,7 +161,7 @@ class TestProbabilisticInversion:
         az.plot_ppc(data, num_pp_samples=20)
 
         plt.rcParams['figure.dpi'] = 72  # Lower DPI for faster rendering
-        
+
         axes = az.plot_density(
             data=[data, data.prior],
             var_names=["dips", "density"],
@@ -155,8 +179,13 @@ class TestProbabilisticInversion:
         else:
             axes.set_yscale('log')
 
-
         plt.show()
+        plot_gravity_comparison(
+            observed_ugal=observed_gravity_ugal,
+            forward_norm=data.prior[r'gravity_response'].mean(axis=1),
+            xy_ravel=xy_ravel,
+            normalization_method='align_to_reference'
+        )
 
         plot_gravity_comparison(
             observed_ugal=observed_gravity_ugal,
@@ -165,7 +194,6 @@ class TestProbabilisticInversion:
             normalization_method='align_to_reference'
         )
 
-            
         # * 9) Analysis inference
         if hasattr(data, 'prior') and r'gravity_response' in data.prior:
             gravity_samples_norm, unit_label = plot(
