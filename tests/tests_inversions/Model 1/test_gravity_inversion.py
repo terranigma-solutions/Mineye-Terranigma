@@ -156,7 +156,7 @@ class TestProbabilisticInversion:
         # Run comprehensive diagnostics with plots
         check_mcmc_quality(data, verbose=True, plot=True)
 
-    def test_run_prior_predictive_analysis(self, simple_geo_model, geophysical_dir):
+    def test_run_predictive_analysis(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
@@ -164,8 +164,10 @@ class TestProbabilisticInversion:
         # Prepare data
         observed_norm = observed_gravity_ugal
         forward_norm = data.prior[r'gravity_response'].mean(axis=1)
-        # many_forward_norm = data.prior[r'gravity_response'].values[0, -20:]
-        many_forward_norm = data.posterior_predictive[r'gravity_response'].values[0, -40:-20]
+        if PRIOR:=True:
+            many_forward_norm = data.prior[r'gravity_response'].values[0, -20:]
+        else:    
+            many_forward_norm = data.posterior_predictive[r'gravity_response'].values[0, -40:-20]
 
         # Create figure
         fig, ax = plt.subplots(figsize=(10, 10))

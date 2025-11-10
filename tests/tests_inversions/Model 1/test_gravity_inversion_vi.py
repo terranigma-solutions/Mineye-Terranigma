@@ -253,7 +253,7 @@ class TestProbabilisticInversionVI:
 
     def test_run_analysis_vi(self, simple_geo_model, geophysical_dir):
         """Analyze VI results."""
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_density_III.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_vi_Nov10_I_hierarchical.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
@@ -278,14 +278,20 @@ class TestProbabilisticInversionVI:
             )
 
             # Apply log scale to all y-axes
-            if isinstance(axes, np.ndarray):
-                for ax in axes.flatten():
-                    ax.set_yscale('log')
-            else:
-                axes.set_yscale('log')
+            # if isinstance(axes, np.ndarray):
+            #     for ax in axes.flatten():
+            #         ax.set_yscale('log')
+            # else:
+            #     axes.set_yscale('log')
 
             plt.show()
-            
+            plot_gravity_comparison(
+                observed_ugal=observed_gravity_ugal,
+                forward_norm=data.prior[r'gravity_response'].mean(axis=1),
+                xy_ravel=xy_ravel,
+                normalization_method='align_to_reference'
+            )
+
         plot_gravity_comparison(
             observed_ugal=observed_gravity_ugal, 
             forward_norm=data.posterior[r'gravity_response'].mean(axis=1),
