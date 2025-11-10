@@ -72,6 +72,7 @@ The forward model f involves:
 sphinx_gallery_thumbnail_num = 5
 
 """
+import os
 import sys
 
 # %%
@@ -110,8 +111,8 @@ np.random.seed(1234)
 from mineye.config import paths
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
-from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
-from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, MultiGravityDiagonalLikelihood
+from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, set_priors
+from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, MultiGravityDiagonalLikelihood, generate_multigravity_likelihood_hierarchical_per_station
 
 # %%
 # Define Model Extent and Resolution
@@ -213,8 +214,8 @@ gpv.plot_3d(
             'show_xlabels': False,
             'show_ylabels': False,
             'show_zlabels': False,
-            'show_bounds': False,
-            
+            'show_bounds' : False,
+
     }
 )
 
@@ -328,12 +329,21 @@ plot_gravity_comparison(
 # Where typical crustal densities range from 2.2-3.0 g/cm³.
 
 n_orientations = geo_model.orientations_copy.xyz.shape[0]
+prior_key_dips = r'dips'
+prior_key_densities = r'density'
 model_priors = {
-        r'dips': dist.Normal(
+        prior_key_dips     : dist.Normal(
             loc=(torch.ones(n_orientations) * 10.0),
             scale=torch.tensor(10.0, dtype=torch.float64),
             validate_args=True
-        )
+        ).to_event(1),
+        prior_key_densities: dist.Normal(
+            loc=(torch.tensor([
+                    2.9,  # plutonites
+                    2.3  # host
+            ])),
+            scale=torch.tensor(0.15),
+        ).to_event(1)
 }
 
 print(f"\nPrior on dips:")
@@ -361,10 +371,6 @@ print(f"  Std: 10°")
 # 1. Debugging: Inspect intermediate values if inference fails
 # 2. Visualization: Plot how gravity predictions evolve during sampling
 # 3. Diagnostics: Check if normalized values are reasonable
-
-pre_forward_dets = {
-        "dips_degrees": lambda samples, gm: samples["dips"],
-}
 
 post_forward_dets = {
         "gravity_response_raw": lambda samples, gm, sol: sol.gravity,
@@ -417,11 +423,11 @@ post_forward_dets = {
 #     σ_i \\sim \\text{HalfNormal}(τ) \\\\
 #     y_i \\sim \\mathcal{N}(f_i(θ), σ_i^2)
 
-likelihood_fn = MultiGravityDiagonalLikelihood(
-    align_fn=align_forward_to_observed,
-    norm_params=norm_params,
-    sigma_value=5000.0
+# TODO: Explain this especific likelihood function in detail. It is in probabilistic_model_likelihoods.py
+likelihood_fn = generate_multigravity_likelihood_hierarchical_per_station(
+    norm_params=norm_params
 )
+
 print("✓ Likelihood function created (diagonal covariance)")
 print(f"  Assumed measurement noise: 5000.0 µGal")
 
@@ -445,7 +451,7 @@ print(f"  Assumed measurement noise: 5000.0 µGal")
 # This function bridges Pyro's sampled parameters to GemPy's geological model:
 #
 # .. code-block:: python
-#
+# TODO: This is wrong!
 #     def set_priors(samples: dict, geo_model: gp.data.GeoModel):
 #         # Extract sampled dips
 #         dips = samples["dips"]
@@ -460,31 +466,17 @@ print(f"  Assumed measurement noise: 5000.0 µGal")
 # This coupling allows MCMC to explore geological parameter space while
 # computing physically-consistent gravity responses.
 
-config = GemPyPyroConfig(
+prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
     priors=model_priors,
-    set_interp_input_fn=create_orientation_modifier(key=r'dips'),
+    set_interp_input_fn=set_priors,
     likelihood_fn=likelihood_fn,
-    pre_forward_deterministics=pre_forward_dets,
+    pre_forward_deterministics={},
     post_forward_deterministics=post_forward_dets,
     obs_name="Gravity Measurement"
 )
 
-prob_model = GemPyPyroModelExtended(config)
-
 print("✓ Probabilistic model created")
 
-# %%
-# Verify Model Structure
-# -----------------------
-#
-# **Model Tracing**
-#
-# Before running expensive inference, we trace the model to verify its structure.
-# This executes one forward pass and checks that all components work correctly.
-
-gravity_observations_tensor = torch.tensor(observed_gravity_ugal, dtype=torch.float64)
-trace = trace_pyro_model(prob_model, geo_model, gravity_observations_tensor)
-print("✓ Model trace verified")
 
 # %%
 # Step 9: Prior Predictive Checks
@@ -518,12 +510,12 @@ print("✓ Model trace verified")
 #
 # Prior predictive sampling generates data *as if* we hadn't seen the observations yet.
 
-print("\nRunning prior predictive sampling (10 samples)...")
+print("\nRunning prior predictive sampling (100 samples)...")
 prior_inference_data: az.InferenceData = gpp.run_predictive(
     prob_model=prob_model,
     geo_model=geo_model,
-    y_obs_list=gravity_observations_tensor,
-    n_samples=10,
+    y_obs_list=observed_gravity_ugal,
+    n_samples=100,
     plot_trace=True
 )
 
@@ -595,27 +587,28 @@ print("  Warmup: 200 steps")
 print("  Sampling: 200 samples")
 print("  Chains: 1")
 
-data = gpp.run_nuts_inference(
-    prob_model=prob_model,
-    geo_model=geo_model,
-    y_obs_list=gravity_observations_tensor,
-    config=NUTSConfig(
-        step_size=0.0001,
-        adapt_step_size=True,
-        target_accept_prob=0.65,
-        max_tree_depth=5,
-        init_strategy='median',
-        num_samples=200,
-        warmup_steps=200,
-        num_chains=1
-    ),
-    plot_trace=True,
-    run_posterior_predictive=True
-)
+RUN_SIMULATION = False
+if RUN_SIMULATION:
+    data = gpp.run_nuts_inference(
+        prob_model=prob_model,
+        geo_model=geo_model,
+        y_obs_list=observed_gravity_ugal,
+        config=NUTSConfig(
+            step_size=0.0001,
+            adapt_step_size=True,
+            target_accept_prob=0.65,
+            max_tree_depth=5,
+            init_strategy='median',
+            num_samples=200,
+            warmup_steps=200,
+            num_chains=1
+        ),
+        plot_trace=True,
+        run_posterior_predictive=True
+    )
 
-print("✓ NUTS inference complete")
+    print("✓ NUTS inference complete")
 
-# %%
 # Combine Prior and Posterior
 # ----------------------------
 #
@@ -623,8 +616,11 @@ print("✓ NUTS inference complete")
 # ArviZ InferenceData object. This allows us to visualize how our beliefs changed
 # after seeing the data.
 
-data.extend(prior_inference_data)
-print("✓ Prior and posterior combined")
+    data.extend(prior_inference_data)
+    print("✓ Prior and posterior combined")
+    
+else:
+    data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
 
 # %%
 # Analysis: Parameter Posterior Statistics
