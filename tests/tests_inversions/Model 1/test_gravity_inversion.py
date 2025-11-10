@@ -12,7 +12,7 @@ from gempy_probability.modules.plot.plot_posterior import default_red, default_b
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, set_priors
-from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal
+from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, generate_multigravity_likelihood_hierarchical_per_station
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.visualization import plot, gempy_viz
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_comparison
@@ -23,6 +23,11 @@ from tests import conftest
 class TestProbabilisticInversion:
     prior_key_dips = r'dips'
     prior_key_density = r'density'
+
+    def test_run_predictive_foo(self, simple_geo_model, geophysical_dir, n_samples=50):
+        geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
+        prob_model(geo_model, observed_gravity_ugal)
+        pass
 
     def test_run_predictive(self, simple_geo_model, geophysical_dir, n_samples=50):
         geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
@@ -39,7 +44,8 @@ class TestProbabilisticInversion:
                 plot_trace=True
             )
 
-    def test_gravity_inversion(self, simple_geo_model, geophysical_dir, n_samples=50):
+    def test_gravity_inversion(self, simple_geo_model, geophysical_dir, n_samples=50,
+                               arviz_data_filename="arviz_data_Nov10_I_hierarchical.nc"):
         """Test reading and computing a geological model."""
         print("Test gravity inversion...")
         # Use actual gravity measurement device locations
@@ -82,7 +88,7 @@ class TestProbabilisticInversion:
         if compute_prior_predictive:
             data.extend(prior_inference_data)
 
-        data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov08_II.nc"))
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), arviz_data_filename))
 
     @staticmethod
     def _create_probabilistic_model(geophysical_dir, simple_geo_model):
@@ -111,7 +117,7 @@ class TestProbabilisticInversion:
                             2.9,  # plutonites
                             2.3  # host
                     ])),
-                    scale=torch.tensor(0.08),
+                    scale=torch.tensor(0.15),
                 ).to_event(1)
         }
 
@@ -129,7 +135,11 @@ class TestProbabilisticInversion:
         }
 
         # * 5) Set up likelihood functions
-        likelihood_fn = generate_multigravity_likelihood_diagonal(
+        # likelihood_fn = generate_multigravity_likelihood_diagonal(
+        #     norm_params=norm_params
+        # )
+
+        likelihood_fn = generate_multigravity_likelihood_hierarchical_per_station(
             norm_params=norm_params
         )
 
@@ -150,15 +160,64 @@ class TestProbabilisticInversion:
         # Run comprehensive diagnostics with plots
         check_mcmc_quality(data, verbose=True, plot=True)
 
+    def test_run_prior_predictive_analysis(self, simple_geo_model, geophysical_dir):
+
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+
+        gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
+        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
+
+        for val in data.posterior_predictive[r'gravity_response'].values[0, -20:]:
+            plot_gravity_comparison(
+                observed_ugal=observed_gravity_ugal,
+                forward_norm=val,
+                xy_ravel=xy_ravel,
+                normalization_method='align_to_reference',
+                show=False
+            )
+
+        plt.show()
+        
+    def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+        
+        posterior_sigmas = data.posterior_predictive["sigma_stations"].values  # shape: (chains, samples, 20)
+
+        # Stations with consistently high σ are either:
+        # - Actually noisier (geology, instrument, location)
+        # - Outliers / model misspecification
+        # - Areas where your forward model is wrong
+
+        station_noise_mean = posterior_sigmas.mean(axis=(0, 1))
+        sigma_global_mean = station_noise_mean.mean()
+        problematic = np.where(station_noise_mean > 2 * sigma_global_mean)[0]
+        print(f"Check stations: {problematic}")
+        axes = az.plot_density(
+            data=[data, data.prior],
+            var_names=["sigma_stations"],
+            filter_vars="like",
+            hdi_prob=0.9999,
+            shade=.2,
+            data_labels=["Posterior", "Prior"],
+            colors=[default_red, default_blue],
+        )
+        
+        plt.show()
+
+
     def test_run_analysis(self, simple_geo_model, geophysical_dir):
 
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov08_II.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+        data.posterior
+
+        az.plot_posterior(data, var_names=["dips", "density"])
+        plt.show()
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
         # # Posterior predictive checks
-        az.plot_ppc(data, num_pp_samples=20)
+        # az.plot_ppc(data, num_pp_samples=20)
 
         plt.rcParams['figure.dpi'] = 72  # Lower DPI for faster rendering
 
@@ -173,11 +232,11 @@ class TestProbabilisticInversion:
         )
 
         # # Apply log scale to all y-axes
-        if isinstance(axes, np.ndarray):
-            for ax in axes.flatten():
-                ax.set_yscale('log')
-        else:
-            axes.set_yscale('log')
+        # if isinstance(axes, np.ndarray):
+        #     for ax in axes.flatten():
+        #         ax.set_yscale('log')
+        # else:
+        #     axes.set_yscale('log')
 
         plt.show()
         plot_gravity_comparison(

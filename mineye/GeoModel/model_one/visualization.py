@@ -79,7 +79,7 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
 
     plot_gempy(
         geo_model=geo_model,
-        n_samples=20,
+        n_samples=100,
         samples=(prior_inference_data.prior[r'dips'].values[0, :]),
         update_model_fn=_update_model_for_plotting,
         gempy_plot=p2d,
@@ -89,7 +89,7 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
     if hasattr(prior_inference_data, 'posterior'):
         plot_gempy(
             geo_model=geo_model,
-            n_samples=20,
+            n_samples=100,
             samples=(prior_inference_data.posterior[r'dips'].values[0, :]),
             update_model_fn=_update_model_for_plotting,
             gempy_plot=p2d,
