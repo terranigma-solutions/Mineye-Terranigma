@@ -314,7 +314,7 @@ class TestProbabilisticInversionVI:
                 xy_ravel=xy_ravel
             )
 
-        if False:
+        if True:
             # Analysis Gempy Model
             gempy_viz(geo_model, data)
 

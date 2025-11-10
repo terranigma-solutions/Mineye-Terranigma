@@ -76,7 +76,6 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
         show_data=False,
         show=False
     )
-
     plot_gempy(
         geo_model=geo_model,
         n_samples=100,
