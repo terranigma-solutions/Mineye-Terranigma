@@ -209,10 +209,11 @@ print(f"  Mean: {observed_gravity_ugal.mean():.1f} µGal")
 
 gp.compute_model(simple_geo_model)
 gpv.plot_2d(simple_geo_model)
+# %%
 gpv.plot_3d(
     model=simple_geo_model,
     ve=5,
-    image=True,
+    image=False,
     kwargs_pyvista_bounds={
             'show_xlabels': False,
             'show_ylabels': False,
@@ -536,7 +537,7 @@ gempy_viz(
 # TODO: Add explanation
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
-    many_forward_norm=prior_inference_data.prior[r'gravity_response'].values[0, -20:],
+    many_forward_norm=prior_inference_data.prior[r'gravity_response'].values[0, -10:],
     observed_norm=observed_gravity_ugal
 )
 
@@ -758,12 +759,22 @@ az.plot_density(
 
 # %%
 
+gempy_viz(
+    geo_model=geo_model,
+    prior_inference_data=data,
+    n_samples=20
+)
+
+# %%
+
 plot_gravity_comparison(
     observed_ugal=observed_gravity_ugal,
     forward_norm=data.prior[r'gravity_response'].mean(axis=1),
     xy_ravel=xy_ravel,
     normalization_method='align_to_reference'
 )
+
+# %%
 
 plot_gravity_comparison(
     observed_ugal=observed_gravity_ugal,
@@ -779,6 +790,8 @@ gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
     observed_gravity_ugal=observed_gravity_ugal,
     xy_ravel=xy_ravel
 )
+
+# %%
 
 if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
     gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
