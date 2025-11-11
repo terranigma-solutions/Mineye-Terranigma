@@ -216,3 +216,5 @@ print(f"  Std: {samples.std():.4f}")
 print(f"  Min: {samples.min():.4f}")
 print(f"  Max: {samples.max():.4f}")
 print(f"  Original: {original_z:.4f}")
+
+# sphinx_gallery_thumbnail_number = -1

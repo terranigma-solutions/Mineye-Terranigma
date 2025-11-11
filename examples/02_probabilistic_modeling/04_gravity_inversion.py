@@ -69,8 +69,8 @@ The forward model f involves:
 3. Forward gravity calculation at observation points
 4. Normalization and alignment to observations
 
-sphinx_gallery_thumbnail_num = 5
 
+sphinx_gallery_thumbnail_number = 9
 """
 import os
 import sys
@@ -475,6 +475,7 @@ post_forward_dets = {
 # - Measurement protocol variations
 #
 # Instead of assuming all stations have identical noise, hierarchical modeling:
+#
 # 1. Estimates noise separately for each station
 # 2. Links stations through shared hyperparameters (partial pooling)
 # 3. Automatically identifies outliers (high-noise stations)
@@ -740,6 +741,7 @@ print("    - Deterministics: gravity_response, mean_gravity, max_gravity")
 #
 # 2. **Model adequacy**: Can *any* parameter combination explain the data?
 #    If prior predictions are far from observations, we may need:
+#
 #    - More model complexity (additional parameters)
 #    - Different physics (e.g., include magnetics, seismic)
 #    - Revised priors (incorrect geological assumptions)
@@ -824,19 +826,23 @@ gempy_viz(
 # **What to look for**:
 #
 # 1. **Lines parallel to 1:1**: Model captures the overall trend
+#
 #    - Offset from 1:1 is handled by normalization
 #    - Slope matters: should be close to 1.0
 #
 # 2. **Lines crossing each other**: Different models fit different subsets of data
+#
 #    - Some samples fit low-gravity stations well
 #    - Other samples fit high-gravity stations well
 #    - Suggests parameter trade-offs or model inadequacy
 #
 # 3. **All lines far from 1:1**: Prior may be mis-specified
+#
 #    - Models can't explain observations
 #    - Need to adjust priors or add model complexity
 #
 # 4. **Lines bunched together**: Prior is restrictive
+#
 #    - Limited parameter range
 #    - May need wider priors for exploration
 #
@@ -1049,7 +1055,41 @@ print(f"  Mean: {residuals.mean():.2f} µGal (bias)")
 print(f"  RMS: {np.sqrt((residuals ** 2).mean()):.2f} µGal (fit quality)")
 print(f"  Max absolute: {np.abs(residuals).max():.2f} µGal")
 
-# %% 
+# %%
+# Posterior Predictive: Model Fit Analysis
+# -----------------------------------------
+#
+# **Understanding Posterior Convergence**
+#
+# In the plot_many_observed_vs_forward visualization, we observe that no single model
+# can perfectly explain all observations simultaneously. This reveals an important aspect
+# of Bayesian inference: the posterior distribution identifies models that best balance
+# the fit across all measurement stations.
+#
+# **What the inference is doing**:
+#
+# The MCMC sampler finds parameter combinations that bring the maximum number of
+# observations close to their measured values. Rather than perfectly fitting a subset
+# of stations, the posterior concentrates on models that provide reasonable explanations
+# across the entire dataset. This "compromise" solution is mathematically optimal under
+# our likelihood model.
+#
+# **Geometric constraints from data**:
+#
+# Even with this distributed fit, the gravity data significantly constrains the possible
+# geological configurations. As visualized in gempy_viz, the posterior distribution shows
+# much tighter bounds on structural geometry than the prior. The inference has successfully
+# ruled out large regions of parameter space that are inconsistent with observations.
+#
+# **Implications**:
+#
+# - Stations that remain poorly fit may indicate localized geological complexity not
+#   captured by our current model structure
+# - The spread in posterior predictions quantifies irreducible uncertainty given model
+#   assumptions
+# - Future model refinements (additional layers, spatially-varying densities) could
+#   improve station-by-station fit while maintaining these geometric constraints
+
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
     many_forward_norm=data.posterior_predictive[r'gravity_response'].values[0, -20:],
@@ -1206,6 +1246,7 @@ if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
 #    expensive MCMC.
 #
 # 3. **Residual patterns tell a story**:
+#
 #    - Random residuals → good model fit
 #    - Spatial patterns → missing geological complexity
 #    - Systematic bias → wrong physics or normalization

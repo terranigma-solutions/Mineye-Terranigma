@@ -357,4 +357,4 @@ print("="*50)
 # * Use residuals for probabilistic inversion
 # * Uncertainty quantification with Bayesian methods
 # * Joint inversion with multiple data types
-# sphinx_gallery_thumbnail_number = 
+# sphinx_gallery_thumbnail_number = 4
