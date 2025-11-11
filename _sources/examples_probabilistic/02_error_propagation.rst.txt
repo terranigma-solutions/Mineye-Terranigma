@@ -468,7 +468,7 @@ Visualize Uncertainty
 ---------------------
 Plot the model with sampled surface points
 
-.. GENERATED FROM PYTHON SOURCE LINES 173-208
+.. GENERATED FROM PYTHON SOURCE LINES 173-209
 
 .. code-block:: Python
 
@@ -502,7 +502,8 @@ Plot the model with sampled surface points
         n_samples=20,
         samples=(prior_inference_data.prior[r'$\mu_{top}$'].values[0, :]),
         update_model_fn=update_model_for_plotting,
-        gempy_plot=p2d
+        gempy_plot=p2d,
+        ve=5
     )
 
     print("✓ Visualization complete")
@@ -562,17 +563,28 @@ Plot the model with sampled surface points
     Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
     Using sequential processing for 1 surfaces
+    KDE: Collected 1599 contour vertices
+    X range: [-705065.02, -676088.67]
+    Z range: [-484.30, 489.30]
+    Computing KDE with bandwidth method: 0.02
+    KDE density range: [0.00e+00, 4.12e-06]
+    KDE density mean: 2.91e-08
+    KDE density median: 1.00e-188
+    Applied power transform (exponent=0.3)
+    Transformed density range: [0.00e+00, 1.00e+00]
+    Linear norm range (pre-masking): [0.00e+00, 6.33e-01]
+    Auto-applying 5% threshold: 0.00e+00
     ✓ Visualization complete
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 209-211
+.. GENERATED FROM PYTHON SOURCE LINES 210-212
 
 Summary Statistics
 ------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 211-219
+.. GENERATED FROM PYTHON SOURCE LINES 212-222
 
 .. code-block:: Python
 
@@ -584,6 +596,8 @@ Summary Statistics
     print(f"  Min: {samples.min():.4f}")
     print(f"  Max: {samples.max():.4f}")
     print(f"  Original: {original_z:.4f}")
+
+    # sphinx_gallery_thumbnail_number = -1
 
 
 
@@ -606,7 +620,7 @@ Summary Statistics
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 26.530 seconds)
+   **Total running time of the script:** (0 minutes 28.585 seconds)
 
 
 .. _sphx_glr_download_examples_probabilistic_02_error_propagation.py:

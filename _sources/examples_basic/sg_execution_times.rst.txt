@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:02.778** total execution time for 3 files **from examples_basic**:
+**00:02.476** total execution time for 3 files **from examples_basic**:
 
 .. container::
 
@@ -33,7 +33,7 @@ Computation times
      - Time
      - Mem (MB)
    * - :ref:`sphx_glr_examples_basic_02_gravity_forward_model.py` (``02_gravity_forward_model.py``)
-     - 00:02.778
+     - 00:02.476
      - 0.0
    * - :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py` (``01_simple_tharsis_model.py``)
      - 00:00.000

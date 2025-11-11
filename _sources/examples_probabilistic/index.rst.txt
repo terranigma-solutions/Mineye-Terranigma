@@ -51,7 +51,7 @@ Add your example scripts here with names starting with `plot_` for automatic gal
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates Bayesian inversion using gravity data. We use NUTS (No-U-Turn Sampler) to infer geological structure parameters from observed gravity.">
+    <div class="sphx-glr-thumbcontainer" tooltip="This tutorial provides a comprehensive walkthrough of Bayesian gravity inversion using the GemPy-Probability framework. We&#x27;ll explore both the theoretical foundations and practical implementation of inferring geological parameters from gravity observations.">
 
 .. only:: html
 
@@ -62,7 +62,7 @@ Add your example scripts here with names starting with `plot_` for automatic gal
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Gravity Inversion with NUTS Sampling</div>
+      <div class="sphx-glr-thumbnail-title">Bayesian Gravity Inversion: Complete Workflow</div>
     </div>
 
 
