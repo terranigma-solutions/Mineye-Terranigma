@@ -30,8 +30,8 @@ def compute_alignment_params(
             "reference_std": float(np.std(observed)),
         }
         if baseline_forward is not None:
-            params["baseline_forward_mean"] = float(np.mean(baseline_forward))
-            params["baseline_forward_std"] = float(np.std(baseline_forward))
+            params["baseline_forward_mean"] = float(baseline_forward.mean())
+            params["baseline_forward_std"] = float(baseline_forward.std())
         if verbose:
             print(f"  Alignment params: {params}")
         return params

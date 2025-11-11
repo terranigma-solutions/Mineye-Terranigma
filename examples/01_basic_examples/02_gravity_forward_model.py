@@ -17,6 +17,9 @@ from matplotlib import pyplot as plt
 import gempy as gp
 import geopandas as gpd
 
+from mineye.GeoModel.geophysics import align_forward_to_observed
+from mineye.GeoModel.model_one.probabilistic_model import normalize
+
 # Set random seed for reproducibility
 np.random.seed(1234)
 
@@ -157,7 +160,15 @@ print("✓ Forward gravity model computed successfully")
 # -----------------------
 # Get the computed gravity response
 
-grav = sol.gravity
+observed_gravity_ugal= observed_gravity * 1000
+norm_params = normalize(
+    sol.gravity,
+    observed_gravity_ugal,
+    method="align_to_reference",
+    extrapolation_buffer=0.3
+)
+grav = align_forward_to_observed(sol.gravity, norm_params)
+
 print(f"\nComputed gravity values:")
 print(f"  Shape: {grav.shape}")
 print(f"  Range: {grav.min():.2f} to {grav.max():.2f} mGal")
@@ -168,7 +179,11 @@ print(f"  Mean: {grav.mean():.2f} mGal")
 # -------------------------
 # Calculate residuals between observed and computed gravity
 
-residuals = observed_gravity - grav.numpy()
+if isinstance(grav, torch.Tensor):
+    grav = grav.detach().numpy()
+    
+residuals = observed_gravity_ugal - grav
+
 print(f"\nGravity residuals:")
 print(f"  Mean: {residuals.mean():.2f} mGal")
 print(f"  Std: {residuals.std():.2f} mGal")
@@ -197,7 +212,7 @@ plot_comparison(observed_gravity, grav, xy_ravel)
 # %%
 # Visualize Forward Model Results
 # --------------------------------
-grav_forward = sol.gravity
+grav_forward = grav
 print(f"✓ Forward model computed")
 print(f"  Gravity range: [{grav_forward.min():.2f}, {grav_forward.max():.2f}] µGal")
 
@@ -226,7 +241,7 @@ plt.show()
 # ------------------------------
 
 # Convert observed from mGal to µGal
-observed_ugal = observed_gravity * 1000
+observed_ugal = observed_gravity_ugal
 
 # Create comparison plot
 fig, axes = plt.subplots(1, 3, figsize=(18, 5))
@@ -342,3 +357,4 @@ print("="*50)
 # * Use residuals for probabilistic inversion
 # * Uncertainty quantification with Bayesian methods
 # * Joint inversion with multiple data types
+# sphinx_gallery_thumbnail_number = 

@@ -639,8 +639,23 @@ if RUN_SIMULATION:
     print("✓ Prior and posterior combined")
     
 else:
-    data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_04.nc"))
 
+    from pathlib import Path
+    import inspect
+
+    # Get the directory of the current file using inspect
+    current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
+    data_path = current_dir / "arviz_data_04.nc"
+
+    if not data_path.exists():
+        raise FileNotFoundError(
+            f"Data file not found at {data_path}. "
+            f"Please run the simulation first with RUN_SIMULATION=True"
+        )
+
+    # Read the data file
+    data = az.from_netcdf(str(data_path))
+    
 # %%
 # Analysis: Parameter Posterior Statistics
 # -----------------------------------------
