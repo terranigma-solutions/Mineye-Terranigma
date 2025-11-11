@@ -14,7 +14,7 @@ from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, set_priors
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, generate_multigravity_likelihood_hierarchical_per_station
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
-from mineye.GeoModel.model_one.visualization import plot, gempy_viz, plot_many_observed_vs_forward
+from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots, gempy_viz, plot_many_observed_vs_forward
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_comparison
 # noinspection PyUnusedImports
 from tests import conftest
@@ -251,14 +251,14 @@ class TestProbabilisticInversion:
 
         # * 9) Analysis inference
         if hasattr(data, 'prior') and r'gravity_response' in data.prior:
-            gravity_samples_norm, unit_label = plot(
+            gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
                 gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
                 observed_gravity_ugal=observed_gravity_ugal,
                 xy_ravel=xy_ravel
             )
 
         if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
-            gravity_samples_norm, unit_label = plot(
+            gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
                 gravity_samples_norm=data.posterior_predictive[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
                 observed_gravity_ugal=observed_gravity_ugal,
                 xy_ravel=xy_ravel

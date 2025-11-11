@@ -80,8 +80,11 @@ import sys
 # ----------------
 
 import dotenv
-
 dotenv.load_dotenv()
+
+from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
+from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward, generate_gravity_uncertainty_plots
+
 
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_gravity_comparison
 
@@ -214,8 +217,6 @@ gpv.plot_3d(
             'show_xlabels': False,
             'show_ylabels': False,
             'show_zlabels': False,
-            'show_bounds' : False,
-
     }
 )
 
@@ -516,12 +517,28 @@ print("\nRunning prior predictive sampling (100 samples)...")
 prior_inference_data: az.InferenceData = gpp.run_predictive(
     prob_model=prob_model,
     geo_model=geo_model,
-    y_obs_list=observed_gravity_ugal,
+    y_obs_list=torch.tensor(observed_gravity_ugal),
     n_samples=100,
     plot_trace=True
 )
 
 print("✓ Prior predictive sampling complete")
+
+# %%
+# TODO: Add explanation
+gempy_viz(
+    geo_model=geo_model,
+    prior_inference_data=prior_inference_data,
+    n_samples=20
+)
+
+# %%
+# TODO: Add explanation
+plot_many_observed_vs_forward(
+    forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
+    many_forward_norm=prior_inference_data.prior[r'gravity_response'].values[0, -20:],
+    observed_norm=observed_gravity_ugal
+)
 
 # %%
 # Step 10: Run MCMC Inference with NUTS
@@ -594,7 +611,7 @@ if RUN_SIMULATION:
     data = gpp.run_nuts_inference(
         prob_model=prob_model,
         geo_model=geo_model,
-        y_obs_list=observed_gravity_ugal,
+        y_obs_list=torch.tensor(observed_gravity_ugal),
         config=NUTSConfig(
             step_size=0.0001,
             adapt_step_size=True,
@@ -622,7 +639,7 @@ if RUN_SIMULATION:
     print("✓ Prior and posterior combined")
     
 else:
-    data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+    data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_04.nc"))
 
 # %%
 # Analysis: Parameter Posterior Statistics
@@ -704,6 +721,56 @@ print(f"\nResiduals (posterior mean - observed):")
 print(f"  Mean: {residuals.mean():.2f} µGal (bias)")
 print(f"  RMS: {np.sqrt((residuals ** 2).mean()):.2f} µGal (fit quality)")
 print(f"  Max absolute: {np.abs(residuals).max():.2f} µGal")
+
+# %% 
+plot_many_observed_vs_forward(
+    forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
+    many_forward_norm=data.posterior_predictive[r'gravity_response'].values[0, -20:],
+    observed_norm=observed_gravity_ugal
+)
+
+
+# %%
+az.plot_density(
+    data=[data, data.prior],
+    var_names=["dips", "density"],
+    filter_vars="like",
+    hdi_prob=0.9999,
+    shade=.2,
+    data_labels=["Posterior", "Prior"],
+    colors=[default_red, default_blue],
+)
+
+# %%
+
+plot_gravity_comparison(
+    observed_ugal=observed_gravity_ugal,
+    forward_norm=data.prior[r'gravity_response'].mean(axis=1),
+    xy_ravel=xy_ravel,
+    normalization_method='align_to_reference'
+)
+
+plot_gravity_comparison(
+    observed_ugal=observed_gravity_ugal,
+    forward_norm=data.posterior_predictive[r'gravity_response'].mean(axis=1),
+    xy_ravel=xy_ravel,
+    normalization_method='align_to_reference'
+)
+
+# %%
+
+gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
+    gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+    observed_gravity_ugal=observed_gravity_ugal,
+    xy_ravel=xy_ravel
+)
+
+if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
+    gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
+        gravity_samples_norm=data.posterior_predictive[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+        observed_gravity_ugal=observed_gravity_ugal,
+        xy_ravel=xy_ravel
+    )
 
 # %%
 # Summary: The Inference Pipeline

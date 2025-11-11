@@ -10,7 +10,7 @@ from gempy_probability.modules.plot.plot_gempy import plot_gempy
 from gempy_probability.modules.plot.plot_posterior import default_blue, default_red
 
 
-def plot(gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, Any]:
+def generate_gravity_uncertainty_plots(gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, Any]:
     # Import visualization functions
     from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_map_interpolated
     from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_profiles
@@ -114,7 +114,7 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
                     'alpha'            : 1,
                     'cmap'             : 'Reds',
                     'lognorm'          : False,  # Use log normalization
-                    'density_threshold': 40,  # Mask bottom 10%
+                    'density_threshold': 40,  # Mask bottom 10%iaa
                     'vmin_percentile'  : 0,  # Start color scale at 5th percentile
                     'vmax_percentile'  : 100  # End color scale at 95th percentile
             }
@@ -132,10 +132,6 @@ def gempy_viz_pro(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Infer
         _draw_kde(ax, x_all, z_all, gridsize=400, bw=0.03, alpha=0.5, cmap="Blues", zorder=35, lognorm=True)
 
     p2d.axes[0].set_title("Uncertainty: KDE background + representative realizations")
-
-
-import numpy as np
-from matplotlib.colors import LogNorm
 
 
 def plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm):

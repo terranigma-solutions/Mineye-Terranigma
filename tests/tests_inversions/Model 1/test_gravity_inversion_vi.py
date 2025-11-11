@@ -15,7 +15,7 @@ from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, _modify_orientations, _modify_densities, set_priors
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, generate_multigravity_likelihood_hierarchical_per_station, generate_multigravity_likelihood_per_station_stable
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
-from mineye.GeoModel.model_one.visualization import plot, gempy_viz
+from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots, gempy_viz
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_gravity_comparison
 # noinspection PyUnusedImports
 from tests import conftest
@@ -217,7 +217,7 @@ class TestProbabilisticInversionVI:
             normalization_method='align_to_reference'
         )
 
-        gravity_samples_norm, unit_label = plot(
+        gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
             gravity_samples_norm=gravity_samples_norm,
             observed_gravity_ugal=observed_gravity_ugal,
             xy_ravel=xy_ravel
@@ -301,14 +301,14 @@ class TestProbabilisticInversionVI:
         
         # Analysis inference
         if hasattr(data, 'prior') and r'gravity_response' in data.prior:
-            gravity_samples_norm, unit_label = plot(
+            gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
                 gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
                 observed_gravity_ugal=observed_gravity_ugal,
                 xy_ravel=xy_ravel
             )
 
         if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
-            gravity_samples_norm, unit_label = plot(
+            gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
                 gravity_samples_norm=data.posterior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
                 observed_gravity_ugal=observed_gravity_ugal,
                 xy_ravel=xy_ravel
