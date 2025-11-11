@@ -70,7 +70,6 @@ The forward model f involves:
 4. Normalization and alignment to observations
 
 
-sphinx_gallery_thumbnail_number = 9
 """
 import os
 import sys
@@ -1295,3 +1294,5 @@ if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
 # - Integrate geophysical data with geological priors
 # - Diagnose and visualize inference results
 # - Extend this framework to your own problems
+
+# sphinx_gallery_thumbnail_number = 9

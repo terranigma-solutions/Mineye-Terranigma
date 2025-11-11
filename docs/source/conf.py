@@ -192,7 +192,7 @@ html_theme_options = {
         'github_user'     : 'leguark',
         'github_repo'     : 'Mineye-Terranigma',
         'github_type'     : 'star',
-        'logo'            : 'logos/Terranigma.png',
+        'logo'            : 'logos/MINEYE_LOGO.png',
         'logo_name'       : False,
         'travis_button'   : False,
         'page_width'      : '1200px',
