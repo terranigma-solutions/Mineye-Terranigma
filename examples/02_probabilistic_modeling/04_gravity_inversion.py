@@ -428,7 +428,7 @@ post_forward_dets = {
 #
 # .. math::
 #
-#     y_i \\sim \\mathcal{N}(f_i(θ), σ^2)
+#     y_i \sim \mathcal{N}(f_i(θ), σ^2)
 #
 # Where:
 #
@@ -458,8 +458,8 @@ post_forward_dets = {
 #
 # .. math::
 #
-#     σ_i \\sim \\text{HalfNormal}(τ) \\\\
-#     y_i \\sim \\mathcal{N}(f_i(θ), σ_i^2)
+#     σ_i \sim \text{HalfNormal}(τ) \\\\
+#     y_i \sim \mathcal{N}(f_i(θ), σ_i^2)
 #
 # **Understanding generate_multigravity_likelihood_hierarchical_per_station**
 #
@@ -486,32 +486,35 @@ post_forward_dets = {
 #
 # .. math::
 #
-#     \\text{Level 1 (Hyperpriors):} \\\\
-#     \\mu_{\\log\\sigma} \\sim \\mathcal{N}(\\log(5000), 0.5) \\\\
-#     \\tau_{\\log\\sigma} \\sim \\text{HalfNormal}(0.5)
+#     \text{Level 1 (Hyperpriors):} \\\\
+#     \mu_{\log\sigma} \sim \mathcal{N}(\log(5000), 0.5) \\\\
+#     \tau_{\log\sigma} \sim \text{HalfNormal}(0.5)
 #
 # .. math::
 #
-#     \\text{Level 2 (Station-specific noise):} \\\\
-#     \\log(\\sigma_i) \\sim \\mathcal{N}(\\mu_{\\log\\sigma}, \\tau_{\\log\\sigma})
+#     \text{Level 2 (Station-specific noise):} \\\\
+#     \log(\sigma_i) \sim \mathcal{N}(\mu_{\log\sigma}, \tau_{\log\sigma})
 #
 # .. math::
 #
-#     \\text{Level 3 (Observations):} \\\\
-#     y_i \\sim \\mathcal{N}(f_i(\\theta), \\sigma_i^2)
+#     \text{Level 3 (Observations):} \\\\
+#     y_i \sim \mathcal{N}(f_i(\theta), \sigma_i^2)
 #
 # **Parameter Interpretation**:
 #
 # - **μ_log_σ**: Global mean noise level (log scale)
+#
 #   * Prior centered at log(5000) ≈ 8.5, meaning typical noise is ~5000 µGal
 #   * Uncertainty of 0.5 allows 1σ range of [3000, 8200] µGal
 #
 # - **τ_log_σ**: Variability between stations (log scale)
+#
 #   * HalfNormal(0.5) prior: most stations similar, but allows outliers
 #   * Small τ → stations have similar noise (strong pooling)
 #   * Large τ → stations have very different noise (weak pooling)
 #
 # - **σ_i**: Each station's noise standard deviation
+#
 #   * Inferred from data automatically
 #   * High σ_i → station is an outlier or has poor data quality
 #   * Low σ_i → station is reliable
@@ -526,6 +529,7 @@ post_forward_dets = {
 # **Working with log-scale**:
 #
 # We model log(σ) rather than σ directly because:
+#
 # - Noise must be positive: exp(log σ) > 0 always
 # - More symmetric uncertainty: equal probability of σ/2 and 2σ
 # - Numerically stable for optimization and sampling

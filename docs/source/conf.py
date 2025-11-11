@@ -28,6 +28,8 @@ import pykeops
 import sphinx_gallery
 from sphinx_gallery.sorting import FileNameSortKey
 import numpy as np
+import pyvista
+from sphinx_gallery.sorting import FileNameSortKey
 
 dotenv.load_dotenv()
 
@@ -38,6 +40,15 @@ try:
 except ImportError:
     has_mineye = False
     print("Warning: mineye package not found. Install with 'pip install -e .' from project root.")
+
+    # region PyVista Configuration
+pyvista.set_error_output_file('errors.txt')
+pyvista.OFF_SCREEN = True  # Not necessary - simply an insurance policy. Ensure that offscreen rendering is used for docs generation
+pyvista.set_plot_theme('document')  # Preferred plotting style for documentation
+pyvista.FIGURE_PATH = os.path.join(os.path.abspath('_images/'), 'auto-generated/')  # Save figures in specified directory
+pyvista.BUILDING_GALLERY = True
+if not os.path.exists(pyvista.FIGURE_PATH):
+    os.makedirs(pyvista.FIGURE_PATH)
 
 sys.path.insert(0, os.path.abspath('.'))
 
@@ -61,6 +72,7 @@ extensions = [
         'sphinx.ext.mathjax',
         'sphinx.ext.viewcode',
         'sphinx.ext.githubpages',
+        "pyvista.ext.plot_directive",
         'sphinx.ext.napoleon',
         'sphinx_gallery.gen_gallery',
 ]
@@ -158,7 +170,7 @@ sphinx_gallery_conf = {
         "within_subsection_order": FileNameSortKey,
         "backreferences_dir"     : 'gen_modules/backreferences',
         "doc_module"             : ("mineye", 'numpy', 'pandas', 'matplotlib'),
-        "image_scrapers"         : ('matplotlib',),
+        "image_scrapers"         : ('matplotlib', 'pyvista'),
         'first_notebook_cell'    : "%matplotlib inline\n",
         'reference_url'          : {
                 'mineye': None,  # The module you locally document uses None
