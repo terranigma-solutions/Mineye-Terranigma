@@ -284,6 +284,42 @@ print(f"\nNormalization parameters:")
 print(f"  Method: {norm_params['method']}")
 print(f"  Parameters: {norm_params}")
 
+# %%
+# **Understanding plot_gravity_comparison**
+#
+# This visualization function creates a comprehensive 4-panel comparison between
+# observed and forward-modeled gravity data:
+#
+# **Panel 1 (Top-Left): Observed Gravity**
+# - Shows the spatial distribution of measured gravity values at station locations
+# - Color represents gravity magnitude (viridis_r colormap: dark = high, light = low)
+# - Each point is a measurement station with its x,y coordinates
+#
+# **Panel 2 (Top-Right): Forward Model Gravity**
+# - Shows the predicted gravity from our geological model at the same locations
+# - Uses the SAME colorbar limits as Panel 1 for direct visual comparison
+# - Reveals how well our model predicts the spatial patterns
+#
+# **Panel 3 (Bottom-Left): Residuals (Observed - Forward)**
+# - Shows the mismatch between observations and predictions
+# - Uses RdBu_r colormap: red = model underpredicts, blue = model overpredicts
+# - Symmetric colorbar centered on zero
+# - **Spatial patterns in residuals indicate**:
+#   * Systematic errors → model is too simple
+#   * Random scatter → good fit with measurement noise
+#   * Clusters of large residuals → missing geological features
+#
+# **Panel 4 (Bottom-Right): Correlation Plot**
+# - Scatter plot: observed (x-axis) vs forward model (y-axis)
+# - Red dashed line: perfect 1:1 agreement
+# - Points on the line = perfect prediction
+# - Correlation coefficient R quantifies linear relationship (-1 to 1)
+# - **Interpretation**:
+#   * R ≈ 1: excellent fit
+#   * R ≈ 0.7-0.9: good fit with some misfit
+#   * R < 0.5: poor fit, model needs improvement
+
+# %%
 plot_gravity_comparison(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
     normalization_method="align_to_reference",
@@ -310,7 +346,7 @@ plot_gravity_comparison(
 #
 # .. math::
 #
-#     \\text{dip} \\sim \\mathcal{N}(10°, 10°)
+#     \text{dip} \sim \mathcal{N}(10^\circ,\, 10^\circ)
 #
 # **Interpretation**:
 #
@@ -424,14 +460,94 @@ post_forward_dets = {
 #
 #     σ_i \\sim \\text{HalfNormal}(τ) \\\\
 #     y_i \\sim \\mathcal{N}(f_i(θ), σ_i^2)
+#
+# **Understanding generate_multigravity_likelihood_hierarchical_per_station**
+#
+# This function creates a **hierarchical Bayesian likelihood** that treats each
+# gravity station's measurement noise as an unknown parameter to be inferred.
+#
+# **Why hierarchical modeling?**
+#
+# Real gravity data has station-dependent noise due to:
+# - Instrument precision differences
+# - Local environmental conditions (vibrations, temperature)
+# - Terrain corrections quality
+# - Measurement protocol variations
+#
+# Instead of assuming all stations have identical noise, hierarchical modeling:
+# 1. Estimates noise separately for each station
+# 2. Links stations through shared hyperparameters (partial pooling)
+# 3. Automatically identifies outliers (high-noise stations)
+# 4. Provides robust inference by downweighting problematic data
+#
+# **Mathematical Structure**:
+#
+# The hierarchical model has three levels:
+#
+# .. math::
+#
+#     \\text{Level 1 (Hyperpriors):} \\\\
+#     \\mu_{\\log\\sigma} \\sim \\mathcal{N}(\\log(5000), 0.5) \\\\
+#     \\tau_{\\log\\sigma} \\sim \\text{HalfNormal}(0.5)
+#
+# .. math::
+#
+#     \\text{Level 2 (Station-specific noise):} \\\\
+#     \\log(\\sigma_i) \\sim \\mathcal{N}(\\mu_{\\log\\sigma}, \\tau_{\\log\\sigma})
+#
+# .. math::
+#
+#     \\text{Level 3 (Observations):} \\\\
+#     y_i \\sim \\mathcal{N}(f_i(\\theta), \\sigma_i^2)
+#
+# **Parameter Interpretation**:
+#
+# - **μ_log_σ**: Global mean noise level (log scale)
+#   * Prior centered at log(5000) ≈ 8.5, meaning typical noise is ~5000 µGal
+#   * Uncertainty of 0.5 allows 1σ range of [3000, 8200] µGal
+#
+# - **τ_log_σ**: Variability between stations (log scale)
+#   * HalfNormal(0.5) prior: most stations similar, but allows outliers
+#   * Small τ → stations have similar noise (strong pooling)
+#   * Large τ → stations have very different noise (weak pooling)
+#
+# - **σ_i**: Each station's noise standard deviation
+#   * Inferred from data automatically
+#   * High σ_i → station is an outlier or has poor data quality
+#   * Low σ_i → station is reliable
+#
+# **Benefits over fixed noise**:
+#
+# 1. **Robustness**: Outliers get high σ_i and are downweighted automatically
+# 2. **Adaptivity**: Model learns which stations to trust
+# 3. **Uncertainty quantification**: Know which measurements are reliable
+# 4. **No manual outlier removal**: Statistical approach to data quality
+#
+# **Working with log-scale**:
+#
+# We model log(σ) rather than σ directly because:
+# - Noise must be positive: exp(log σ) > 0 always
+# - More symmetric uncertainty: equal probability of σ/2 and 2σ
+# - Numerically stable for optimization and sampling
+#
+# **Partial pooling effect**:
+#
+# The hierarchical structure provides "partial pooling" between no pooling
+# (each station independent) and complete pooling (all stations identical):
+#
+# - Stations with few observations borrow strength from others (shrinkage)
+# - Stations with many observations stay close to their data
+# - Automatically balances individual evidence vs. group information
 
-# TODO: Explain this especific likelihood function in detail. It is in probabilistic_model_likelihoods.py
+# %%
+
 likelihood_fn = generate_multigravity_likelihood_hierarchical_per_station(
     norm_params=norm_params
 )
 
-print("✓ Likelihood function created (diagonal covariance)")
-print(f"  Assumed measurement noise: 5000.0 µGal")
+print("✓ Likelihood function created (hierarchical per-station)")
+print(f"  Global mean noise prior: ~5000.0 µGal")
+print(f"  Each station's noise will be inferred from data")
 
 # %%
 # Step 8: Create Probabilistic Model
@@ -450,24 +566,146 @@ print(f"  Assumed measurement noise: 5000.0 µGal")
 #
 # **The `set_interp_input_fn` function**
 #
-# This function bridges Pyro's sampled parameters to GemPy's geological model:
+# This function bridges Pyro's sampled parameters to GemPy's geological model.
+# The actual implementation (set_priors) performs these steps:
 #
 # .. code-block:: python
-# TODO: This is wrong!
+#
 #     def set_priors(samples: dict, geo_model: gp.data.GeoModel):
-#         # Extract sampled dips
-#         dips = samples["dips"]
-#         # Update orientations in geo_model
-#         geo_model.orientations_copy.dip = dips
-#         # Extract sampled densities
-#         densities = samples["density"]
-#         # Update rock densities
-#         geo_model.structural_frame.densities = densities
-#         return geo_model
+#         # 1. Create interpolation input from current model state
+#         interp_input = interpolation_input_from_structural_frame(geo_model)
+#
+#         # 2. Extract current orientation gradients
+#         og_gradients = interp_input.orientations.dip_gradients
+#
+#         # 3. Compute azimuth, dip, polarity from gradients
+#         azimuth, dip, polarity = compute_adp_from_gradients(
+#             G_x=og_gradients[:, 0],
+#             G_y=og_gradients[:, 1],
+#             G_z=og_gradients[:, 2]
+#         )
+#
+#         # 4. Replace dip with sampled values, keeping azimuth/polarity
+#         sampled_dips = samples["dips"]
+#         new_gradients = convert_orientation_to_pole_vector(
+#             azimuth=azimuth,
+#             dip=sampled_dips,  # ← This is what we're inferring
+#             polarity=polarity
+#         )
+#
+#         # 5. Update interpolation input with new gradients
+#         interp_input.orientations.dip_gradients = new_gradients
+#
+#         # 6. Update densities
+#         geo_model.geophysics_input.densities = samples["density"]
+#
+#         return interp_input
+#
+# **Why this complexity?**
+#
+# GemPy internally represents orientations as 3D gradient vectors (G_x, G_y, G_z),
+# not as angles. The conversion ensures:
+#
+# - Sampled dip angles are properly transformed to gradients
+#
+# - Azimuth and polarity remain consistent with original data
+#
+# - All operations are differentiable (required for NUTS)
 #
 # This coupling allows MCMC to explore geological parameter space while
 # computing physically-consistent gravity responses.
+#
+# **Understanding make_gempy_pyro_model_extended**
+#
+# This function creates a complete Bayesian probabilistic model by connecting
+# all the pieces we've defined. It orchestrates the entire inference workflow
+# within Pyro's probabilistic programming framework.
+#
+# **Function Arguments Explained**:
+#
+# 1. **priors** (dict): Prior distributions for all parameters
+#    - Keys: parameter names (e.g., "dips", "density")
+#    - Values: Pyro distribution objects
+#    - These encode our geological knowledge before seeing data
+#
+# 2. **set_interp_input_fn** (callable): Bridge between Pyro and GemPy
+#    - Takes sampled parameters from Pyro
+#    - Updates the GemPy geological model accordingly
+#    - Returns modified InterpolationInput for forward modeling
+#    - Example: set_priors() updates orientations and densities
+#
+# 3. **likelihood_fn** (callable): Connects predictions to observations
+#    - Takes GemPy Solutions (forward model output)
+#    - Returns Pyro distribution representing p(data|parameters)
+#    - Defines the noise model (Gaussian, Student-t, etc.)
+#
+# 4. **pre_forward_deterministics** (dict): Quantities tracked BEFORE forward model
+#    - Useful for debugging parameter transformations
+#    - Example: track transformed coordinates, scaled parameters
+#
+# 5. **post_forward_deterministics** (dict): Quantities tracked AFTER forward model
+#    - Monitor derived quantities during inference
+#    - Keys: variable names for ArviZ
+#    - Values: functions that extract/compute quantities from Solutions
+#    - Example: track mean gravity, max gravity, normalized response
+#
+# 6. **obs_name** (str): Name for observed data in ArviZ output
+#    - Used for labeling in posterior predictive plots
+#    - Helps identify which likelihood corresponds to which data
+#
+# **What happens inside make_gempy_pyro_model_extended?**
+#
+# The function creates a Pyro model that executes this sequence on each MCMC iteration:
+#
+# .. code-block:: none
+#
+#     1. Sample parameters from priors:
+#        θ ~ p(θ)
+#        Example: dips ~ Normal(10, 10)
+#
+#     2. Transform parameters via set_interp_input_fn:
+#        InterpolationInput = set_priors(θ, geo_model)
+#        Updates: orientations.dip, densities, etc.
+#
+#     3. Compute pre-forward deterministics (if any):
+#        pyro.deterministic("param_squared", θ**2)
+#
+#     4. Run GemPy forward model:
+#        Solutions = gp.compute_model(geo_model)
+#        Computes: gravity field at observation points
+#
+#     5. Compute post-forward deterministics:
+#        pyro.deterministic("gravity_response", normalize(Solutions.gravity))
+#        pyro.deterministic("mean_gravity", torch.mean(...))
+#
+#     6. Evaluate likelihood:
+#        y_obs ~ likelihood_fn(Solutions)
+#        Computes: log p(y_obs | θ)
+#
+#     7. MCMC/VI uses log p(y_obs | θ) + log p(θ) to update sampler
+#
+# **Why this architecture?**
+#
+# - **Modularity**: Each component (prior, forward model, likelihood) can be
+#   modified independently
+#
+# - **Flexibility**: Easy to add new parameters, change noise models, or
+#   incorporate multiple data types
+#
+# - **Automatic differentiation**: Pyro tracks gradients through the entire
+#   workflow, enabling efficient NUTS sampling
+#
+# - **Diagnostics**: Deterministics provide visibility into intermediate steps
+#   without affecting inference
+#
+# **Return value**:
+#
+# A GemPyPyroModel object that can be passed to:
+# - gpp.run_nuts_inference() for MCMC sampling
+# - gpp.run_predictive() for prior/posterior predictive checks
+# - gpp.run_vi_inference() for variational inference (faster approximation)
 
+# %%
 prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
     priors=model_priors,
     set_interp_input_fn=set_priors,
@@ -478,8 +716,11 @@ prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
 )
 
 print("✓ Probabilistic model created")
-
-# TODO: explain make_gempy_pyro_model_extended
+print("  Model components:")
+print("    - Priors: dips (orientations), densities")
+print("    - Forward model: GemPy geological interpolation + gravity")
+print("    - Likelihood: Hierarchical per-station noise")
+print("    - Deterministics: gravity_response, mean_gravity, max_gravity")
 
 
 # %%
@@ -526,7 +767,34 @@ prior_inference_data: az.InferenceData = gpp.run_predictive(
 print("✓ Prior predictive sampling complete")
 
 # %%
-# TODO: Add explanation
+# Visualize Prior Geological Models
+# ----------------------------------
+#
+# **Understanding gempy_viz**
+#
+# This function creates a 2D cross-section visualization showing:
+#
+# 1. **The geological model**: Interpolated lithological boundaries
+# 2. **Prior uncertainty via KDE (Kernel Density Estimation)**:
+#
+#    - Background colored contours show probability density of boundary locations
+#    - Darker/more saturated colors = higher probability
+#    - Shows where the geological boundary is likely to be given our prior beliefs
+#
+# 3. **Representative realizations**: Individual model samples overlaid as contours
+#
+# **Why visualize the prior?**
+#
+# - Verify that prior predictions span a geologically reasonable range
+# - Check if the model can produce diverse enough structures
+# - Identify if priors are too restrictive (narrow KDE) or too vague (very wide KDE)
+#
+# **KDE interpretation**:
+#
+# - **Narrow, focused density**: Strong prior belief about structure location
+# - **Wide, diffuse density**: High uncertainty in structure location
+# - **Multiple modes**: Prior suggests multiple possible configurations
+
 gempy_viz(
     geo_model=geo_model,
     prior_inference_data=prior_inference_data,
@@ -534,7 +802,46 @@ gempy_viz(
 )
 
 # %%
-# TODO: Add explanation
+# Compare Multiple Prior Predictions to Observations
+# ---------------------------------------------------
+#
+# **Understanding plot_many_observed_vs_forward**
+#
+# This diagnostic plot shows how well different prior samples fit the data.
+# It helps answer: "Can ANY model from our prior explain the observations?"
+#
+# **Plot Structure**:
+#
+# - **X-axis**: Observed gravity (sorted by value for clarity)
+# - **Y-axis**: Forward-modeled gravity from different prior samples
+# - **Each colored line**: One realization from the prior distribution
+# - **Red dashed line**: Perfect 1:1 agreement
+#
+# **What to look for**:
+#
+# 1. **Lines parallel to 1:1**: Model captures the overall trend
+#    - Offset from 1:1 is handled by normalization
+#    - Slope matters: should be close to 1.0
+#
+# 2. **Lines crossing each other**: Different models fit different subsets of data
+#    - Some samples fit low-gravity stations well
+#    - Other samples fit high-gravity stations well
+#    - Suggests parameter trade-offs or model inadequacy
+#
+# 3. **All lines far from 1:1**: Prior may be mis-specified
+#    - Models can't explain observations
+#    - Need to adjust priors or add model complexity
+#
+# 4. **Lines bunched together**: Prior is restrictive
+#    - Limited parameter range
+#    - May need wider priors for exploration
+#
+# **Implications for inference**:
+#
+# - If some lines pass through observations → posterior will identify those parameters
+# - If NO lines match observations → model structure is inadequate
+# - Scatter in lines → posterior will reduce uncertainty by selecting best-fitting models
+
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
     many_forward_norm=prior_inference_data.prior[r'gravity_response'].values[0, -10:],
@@ -801,68 +1108,145 @@ if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
     )
 
 # %%
-# Summary: The Inference Pipeline
-# --------------------------------
+# Summary: The Complete Bayesian Gravity Inversion Workflow
+# ----------------------------------------------------------
 #
-# **Complete Workflow Recap**
+# **Workflow Recap with Function Explanations**
 #
-# We've completed a full Bayesian gravity inversion:
+# We've completed a full Bayesian gravity inversion. Here's the complete pipeline
+# with the role of each key function:
 #
 # .. code-block:: none
 #
-#     Priors (dips, densities)
-#         ↓
-#     set_priors() → Update GeoModel
-#         ↓
-#     Forward gravity computation
-#         ↓
-#     Normalize & align to observations
-#         ↓
-#     Likelihood evaluation (diagonal)
-#         ↓
-#     MCMC sampling (NUTS)
-#         ↓
-#     Posterior (updated beliefs)
-#         ↓
-#     Posterior predictive (predictions with uncertainty)
+#     ┌─────────────────────────────────────────────────────────────────┐
+#     │ 1. PRIOR DEFINITION                                             │
+#     │    Define prior distributions for parameters                    │
+#     │    → model_priors = {dips: Normal(10, 10), density: Normal(...)}│
+#     └─────────────────────────────────────────────────────────────────┘
+#                                    ↓
+#     ┌─────────────────────────────────────────────────────────────────┐
+#     │ 2. PROBABILISTIC MODEL CONSTRUCTION                             │
+#     │    make_gempy_pyro_model_extended() orchestrates:               │
+#     │    - Connects priors to GemPy via set_priors()                  │
+#     │    - Defines forward model execution                            │
+#     │    - Links predictions to data via likelihood_fn()              │
+#     └─────────────────────────────────────────────────────────────────┘
+#                                    ↓
+#     ┌─────────────────────────────────────────────────────────────────┐
+#     │ 3. PRIOR PREDICTIVE CHECKS (gpp.run_predictive)                 │
+#     │    Sample from prior to verify model adequacy:                  │
+#     │    - gempy_viz() shows geological model uncertainty (KDE)       │
+#     │    - plot_many_observed_vs_forward() checks if ANY prior        │
+#     │      samples can explain observations                           │
+#     └─────────────────────────────────────────────────────────────────┘
+#                                    ↓
+#     ┌─────────────────────────────────────────────────────────────────┐
+#     │ 4. MCMC INFERENCE (gpp.run_nuts_inference)                      │
+#     │    For each iteration:                                          │
+#     │    a) Sample θ from priors                                      │
+#     │    b) set_priors(θ) → update GeoModel orientations & densities  │
+#     │    c) Forward gravity computation                               │
+#     │    d) Normalize & align to observations                         │
+#     │    e) generate_multigravity_likelihood_hierarchical_per_station │
+#     │       evaluates p(data|θ) with adaptive noise per station       │
+#     │    f) NUTS uses ∇log p(data|θ) + ∇log p(θ) to propose next θ   │
+#     └─────────────────────────────────────────────────────────────────┘
+#                                    ↓
+#     ┌─────────────────────────────────────────────────────────────────┐
+#     │ 5. POSTERIOR ANALYSIS                                           │
+#     │    - plot_gravity_comparison() visualizes fit quality           │
+#     │      * Shows observed, predicted, residuals, correlation        │
+#     │    - az.plot_density() shows prior vs posterior distributions   │
+#     │    - Posterior predictive checks validate model                 │
+#     └─────────────────────────────────────────────────────────────────┘
 #
-# **Key Insights**
+# **Key Functions and Their Roles**:
 #
-# 1. **Model limitations**: If prior predictive shows models that fit some stations
-#    but not others, the forward model may be too simple. Adding more data types
-#    (magnetics, seismics) won't help if the model structure is inadequate.
+# 1. **make_gempy_pyro_model_extended()**
+#    - Central orchestrator connecting all components
+#    - Creates the probabilistic model structure
+#    - Enables automatic differentiation through entire workflow
 #
-# 2. **Posterior concentration**: The posterior focuses on explaining the maximum
-#    number of observations. Outliers may indicate interesting geological features
-#    requiring model complexity increases.
+# 2. **set_priors()** (passed as set_interp_input_fn)
+#    - Bridges Pyro samples → GemPy geological model
+#    - Converts sampled dip angles to gradient vectors
+#    - Updates densities in geophysics input
 #
-# 3. **The forward model as a polynomial**: Just as y = θ₁x + θ₂ in linear regression,
-#    here y = f(θ) where f is a complex geological simulation. The principles of
-#    regression still apply, but f is much more sophisticated!
+# 3. **generate_multigravity_likelihood_hierarchical_per_station()**
+#    - Creates robust likelihood with per-station noise inference
+#    - Automatically handles outliers via partial pooling
+#    - Returns function that computes p(observations|predictions)
 #
-# **Next Steps**
+# 4. **plot_gravity_comparison()**
+#    - 4-panel diagnostic showing observed vs predicted
+#    - Spatial residual patterns reveal model inadequacy
+#    - Correlation plot quantifies overall fit quality
 #
-# For production inversions, consider:
+# 5. **plot_many_observed_vs_forward()**
+#    - Shows if prior samples can explain observations
+#    - Crossing lines indicate parameter trade-offs
+#    - Essential for diagnosing prior mis-specification
 #
-# 1. **Hierarchical likelihood**: Use per-station noise estimation for automatic
-#    outlier detection and robustness
+# 6. **gempy_viz()**
+#    - Visualizes geological uncertainty via KDE
+#    - Overlays sample realizations on cross-sections
+#    - Compares prior vs posterior structural uncertainty
 #
-# 2. **Multiple chains**: Run 4+ chains to diagnose convergence with R-hat
+# **Key Insights from This Tutorial**
 #
-# 3. **More parameters**: Invert for densities, layer thicknesses, additional
-#    orientations, spatial density variations
+# 1. **Hierarchical modeling is powerful**: By inferring per-station noise,
+#    we get automatic outlier detection without manual data cleaning.
 #
-# 4. **Joint inversion**: Combine gravity with magnetics, seismics, or other
-#    geophysical data for better constraint
+# 2. **Prior predictive checks are essential**: Always verify that SOME
+#    combination of prior parameters can explain your data before running
+#    expensive MCMC.
 #
-# 5. **Model comparison**: Use WAIC or LOO to compare alternative geological
-#    hypotheses
+# 3. **Residual patterns tell a story**:
+#    - Random residuals → good model fit
+#    - Spatial patterns → missing geological complexity
+#    - Systematic bias → wrong physics or normalization
 #
-# **Diagnostic checks** (not shown here but available):
+# 4. **Geological inversions are regression problems**: Just as y = θ₁x + θ₂
+#    in linear regression, here y = f(θ) where f is complex geological simulation.
+#    Same statistical principles apply!
 #
-# - Convergence diagnostics (R-hat, ESS)
-# - Divergence analysis
-# - Trace plots and autocorrelation
-# - Prior-posterior comparison plots
-# - Observed vs predicted scatter plots
-# - Spatial residual maps
+# 5. **Multiple data views matter**: Use gempy_viz, plot_gravity_comparison,
+#    and plot_many_observed_vs_forward together for comprehensive understanding.
+#
+# **Next Steps for Production Inversions**
+#
+# To enhance this workflow for real-world applications:
+#
+# 1. **Run multiple chains** (num_chains=4): Diagnose convergence with R-hat statistic
+#
+# 2. **Increase samples**: 200 is minimal; use 1000+ for publication-quality results
+#
+# 3. **More parameters**: Invert for layer thicknesses, additional orientations,
+#    spatially-varying densities, fault locations
+#
+# 4. **Joint inversion**: Combine gravity with magnetics, seismic, or MT data
+#    for tighter constraints
+#
+# 5. **Model comparison**: Use LOO-CV or WAIC to compare alternative geological
+#    hypotheses (e.g., 2-layer vs 3-layer models)
+#
+# 6. **Sensitivity analysis**: Systematically vary priors to assess robustness
+#
+# 7. **Forward uncertainty propagation**: Use posterior samples to quantify
+#    uncertainty in derived quantities (ore tonnage, depth to target, etc.)
+#
+# **Diagnostic Checks Available** (not all shown in this tutorial):
+#
+# - Convergence: R-hat < 1.01, ESS > 400 per chain
+# - Trace plots: Check for mixing and stationarity
+# - Divergences: Should be < 1% of samples (indicates problematic geometry)
+# - Energy plots: Diagnose sampler efficiency
+# - Posterior predictive p-values: Assess model adequacy
+# - Leave-one-out cross-validation: Predict held-out stations
+#
+# **Congratulations!** You now understand how to:
+# - Build complex geological forward models
+# - Define hierarchical Bayesian likelihoods
+# - Integrate geophysical data with geological priors
+# - Diagnose and visualize inference results
+# - Extend this framework to your own problems
