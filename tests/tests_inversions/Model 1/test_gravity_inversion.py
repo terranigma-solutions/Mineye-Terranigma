@@ -11,9 +11,9 @@ from gempy_probability.core.samplers_data import NUTSConfig
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
-from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, set_priors
-from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, generate_multigravity_likelihood_hierarchical_per_station
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
+from mineye.GeoModel.model_one.probabilistic_model import normalize, set_priors
+from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_hierarchical_per_station
 from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots, gempy_viz, plot_many_observed_vs_forward
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 # noinspection PyUnusedImports
@@ -23,11 +23,6 @@ from tests import conftest
 class TestProbabilisticInversion:
     prior_key_dips = r'dips'
     prior_key_density = r'density'
-
-    def test_run_predictive_foo(self, simple_geo_model, geophysical_dir, n_samples=50):
-        geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
-        prob_model(geo_model, observed_gravity_ugal)
-        pass
 
     def test_run_predictive(self, simple_geo_model, geophysical_dir, n_samples=50):
         geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
@@ -166,13 +161,13 @@ class TestProbabilisticInversion:
             many_forward_norm = data.posterior_predictive[r'gravity_response'].values[0, -40:-20]
 
         plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm)
-        
+
     def test_run_kde_sections(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
-        
+
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
-        
+
         gempy_viz(geo_model, data, n_samples=100)
 
     def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
@@ -226,13 +221,6 @@ class TestProbabilisticInversion:
             data_labels=["Posterior", "Prior"],
             colors=[default_red, default_blue],
         )
-
-        # # Apply log scale to all y-axes
-        # if isinstance(axes, np.ndarray):
-        #     for ax in axes.flatten():
-        #         ax.set_yscale('log')
-        # else:
-        #     axes.set_yscale('log')
 
         plt.show()
         plot_geophysics_comparison(forward_norm=data.prior[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
