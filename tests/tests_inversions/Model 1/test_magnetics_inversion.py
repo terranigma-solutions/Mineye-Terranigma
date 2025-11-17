@@ -13,7 +13,7 @@ from gempy_probability.core.samplers_data import NUTSConfig
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
-from mineye.GeoModel.model_one.probabilistic_model import normalize
+from mineye.GeoModel.model_one.probabilistic_model import normalize, _modify_orientations
 from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 
@@ -25,16 +25,10 @@ class TestMagneticInversion:
     prior_key_dips = r'dips'
     prior_key_susceptibility = r'susceptibility'
 
-    def test_run_predictive_foo(self, simple_geo_model, geophysical_dir, n_samples=50):
-        geo_model, observed_magnetics_nt, prob_model = self._create_probabilistic_model(
-            geophysical_dir, simple_geo_model
-        )
-        prob_model(geo_model, observed_magnetics_nt)
-        pass
-
     def test_run_predictive(self, simple_geo_model, geophysical_dir, n_samples=50):
         geo_model, observed_magnetics_nt, prob_model = self._create_probabilistic_model(
-            geophysical_dir, simple_geo_model
+            geophysical_dir=geophysical_dir,
+            simple_geo_model=simple_geo_model
         )
 
         # * 7) Run predictive
@@ -119,15 +113,15 @@ class TestMagneticInversion:
 
         # * 3) Setup Priors
         model_priors = {
-                TestMagneticInversion.prior_key_dips: dist.Normal(
+                TestMagneticInversion.prior_key_dips          : dist.Normal(
                     loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10),  # Dip 10 degrees
                     scale=torch.tensor(10, dtype=torch.float64),
                     validate_args=True
                 ),
                 TestMagneticInversion.prior_key_susceptibility: dist.Normal(
                     loc=(torch.tensor([
-                            0.05,   # plutonites - typical magnetic susceptibility (SI units)
-                            0.001   # sedimentary host - low susceptibility
+                            0.05,  # plutonites - typical magnetic susceptibility (SI units)
+                            0.001  # sedimentary host - low susceptibility
                     ])),
                     scale=torch.tensor(0.01),  # Reasonable uncertainty in susceptibility
                 ).to_event(1)
@@ -136,13 +130,13 @@ class TestMagneticInversion:
         # * 4) Set up Deterministics
         post_forward_dets = {
                 "magnetic_response_raw": lambda samples, gm, sol: sol.magnetics,  # Store raw magnetics
-                "magnetic_response": lambda samples, gm, sol: align_forward_to_observed(
+                "magnetic_response"    : lambda samples, gm, sol: align_forward_to_observed(
                     sol.magnetics, norm_params
                 ),  # Normalized!
-                "mean_magnetics": lambda samples, gm, sol: torch.mean(
+                "mean_magnetics"       : lambda samples, gm, sol: torch.mean(
                     align_forward_to_observed(sol.magnetics, norm_params)
                 ),
-                "max_magnetics": lambda samples, gm, sol: torch.max(
+                "max_magnetics"        : lambda samples, gm, sol: torch.max(
                     align_forward_to_observed(sol.magnetics, norm_params), 0
                 ),
         }
@@ -196,9 +190,9 @@ class TestMagneticInversion:
         gradient_tensor_dict = calculate_magnetic_gradient_tensor(
             centered_grid=simple_geo_model.grid.centered_grid,
             igrf_params={
-                    "inclination": 60.79,   # Huelva, Spain (2025)
-                    "declination": 1.26,    # Huelva, Spain (2025)
-                    "intensity": 47258.4    # Earth's field strength in nT
+                    "inclination": 60.79,  # Huelva, Spain (2025)
+                    "declination": 1.26,  # Huelva, Spain (2025)
+                    "intensity"  : 47258.4  # Earth's field strength in nT
             },
             compute_tmi=True,
             units_nT=True,
@@ -212,10 +206,19 @@ class TestMagneticInversion:
                 igrf_params={
                         "inclination": gradient_tensor_dict['inclination'],
                         "declination": gradient_tensor_dict['declination'],
-                        "intensity": gradient_tensor_dict['intensity']
+                        "intensity"  : gradient_tensor_dict['intensity']
                 }
             )
         )
+
+        simple_geo_model.interpolation_options.mesh_extraction = False
+
+        gp.set_active_grid(
+            grid=simple_geo_model.grid,
+            grid_type=[simple_geo_model.grid.GridTypes.CENTERED],
+            reset=True
+        )
+        gp.compute_model(simple_geo_model)
 
         return simple_geo_model, xy_ravel
 
@@ -229,9 +232,12 @@ class TestMagneticInversion:
     def _set_magnetic_priors(samples: dict, geo_model: gp.data.GeoModel):
         """Set priors for magnetic inversion - modifies susceptibilities and orientations."""
         # Modify orientations (dips)
-        if TestMagneticInversion.prior_key_dips in samples:
-            dips = samples[TestMagneticInversion.prior_key_dips]
-            geo_model.orientations_copy.grads[:, 2] = dips
+
+        interpolation_input = _modify_orientations(
+            samples=samples,
+            geo_model=geo_model,
+            key=r"dips"
+        )
 
         # Modify susceptibilities
         if TestMagneticInversion.prior_key_susceptibility in samples:
@@ -239,12 +245,15 @@ class TestMagneticInversion:
             if geo_model.geophysics_input and geo_model.geophysics_input.magnetics_input:
                 geo_model.geophysics_input.magnetics_input.susceptibilities = susceptibilities
 
+        return interpolation_input
+
     @staticmethod
     def _generate_multimagnetic_likelihood_hierarchical_per_station(norm_params):
         """
         Per-station noise with hierarchical structure for magnetics.
         Adapted from gravity likelihood.
         """
+
         def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
             simulated_magnetics = align_forward_to_observed(solutions.magnetics, norm_params)
             import pyro
