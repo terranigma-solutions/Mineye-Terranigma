@@ -8,7 +8,7 @@ from pandas import DataFrame
 from mineye.GeoModel.geophysics import compute_alignment_params, align_forward_to_observed
 
 
-def plot_comparison(observed, fw_values, xy_ravel,
+def plot_comparison(observed, fw_values, xy_ravel, unit_label,
                     normalization_method='align_to_reference'):
     import matplotlib.pyplot as plt
     print("\n=== Observed vs Predicted Comparison ===")
@@ -31,11 +31,11 @@ def plot_comparison(observed, fw_values, xy_ravel,
     if isinstance(forward_norm, torch.Tensor):
         forward_norm = forward_norm.numpy()
 
-    plot_geophysics_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel)
+    plot_geophysics_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel, unit_label=unit_label)
 
 
 def plot_geophysics_comparison(forward_norm, normalization_method, observed_ugal,
-                            xy_ravel, show=True, unit_label=r'$\mu$Gal'):
+                               xy_ravel, show=True, unit_label=r'$\mu$Gal'):
     observed_norm = observed_ugal
 
     residuals_norm = observed_norm - forward_norm
