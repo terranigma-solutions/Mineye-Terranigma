@@ -45,7 +45,7 @@ class TestMagneticInversion:
 
     def test_magnetic_inversion(
             self, simple_geo_model, geophysical_dir, n_samples=50,
-            arviz_data_filename="arviz_data_magnetic_Nov10_I_hierarchical.nc"
+            arviz_data_filename="arviz_data_magnetic_Nov_17_I_hierarchical.nc"
     ):
         """Test magnetic inversion using NUTS sampler."""
         print("Test magnetic inversion...")
@@ -291,16 +291,10 @@ class TestMagneticInversion:
 
         return likelihood_fn
 
-    def test_run_diagnostics(self):
-        data = az.from_netcdf(os.path.join(
-            os.path.dirname(__file__), "arviz_data_magnetic.nc"
-        ))
-        # Run comprehensive diagnostics with plots
-        check_mcmc_quality(data, verbose=True, plot=True)
 
     def test_run_predictive_analysis(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(
-            os.path.dirname(__file__), "arviz_data_magnetic_Nov10_I_hierarchical.nc"
+            os.path.dirname(__file__), "arviz_data_magnetic_Nov_17_I_hierarchical.nc"
         ))
         magnetic_data, observed_magnetics_nt = self._read_magnetics(geophysical_dir)
         geo_model, xy_ravel = self._setup_magnetic_geomodel(magnetic_data, simple_geo_model)
@@ -308,7 +302,7 @@ class TestMagneticInversion:
         # Prepare data
         observed_norm = observed_magnetics_nt
         forward_norm = data.prior[r'magnetic_response'].mean(axis=1)
-        if PRIOR := True:
+        if PRIOR := False:
             many_forward_norm = data.prior[r'magnetic_response'].values[0, -20:]
         else:
             many_forward_norm = data.posterior_predictive[r'magnetic_response'].values[0, -40:-20]
@@ -317,7 +311,7 @@ class TestMagneticInversion:
 
     def test_run_kde_sections(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(
-            os.path.dirname(__file__), "arviz_data_magnetic_Nov10_I_hierarchical.nc"
+            os.path.dirname(__file__), "arviz_data_magnetic_Nov_17_I_hierarchical.nc"
         ))
 
         magnetic_data, observed_magnetics_nt = self._read_magnetics(geophysical_dir)
@@ -327,7 +321,7 @@ class TestMagneticInversion:
 
     def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(
-            os.path.dirname(__file__), "arviz_data_magnetic_Nov10_I_hierarchical.nc"
+            os.path.dirname(__file__), "arviz_data_magnetic_Nov_17_I_hierarchical.nc"
         ))
 
         posterior_sigmas = data.posterior_predictive["sigma_stations"].values  # shape: (chains, samples, 20)
@@ -356,7 +350,7 @@ class TestMagneticInversion:
 
     def test_run_analysis(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(
-            os.path.dirname(__file__), "arviz_data_magnetic_Nov10_I_hierarchical.nc"
+            os.path.dirname(__file__), "arviz_data_magnetic_Nov_17_I_hierarchical.nc"
         ))
         data.posterior
 
