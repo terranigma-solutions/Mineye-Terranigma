@@ -10,8 +10,8 @@
         Your current settings (20 samples, 5 warmup, 1 chain) are essentially "checking if the code runs" - not doing actual inference.
 - [x] Play with VI
 - [x] Do sphinx
-- [ ] Retry graph with the new factory
-- [ ] Retry vi with the new factory
+- [x] Retry graph with the new factory
+- [ ] Look into the scaling
 - [ ] Mapping gravity in a fancier way
 - Magnetic inversion
 - Double inversion 

@@ -1,13 +1,14 @@
 from typing import Any
 
 import numpy as np
+import torch
 from matplotlib import pyplot as plt
 from pandas import DataFrame
 
 from mineye.GeoModel.geophysics import compute_alignment_params, align_forward_to_observed
 
 
-def _plot_comparison(observed_gravity, grav, xy_ravel,
+def plot_comparison(observed_gravity, grav, xy_ravel,
                      normalization_method='align_to_reference'):
     import matplotlib.pyplot as plt
     print("\n=== Observed vs Predicted Comparison ===")
@@ -19,20 +20,22 @@ def _plot_comparison(observed_gravity, grav, xy_ravel,
     
     params = compute_alignment_params(
         observed=observed_ugal,
-        baseline_forward=forward_model
+        baseline_forward=forward_model,
+        method=normalization_method
     )
 
     forward_norm = align_forward_to_observed(
         forward=forward_model,
-        params=params
+        params=params,
     )
     
-    forward_norm = forward_norm.numpy()
+    if isinstance(forward_norm, torch.Tensor):
+        forward_norm = forward_norm.numpy()
 
     plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel)
 
 
-def plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel):
+def plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel, show=True):
     observed_norm = observed_ugal
     unit_label = r'$\mu$Gal'
 
@@ -96,7 +99,8 @@ def plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, x
     ax4.text(0.05, 0.95, f'R = {correlation:.3f}', transform=ax4.transAxes,
              bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontsize=12)
 
-    plt.show()
+    if show:
+        plt.show()
 
 
 def _plot_fw_gravity(grav, gravity_data: DataFrame, xy_ravel: np.ndarray[tuple[Any, ...], np.dtype]):

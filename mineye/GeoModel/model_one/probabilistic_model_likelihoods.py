@@ -8,7 +8,6 @@ from pyro import distributions as dist
 import gempy as gp
 from mineye.GeoModel.geophysics import align_forward_to_observed
 
-
 from dataclasses import dataclass
 from typing import Callable
 import torch
@@ -34,7 +33,8 @@ class MultiGravityDiagonalLikelihood:
         # 3. Build diagonal Normal likelihood
         sigma = torch.tensor(self.sigma_value, dtype=torch.float64)
         return dist.Normal(simulated_geophysics, sigma).to_event(1)
-    
+
+
 def generate_multigravity_likelihood_diagonal(norm_params):
     """
     Use independent Normal distributions instead of multivariate.
@@ -46,15 +46,15 @@ def generate_multigravity_likelihood_diagonal(norm_params):
         pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
         n_stations = simulated_geophysics.shape[0]
         # ? Half normal is too unstable. Try with some prior that is somehow more stable
-        
+
         # Sample noise standard deviation
         # sigma = pyro.sample(
         #     "sigma",
         #     dist.HalfNormal(torch.tensor(5_000.0, dtype=torch.float64)).expand([n_stations]).to_event(1)  # 100 µGal noise
         # )
 
-        sigma = torch.tensor(5_000.0, dtype=torch.float64)
-        
+        sigma = torch.tensor(10_000.0, dtype=torch.float64)
+
         # Independent Normal likelihood (much more stable!)
         # sigma = pyro.sample(
         #     "sigma",
@@ -63,11 +63,86 @@ def generate_multigravity_likelihood_diagonal(norm_params):
         #         torch.tensor(0.5, dtype=torch.float64)
         #     )
         # )
-        
+
         return dist.Normal(simulated_geophysics, sigma).to_event(1)
 
     return likelihood_fn
 
+
+def generate_multigravity_likelihood_hierarchical_per_station(norm_params):
+    """
+    Per-station noise with hierarchical structure.
+    Best for: Different stations with unknown individual noise levels.
+    """
+
+    def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
+        simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
+        pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
+        n_stations = simulated_geophysics.shape[0]
+
+        # Global hyperprior on typical noise level
+        mu_log_sigma = pyro.sample(
+            "mu_log_sigma",
+            dist.Normal(
+                torch.tensor(np.log(5000.0), dtype=torch.float64),
+                torch.tensor(0.5, dtype=torch.float64)
+            )
+        )
+
+        # How much stations vary from each other
+        tau_log_sigma = pyro.sample(
+            "tau_log_sigma",
+            dist.HalfNormal(torch.tensor(0.5, dtype=torch.float64))
+        )
+
+        # Per-station noise (centered on global mean)
+        log_sigma_stations = pyro.sample(
+            "log_sigma_stations",
+            dist.Normal(
+                mu_log_sigma.expand([n_stations]),
+                tau_log_sigma
+            ).to_event(1)
+        )
+
+        sigma_stations = torch.exp(log_sigma_stations)
+        pyro.deterministic("sigma_stations", sigma_stations)
+
+        return dist.Normal(simulated_geophysics, sigma_stations).to_event(1)
+
+    return likelihood_fn
+
+
+def generate_multigravity_likelihood_per_station_stable(norm_params):
+    """
+    Per-station noise with strict bounds for VI stability.
+    """
+    def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
+        simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
+        pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
+        n_stations = simulated_geophysics.shape[0]
+
+        # Sample on a transformed scale that's bounded
+        # Transform: sigma = min + (max - min) * sigmoid(raw_param)
+        sigma_raw = pyro.sample(
+            "sigma_raw",
+            dist.Normal(
+                torch.zeros(n_stations, dtype=torch.float64),
+                torch.ones(n_stations, dtype=torch.float64)
+            ).to_event(1)
+        )
+
+        # Map to reasonable range: 1,000 to 20,000 µGal
+        sigma_min = 1000.0
+        sigma_max = 20000.0
+        sigma_stations = sigma_min + (sigma_max - sigma_min) * torch.sigmoid(sigma_raw)
+        pyro.deterministic("sigma_stations", sigma_stations)
+
+        # Clamp for extra safety
+        sigma_clamped = torch.clamp(sigma_stations, min=500.0, max=30000.0)
+
+        return dist.Normal(simulated_geophysics, sigma_clamped).to_event(1)
+
+    return likelihood_fn
 
 def generate_multigravity_likelihood(covariance_matrix, norm_params):
     return partial(multigravity_likelihood, covariance_matrix=covariance_matrix, norm_params=norm_params)

@@ -7,7 +7,7 @@ import gempy_viewer as gpv
 import numpy as np
 import geopandas as gpd
 
-from mineye.GeoModel.plotting.probabilistic_analysis import _plot_comparison, _plot_fw_gravity
+from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, _plot_fw_gravity
 
 
 def test_simple_model_gravity(simple_geo_model, geophysical_dir):
@@ -50,7 +50,7 @@ def test_simple_model_gravity(simple_geo_model, geophysical_dir):
     if PLOT:=True:
         # For actual measurement locations, show as scatter plot with color-coded gravity values
         _plot_fw_gravity(grav, gravity_data, xy_ravel)
-        _plot_comparison(observed_gravity, grav, xy_ravel)
+        plot_comparison(observed_gravity, grav, xy_ravel)
 
 
 def _gravity_precomputations(density_plutonites: float, density_sedimentary_host: float, 

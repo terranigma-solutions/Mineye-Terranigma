@@ -30,8 +30,8 @@ def compute_alignment_params(
             "reference_std": float(np.std(observed)),
         }
         if baseline_forward is not None:
-            params["baseline_forward_mean"] = float(np.mean(baseline_forward))
-            params["baseline_forward_std"] = float(np.std(baseline_forward))
+            params["baseline_forward_mean"] = float(baseline_forward.mean())
+            params["baseline_forward_std"] = float(baseline_forward.std())
         if verbose:
             print(f"  Alignment params: {params}")
         return params
@@ -105,8 +105,8 @@ def align_forward_to_observed(
     if method == "align_to_reference":
         ref_mu = float(params["reference_mean"])
         ref_sigma = float(params["reference_std"])
-        base_mu = float(params.get("baseline_forward_mean", torch.mean(x).item()))
-        base_sigma = float(params.get("baseline_forward_std", torch.std(x, unbiased=False).item()))
+        base_mu = float(params.get("baseline_forward_mean"))
+        base_sigma = float(params.get("baseline_forward_std"))
         base_sigma = max(base_sigma, eps)
         standardized = (x - base_mu) / base_sigma
         return standardized * ref_sigma + ref_mu

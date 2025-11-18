@@ -1,3 +1,4 @@
+
 About
 =====
 Mineye-Terranigma
@@ -25,17 +26,22 @@ Contents:
 
 .. toctree::
    :maxdepth: 2
-   :caption: Example Galleries
-
-   examples_basic/index
-   examples_probabilistic/index
-
-.. toctree::
-   :maxdepth: 2
    :caption: API Reference
 
    api_reference
 
+
+Example Galleries
+=================
+
+Explore practical examples demonstrating the capabilities of Mineye-Terranigma.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Galleries
+
+   examples_basic/index
+   examples_probabilistic/index
 
 
 Key Features
@@ -65,7 +71,7 @@ Indices and tables
 * :ref:`search`
 
 
-.. image:: _static/logos/logo_CGRE.png
+.. image:: _static/logos/MINEYE_LOGO.png
    :width: 40%
 
 .. image:: _static/logos/Terranigma.png
