@@ -85,7 +85,7 @@ from gempy_probability.modules.plot.plot_posterior import default_red, default_b
 from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward, generate_gravity_uncertainty_plots
 
 
-from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_gravity_comparison
+from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_geophysics_comparison
 
 import numpy as np
 from whoami import whoami
@@ -319,12 +319,7 @@ print(f"  Parameters: {norm_params}")
 #   * R < 0.5: poor fit, model needs improvement
 
 # %%
-plot_gravity_comparison(
-    forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
-    normalization_method="align_to_reference",
-    observed_ugal=observed_gravity_ugal,
-    xy_ravel=xy_ravel
-)
+plot_geophysics_comparison(forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)), normalization_method="align_to_reference", observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
 # %%
 # Step 5: Define Prior Distributions
@@ -1117,21 +1112,11 @@ gempy_viz(
 
 # %%
 
-plot_gravity_comparison(
-    observed_ugal=observed_gravity_ugal,
-    forward_norm=data.prior[r'gravity_response'].mean(axis=1),
-    xy_ravel=xy_ravel,
-    normalization_method='align_to_reference'
-)
+plot_geophysics_comparison(forward_norm=data.prior[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
 # %%
 
-plot_gravity_comparison(
-    observed_ugal=observed_gravity_ugal,
-    forward_norm=data.posterior_predictive[r'gravity_response'].mean(axis=1),
-    xy_ravel=xy_ravel,
-    normalization_method='align_to_reference'
-)
+plot_geophysics_comparison(forward_norm=data.posterior_predictive[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
 # %%
 

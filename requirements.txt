@@ -1,8 +1,8 @@
 arviz
 torch
 gempy_probability
-gempy>=2025.2.0
-gempy_viewer>=2025.1.2
+gempy>=2025.2.1a0
+gempy_viewer>=2025.1.6
 matplotlib~=3.10.7
 numpy~=2.3.4
 pandas~=2.3.3

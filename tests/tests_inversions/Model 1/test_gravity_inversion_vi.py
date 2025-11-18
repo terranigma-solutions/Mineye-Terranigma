@@ -16,7 +16,7 @@ from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orie
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, generate_multigravity_likelihood_hierarchical_per_station, generate_multigravity_likelihood_per_station_stable
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots, gempy_viz
-from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_gravity_comparison
+from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_geophysics_comparison
 # noinspection PyUnusedImports
 from tests import conftest
 import numpy as np
@@ -210,12 +210,7 @@ class TestProbabilisticInversionVI:
     def _plot_prior_predictive(geo_model, observed_gravity_ugal, data, xy_ravel):
         gravity_samples_norm = data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
 
-        plot_gravity_comparison(
-            observed_ugal=observed_gravity_ugal,
-            forward_norm=data.prior[r'gravity_response'].mean(axis=1),
-            xy_ravel=xy_ravel,
-            normalization_method='align_to_reference'
-        )
+        plot_geophysics_comparison(forward_norm=data.prior[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
         gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
             gravity_samples_norm=gravity_samples_norm,
@@ -285,19 +280,9 @@ class TestProbabilisticInversionVI:
             #     axes.set_yscale('log')
 
             plt.show()
-            plot_gravity_comparison(
-                observed_ugal=observed_gravity_ugal,
-                forward_norm=data.prior[r'gravity_response'].mean(axis=1),
-                xy_ravel=xy_ravel,
-                normalization_method='align_to_reference'
-            )
+            plot_geophysics_comparison(forward_norm=data.prior[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
-        plot_gravity_comparison(
-            observed_ugal=observed_gravity_ugal, 
-            forward_norm=data.posterior[r'gravity_response'].mean(axis=1),
-            xy_ravel=xy_ravel,
-            normalization_method='align_to_reference'
-        )
+        plot_geophysics_comparison(forward_norm=data.posterior[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
         
         # Analysis inference
         if hasattr(data, 'prior') and r'gravity_response' in data.prior:
