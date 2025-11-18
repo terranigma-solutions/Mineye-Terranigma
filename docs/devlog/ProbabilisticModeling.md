@@ -8,11 +8,13 @@
       - Start with num_samples=200, warmup_steps=200, num_chains=2 (minimum viable)
         Once model ish working, scale up to num_samples=1000, warmup_steps=1000, num_chains=4
         Your current settings (20 samples, 5 warmup, 1 chain) are essentially "checking if the code runs" - not doing actual inference.
-- [ ] Play with VI
-- [ ] Do sphinx
+- [x] Play with VI
+- [x] Do sphinx
+- [ ] Retry graph with the new factory
+- [ ] Retry vi with the new factory
+- [ ] Mapping gravity in a fancier way
 - Magnetic inversion
 - Double inversion 
-- Mapping gravity in a fancier way
 
 
 ## Notes 

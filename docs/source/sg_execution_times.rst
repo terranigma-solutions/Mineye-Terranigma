@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:03.112** total execution time for 6 files **from all galleries**:
+**09:36.003** total execution time for 6 files **from all galleries**:
 
 .. container::
 
@@ -33,7 +33,7 @@ Computation times
      - Time
      - Mem (MB)
    * - :ref:`sphx_glr_examples_probabilistic_04_gravity_inversion.py` (``../../examples/02_probabilistic_modeling/04_gravity_inversion.py``)
-     - 00:03.112
+     - 09:36.003
      - 0.0
    * - :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py` (``../../examples/01_basic_examples/01_simple_tharsis_model.py``)
      - 00:00.000
