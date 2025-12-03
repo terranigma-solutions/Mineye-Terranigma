@@ -17,12 +17,42 @@ def parse_enmap_wavelengths(xml_path):
     root = tree.getroot()
     wavelengths = []
 
-    for band in root.findall(".//BAND"):
-        wl_el = band.find("WAVELENGTH")
-        if wl_el is not None:
-            wavelengths.append(float(wl_el.text))
+    # Helper to strip namespaces
+    def strip(tag):
+        return tag.split('}')[-1] if '}' in tag else tag
 
-    return np.array(wavelengths)  # nm
+    # Find all BAND-like elements (case-insensitive, ignoring namespaces)
+    for band in root.iter():
+        if strip(band.tag).upper() == "BAND":
+            wl_val = None
+            # Search children for any element whose tag contains 'WAVELENGTH'
+            for child in list(band):
+                tag_u = strip(child.tag).upper()
+                if "WAVELENGTH" in tag_u:
+                    text = (child.text or "").strip()
+                    if text:
+                        try:
+                            wl_val = float(text)
+                            break
+                        except ValueError:
+                            continue
+            if wl_val is not None:
+                wavelengths.append(wl_val)
+
+    wls = np.array(wavelengths, dtype=float)
+    if wls.size == 0:
+        print(f"[EnMap] parse_enmap_wavelengths: No wavelengths parsed from {os.path.basename(xml_path)}")
+        return wls
+
+    # If values look like micrometers (e.g., 0.4–2.5), convert to nm
+    converted = False
+    if np.nanmax(wls) < 10.0:
+        wls = wls * 1000.0
+        converted = True
+
+    print(f"[EnMap] Wavelengths: count={wls.size}, min={np.min(wls):.2f} nm, max={np.max(wls):.2f} nm, converted_from_um={converted}")
+
+    return wls  # in nm
 
 
 # ============================================================
@@ -32,22 +62,35 @@ def parse_enmap_wavelengths(xml_path):
 def load_enmap_dataset(path):
     files = os.listdir(path)
 
-    cube_path = next(f for f in files if "SPECTRAL_IMAGE" in f and f.endswith(".TIF"))
+    cube_path = next(f for f in files if "SPECTRAL_IMAGE" in f and f.upper().endswith((".TIF", ".TIFF")))
     cube_path = os.path.join(path, cube_path)
 
     with rasterio.open(cube_path) as src:
         cube = src.read()      # (bands, y, x)
         meta = src.meta.copy()
+    print(f"[EnMap] Loaded spectral cube: path={os.path.basename(cube_path)}, shape={cube.shape}, dtype={cube.dtype}")
+    print(f"[EnMap] Geo: crs={meta.get('crs')}, transform={meta.get('transform')}, res={(abs(meta.get('transform').a), abs(meta.get('transform').e)) if meta.get('transform') is not None else None}")
 
     xml_path = next(f for f in files if "METADATA.XML" in f.upper())
     xml_path = os.path.join(path, xml_path)
+    print(f"[EnMap] Metadata XML: {os.path.basename(xml_path)}")
 
     qa_masks = {}
     for f in files:
-        if ("QL_PIXELMASK" in f) or ("QL_QUALITY" in f):
+        fu = f.upper()
+        # Only consider actual raster files, ignore sidecar files like .aux.xml
+        if ("QL_PIXELMASK" in fu or "QL_QUALITY" in fu) and fu.endswith((".TIF", ".TIFF")):
             fp = os.path.join(path, f)
-            with rasterio.open(fp) as src:
-                qa_masks[f] = src.read(1)
+            try:
+                with rasterio.open(fp) as src:
+                    qa_masks[f] = src.read(1)
+                print(f"[EnMap] Loaded QA mask: {f} shape={qa_masks[f].shape} dtype={qa_masks[f].dtype}")
+            except Exception as e:
+                print(f"[EnMap] Skipped QA mask '{f}' due to error: {e}")
+                continue
+
+    if len(qa_masks) == 0:
+        print("[EnMap] No QA mask rasters found in folder. Proceeding without QA mask.")
 
     return cube, meta, qa_masks, xml_path
 
@@ -57,10 +100,35 @@ def load_enmap_dataset(path):
 # ============================================================
 
 def build_mask(qa_masks):
+    """Combine QA layers into a single boolean mask of bad pixels.
+
+    Rules:
+    - For generic QA layers (e.g., QL_PIXELMASK, QL_QUALITY_* except CLASSES): bad where value != 0
+    - For QL_QUALITY_CLASSES: keep classes 0 (None) and 1 (Land); mark others (2=Water, 3=Background) as bad
+    """
     mask = None
-    for arr in qa_masks.values():
-        bad = (arr != 0)
+    for name, arr in qa_masks.items():
+        name_u = name.upper()
+        if "QUALITY_CLASSES" in name_u:
+            # Keep 0 (None) and 1 (Land); everything else considered bad
+            bad = ~np.isin(arr, [0, 1])
+            # Log class distribution for diagnostics
+            unique, counts = np.unique(arr, return_counts=True)
+            stats = ", ".join([f"{int(u)}:{int(c)}" for u, c in zip(unique, counts)])
+            print(f"[EnMap] QA '{name}' class histogram -> {stats}")
+        else:
+            # Default rule: 0=good, non-zero=bad
+            bad = (arr != 0)
+        count_bad = int(np.sum(bad))
+        total = bad.size
+        pct = (count_bad / total * 100.0) if total > 0 else 0.0
+        print(f"[EnMap] QA '{name}': bad_pixels={count_bad} ({pct:.2f}%)")
         mask = bad if mask is None else (mask | bad)
+    if mask is not None:
+        overall_bad = int(np.sum(mask))
+        total = mask.size
+        pct = (overall_bad / total * 100.0) if total > 0 else 0.0
+        print(f"[EnMap] Combined QA bad mask: bad_pixels={overall_bad} ({pct:.2f}%), shape={mask.shape}")
     return mask
 
 
@@ -71,11 +139,23 @@ def build_mask(qa_masks):
 def drop_bad_bands(cube, wavelengths):
     keep = []
     for i, wl in enumerate(wavelengths):
-        if wl < 430: continue
-        if 1340 < wl < 1440: continue
-        if 1800 < wl < 2000: continue
-        if wl > 2450: continue
+        if wl < 430:
+            continue
+        if 1340 < wl < 1440:
+            continue
+        if 1800 < wl < 2000:
+            continue
+        if wl > 2450:
+            continue
         keep.append(i)
+
+    if len(keep) == 0:
+        print("[EnMap] drop_bad_bands: No bands remained after filtering.")
+        if len(wavelengths) > 0:
+            print(f"[EnMap] Wavelengths stats -> count={len(wavelengths)}, min={np.min(wavelengths):.2f}, max={np.max(wavelengths):.2f}")
+        else:
+            print("[EnMap] Wavelengths array is empty.")
+        raise ValueError("No valid bands after filtering. Check wavelength parsing/units and filter ranges.")
 
     return cube[keep], wavelengths[keep], keep
 
@@ -183,7 +263,8 @@ def enmap_to_feature_stack(folder_path, n_mnf=12, n_deriv_pcs=3):
     cube, wavelengths, _ = drop_bad_bands(cube, wavelengths)
 
     cube = smooth_cube(cube)
-    cube[:, mask] = np.nan
+    if mask is not None:
+        cube[:, mask] = np.nan
 
     mnf = run_mnf(cube, n_components=n_mnf)
 
