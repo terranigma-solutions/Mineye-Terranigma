@@ -9,6 +9,25 @@ from matplotlib.colors import ListedColormap
 from bayseg.bayseg import BaySeg
 from bayseg.bayseg import labels_map, compute_labels_prob, compute_ie
 import time
+from contextlib import contextmanager
+
+@contextmanager
+def _as_rio_dataset(obj):
+    """
+    Yield a rasterio dataset from either a file path or an already-open rasterio dataset-like object.
+    If a path is provided, it will be opened and closed within this context.
+    If a dataset object is provided, it will be yielded as-is without closing.
+    """
+    if isinstance(obj, str):
+        with rasterio.open(obj) as ds:
+            yield ds
+    elif hasattr(obj, 'read') and hasattr(obj, 'transform') and hasattr(obj, 'crs'):
+        # If the dataset is closed, raise a clear error
+        if hasattr(obj, 'closed') and getattr(obj, 'closed'):
+            raise ValueError("Provided rasterio dataset object is closed. Please pass an open dataset.")
+        yield obj
+    else:
+        raise TypeError("Band value must be a file path (str) or an open rasterio dataset object.")
 
 def crop_to_bounds(src, bounds, transform):
     """
@@ -43,7 +62,9 @@ def crop_to_bounds(src, bounds, transform):
     ix_top = min(ymax, r_top)
 
     if not (ix_left < ix_right and ix_bottom < ix_top):
-        raise ValueError("Requested bounds do not overlap the raster.")
+        r_bounds_str = f"raster bounds: left={r_left}, bottom={r_bottom}, right={r_right}, top={r_top}"
+        req_bounds_str = f"requested bounds: left={xmin}, bottom={ymin}, right={xmax}, top={ymax}"
+        raise ValueError(f"Requested bounds do not overlap the raster. ({req_bounds_str}; {r_bounds_str})")
 
     # Compute a pixel window from the intersected bounds
     window = win_from_bounds(ix_left, ix_bottom, ix_right, ix_top, transform=transform)
@@ -121,18 +142,18 @@ def crop_by_rectangle(data, row_start, row_end, col_start, col_end):
     print(f"Cropped data shape: {cropped_data.shape}")
     return cropped_data
 
-def apply_soil_mask(img_stack, scl_path, bounds):
+def apply_soil_mask(img_stack, scl_source, bounds):
     """
     Apply soil mask to the image stack using SCL layer
     Args:
         img_stack: numpy array of shape (rows, cols, bands)
-        scl_path: path to the SCL layer
+        scl_source: path to the SCL layer or an open rasterio dataset
         bounds: tuple of (xmin, ymin, xmax, ymax)
     Returns:
         masked image stack with -1 for non-soil pixels
     """
     # Load and process the SCL layer to create a soil mask
-    with rasterio.open(scl_path) as src:
+    with _as_rio_dataset(scl_source) as src:
         scl_data = crop_to_bounds(src, bounds, src.transform)
         # Ensure 2D SCL array
         if scl_data.ndim == 3 and scl_data.shape[0] == 1:
@@ -167,7 +188,7 @@ def run_workflow(bands: dict,
     Generalized segmentation workflow.
 
     Args:
-        bands: dict mapping band names to file paths. May include optional keys 'SCL' and 'TCI'.
+        bands: dict mapping band names to file paths or open rasterio datasets. May include optional keys 'SCL' and 'TCI'.
         bounds: (xmin, ymin, xmax, ymax) in the image CRS.
         n_classes: number of segmentation classes (labels).
         beta_init: initial beta for BaySeg.
@@ -189,7 +210,7 @@ def run_workflow(bands: dict,
         raise ValueError(f"ref_band '{ref_band}' not found in provided bands.")
 
     print("Step 1: Preparing data...")
-    with rasterio.open(bands[ref_band]) as ref:
+    with _as_rio_dataset(bands[ref_band]) as ref:
         profile = ref.profile
         height, width = ref.height, ref.width
         crs = ref.crs
@@ -204,10 +225,10 @@ def run_workflow(bands: dict,
 
     # Build stack from provided bands (exclude TCI and SCL)
     stack = []
-    for name, path in bands.items():
+    for name, source in bands.items():
         if name in ("TCI", "SCL"):
             continue
-        with rasterio.open(path) as src:
+        with _as_rio_dataset(source) as src:
             band_data = crop_to_bounds(src, bounds, src.transform)
             # Ensure 2D per-band array
             if band_data.ndim == 3 and band_data.shape[0] == 1:
@@ -233,7 +254,7 @@ def run_workflow(bands: dict,
 
     # Plot TCI for reference if available and requested
     if plot_tci and ("TCI" in bands):
-        with rasterio.open(bands["TCI"]) as src:
+        with _as_rio_dataset(bands["TCI"]) as src:
             if src.count >= 3:  # If TCI has 3 bands
                 tci_data = crop_to_bounds(src, bounds, src.transform)  # (bands, rows, cols)
                 tci_data = tci_data.transpose(1, 2, 0)  # Change to (rows, cols, bands)
@@ -276,7 +297,7 @@ def run_workflow(bands: dict,
 
     # Export as georeferenced GeoTIFF
     # Get the transform for the cropped region based on bounds using reference band
-    with rasterio.open(bands[ref_band]) as src:
+    with _as_rio_dataset(bands[ref_band]) as src:
         from rasterio.windows import from_bounds as win_from_bounds, Window, transform as win_transform
         # Recompute the same window used by crop_to_bounds
         window = win_from_bounds(bounds[0], bounds[1], bounds[2], bounds[3], transform=src.transform)
