@@ -175,6 +175,18 @@ def load_enmap_dataset(path):
     print(f"[EnMap] Loaded spectral cube: path={os.path.basename(cube_path)}, shape={cube.shape}, dtype={cube.dtype}")
     print(f"[EnMap] Geo: crs={meta.get('crs')}, transform={meta.get('transform')}, res={(abs(meta.get('transform').a), abs(meta.get('transform').e)) if meta.get('transform') is not None else None}")
 
+    # Convert reflectance to float and apply scale if likely scaled integers
+    if np.issubdtype(cube.dtype, np.integer):
+        mx = float(np.nanmax(cube))
+        mn = float(np.nanmin(cube))
+        if 2.0 < mx <= 10000.0 and mn >= 0.0:
+            cube = cube.astype(np.float32) / 10000.0
+            print("[EnMap] Applied scale factor 1/10000 to convert integer reflectance to [0,1] float range.")
+        else:
+            cube = cube.astype(np.float32)
+    else:
+        cube = cube.astype(np.float32)
+
     xml_path = next(f for f in files if "METADATA.XML" in f.upper())
     xml_path = os.path.join(path, xml_path)
     print(f"[EnMap] Metadata XML: {os.path.basename(xml_path)}")
@@ -275,29 +287,108 @@ def smooth_cube(cube, window=11, poly=2):
     )
 
 
+def destripe_columns(cube, frac=1.0, polyfit_order=None):
+    """Lightweight destriping along columns for each band.
+
+    - Computes per-band column medians ignoring NaNs and subtracts them.
+    - Optionally fits a low-order polynomial across column medians to
+      remove very low-frequency trends (set polyfit_order to 1 or 2).
+    - Adds back the global median per band to preserve overall level.
+
+    Args:
+        cube: array (bands, rows, cols)
+        frac: scale factor for subtraction (1.0 = full, 0.5 = half)
+        polyfit_order: None or int for polynomial fit across columns.
+    Returns:
+        cube_out with reduced column striping.
+    """
+    if frac is None or frac <= 0:
+        return cube
+    bands, rows, cols = cube.shape
+    out = cube.astype(np.float32, copy=True)
+    x = np.arange(cols, dtype=np.float32)
+    for b in range(bands):
+        img = out[b]
+        # Column medians ignoring NaNs
+        col_med = np.nanmedian(img, axis=0)
+        # Replace non-finite with overall median
+        base_med = np.nanmedian(col_med) if np.isfinite(col_med).any() else 0.0
+        col_med = np.where(np.isfinite(col_med), col_med, base_med)
+        trend = col_med
+        if polyfit_order is not None and polyfit_order >= 1:
+            try:
+                coeffs = np.polyfit(x, col_med, deg=int(polyfit_order))
+                trend = np.polyval(coeffs, x)
+            except Exception:
+                trend = col_med
+        # Scale subtraction and preserve level
+        img_med = np.nanmedian(img) if np.isfinite(img).any() else 0.0
+        correction = (frac * trend)[None, :]
+        out[b] = img - correction + img_med
+    return out
+
+
 # ============================================================
 # 6. MNF transform
 # ============================================================
 
+def _impute_nan_columns(X):
+    """Impute NaNs and infs column-wise with column means; if a column is all NaN/inf, fill with 0.
+    Args:
+        X: 2D array (n_samples, n_features)
+    Returns:
+        X_out: imputed float32 array
+    """
+    X = X.astype(np.float64, copy=True)
+    # Treat inf as NaN
+    non_finite = ~np.isfinite(X)
+    if np.any(non_finite):
+        X[non_finite] = np.nan
+    col_means = np.nanmean(X, axis=0)
+    # Columns that are all NaN -> set mean to 0
+    col_means = np.where(np.isfinite(col_means), col_means, 0.0)
+    # Find NaNs to replace
+    inds = np.where(np.isnan(X))
+    if inds[0].size > 0:
+        X[inds] = np.take(col_means, inds[1])
+    return X.astype(np.float32, copy=False)
+
+
 def estimate_noise(cube):
     diffs = cube[:, 1:, :] - cube[:, :-1, :]
-    diffs = diffs.reshape(cube.shape[0], -1).T
-    cov = EmpiricalCovariance().fit(diffs)
+    diffs = diffs.reshape(cube.shape[0], -1).T  # (n_samples, n_features)
+    # Remove any samples (rows) containing NaNs/Infs
+    mask = np.all(np.isfinite(diffs), axis=1)
+    valid = diffs[mask]
+    if valid.shape[0] == 0:
+        raise ValueError("[EnMap] estimate_noise: No valid (finite) samples available for noise covariance estimation.")
+    cov = EmpiricalCovariance().fit(valid)
     return cov.covariance_
 
 def run_mnf(cube, n_components=12):
     bands, h, w = cube.shape
-    X = cube.reshape(bands, -1).T
+    X = cube.reshape(bands, -1).T  # (n_pixels, bands)
 
+    # Estimate noise covariance robustly (handles NaNs internally)
     noise_cov = estimate_noise(cube)
-    noise_inv = np.linalg.inv(noise_cov)
+    # Invert (or pseudo-invert) noise covariance
+    try:
+        noise_inv = np.linalg.inv(noise_cov)
+    except np.linalg.LinAlgError:
+        noise_inv = np.linalg.pinv(noise_cov, rcond=1e-6)
 
+    # Noise-whiten features
     Xw = X @ noise_inv
 
-    pca = PCA(n_components=n_components)
+    # Impute NaNs/infs before PCA
+    Xw = _impute_nan_columns(Xw)
+
+    # Ensure n_components <= bands
+    k = min(n_components, bands)
+    pca = PCA(n_components=k)
     mnf = pca.fit_transform(Xw)
 
-    return mnf.T.reshape(n_components, h, w)
+    return mnf.T.reshape(k, h, w)
 
 
 # ============================================================
@@ -310,11 +401,16 @@ def continuum_removed_depth(cube, wavelengths, center_range):
     if len(idx) < 3:
         return None
 
-    sub = cube[idx]
+    sub = cube[idx].astype(np.float32, copy=False)
     left = sub[0]
     right = sub[-1]
-    continuum = np.linspace(left, right, sub.shape[0])
-    cr = 1 - (sub / continuum)
+    continuum = np.linspace(left, right, sub.shape[0]).astype(np.float32, copy=False)
+    # Avoid division by near-zero continuum values
+    eps = 1e-6
+    continuum = np.where(np.isfinite(continuum) & (np.abs(continuum) > eps), continuum, np.nan)
+    cr = 1.0 - (sub / continuum)
+    # Clamp to finite range
+    cr = np.where(np.isfinite(cr), cr, np.nan)
     return np.nanmax(cr, axis=0)
 
 
@@ -326,11 +422,15 @@ def derivative_pca(cube, wavelengths, n_components=3):
     deriv = np.gradient(cube, axis=0)
     bands, h, w = deriv.shape
 
-    X = deriv.reshape(bands, -1).T
-    pca = PCA(n_components=n_components)
+    X = deriv.reshape(bands, -1).T  # (n_pixels, bands)
+    # Impute NaNs/infs before PCA
+    X = _impute_nan_columns(X)
+
+    k = min(n_components, bands)
+    pca = PCA(n_components=k)
     pcs = pca.fit_transform(X)
 
-    return pcs.T.reshape(n_components, h, w)
+    return pcs.T.reshape(k, h, w)
 
 
 # ============================================================
@@ -359,7 +459,7 @@ def create_rasterio_layer(array, meta):
 
 
 
-def enmap_to_feature_stack(folder_path, n_mnf=12, n_deriv_pcs=3):
+def enmap_to_feature_stack(folder_path, n_mnf=12, n_deriv_pcs=3, destripe=True, destripe_frac=1.0, destripe_poly=1):
     cube, meta, qa_masks, xml = load_enmap_dataset(folder_path)
 
     wavelengths = parse_enmap_wavelengths(xml)
@@ -375,6 +475,9 @@ def enmap_to_feature_stack(folder_path, n_mnf=12, n_deriv_pcs=3):
     cube, wavelengths, _ = drop_bad_bands(cube, wavelengths)
 
     cube = smooth_cube(cube)
+    if destripe:
+        cube = destripe_columns(cube, frac=destripe_frac, polyfit_order=destripe_poly)
+        print(f"[EnMap] Applied column destriping: frac={destripe_frac}, poly_order={destripe_poly}")
     if mask is not None:
         cube[:, mask] = np.nan
 
@@ -390,19 +493,19 @@ def enmap_to_feature_stack(folder_path, n_mnf=12, n_deriv_pcs=3):
 
     features = {}
 
-    # MNF components
+    # MNF components (return raw arrays; caller wraps into rasters)
     for i in range(mnf.shape[0]):
-        features[f"MNF_{i+1:02d}"] = create_rasterio_layer(mnf[i], meta)
+        features[f"MNF_{i+1:02d}"] = mnf[i]
 
     # Absorption depths
-    if depth_2200 is not None: features["Depth_2200"] = create_rasterio_layer(depth_2200, meta)
-    if depth_2300 is not None: features["Depth_2300"] = create_rasterio_layer(depth_2300, meta)
-    if depth_2340 is not None: features["Depth_2340"] = create_rasterio_layer(depth_2340, meta)
-    if depth_1000 is not None: features["Depth_1000"] = create_rasterio_layer(depth_1000, meta)
-    if depth_1750 is not None: features["Depth_1750"] = create_rasterio_layer(depth_1750, meta)
+    if depth_2200 is not None: features["Depth_2200"] = depth_2200
+    if depth_2300 is not None: features["Depth_2300"] = depth_2300
+    if depth_2340 is not None: features["Depth_2340"] = depth_2340
+    if depth_1000 is not None: features["Depth_1000"] = depth_1000
+    if depth_1750 is not None: features["Depth_1750"] = depth_1750
 
     # Derivative PCA
     for i in range(n_deriv_pcs):
-        features[f"Deriv_PC{i+1}"] = create_rasterio_layer(deriv[i], meta)
+        features[f"Deriv_PC{i+1}"] = deriv[i]
 
     return features, meta
