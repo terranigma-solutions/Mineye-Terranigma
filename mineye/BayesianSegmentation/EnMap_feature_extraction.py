@@ -13,44 +13,127 @@ import xml.etree.ElementTree as ET
 # ============================================================
 
 def parse_enmap_wavelengths(xml_path):
+    """Parse center wavelengths from an EnMAP metadata XML file.
+
+    Returns wavelengths in nanometers (nm). Robust to namespaces and
+    multiple schema variants used by EnMAP/ESA products.
+    """
     tree = ET.parse(xml_path)
     root = tree.getroot()
-    wavelengths = []
 
-    # Helper to strip namespaces
     def strip(tag):
         return tag.split('}')[-1] if '}' in tag else tag
 
-    # Find all BAND-like elements (case-insensitive, ignoring namespaces)
-    for band in root.iter():
-        if strip(band.tag).upper() == "BAND":
+    def to_float_safe(text):
+        if text is None:
+            return None
+        s = text.strip()
+        if not s:
+            return None
+        # Remove common units if included inline, like "2200 nm" or "2.2 um"
+        s_clean = (
+            s.replace("nm", " ")
+             .replace("nanometer", " ")
+             .replace("nanometre", " ")
+             .replace("µm", " ")
+             .replace("um", " ")
+             .replace("micrometer", " ")
+             .replace("micrometre", " ")
+        )
+        try:
+            return float(s_clean.split()[0])
+        except Exception:
+            return None
+
+    wavelengths = []
+    units_detected = None  # 'nm' or 'um'
+
+    # Strategy A: Iterate BAND(-like) elements and fetch child tags with wavelength info
+    band_like_names = {"BAND", "BAND_INFORMATION", "SPECTRALBAND", "CHANNEL"}
+    wavelength_like_subtags = (
+        "WAVELENGTH", "CENTER_WAVELENGTH", "CENTRAL_WAVELENGTH", "WAVELENGTH_CENTER",
+        "BAND_CENTER", "CENTER", "CWAVELENGTH"
+    )
+
+    for elem in root.iter():
+        tag_u = strip(elem.tag).upper()
+        if tag_u in band_like_names:
             wl_val = None
-            # Search children for any element whose tag contains 'WAVELENGTH'
-            for child in list(band):
-                tag_u = strip(child.tag).upper()
-                if "WAVELENGTH" in tag_u:
-                    text = (child.text or "").strip()
-                    if text:
-                        try:
-                            wl_val = float(text)
-                            break
-                        except ValueError:
-                            continue
+            # Look in children
+            for child in list(elem):
+                ctag = strip(child.tag).upper()
+                if any(k in ctag for k in wavelength_like_subtags):
+                    wl_val = to_float_safe(child.text)
+                    # Unit via attribute (if any)
+                    unit_attr = (child.attrib.get("unit") or child.attrib.get("units") or "").lower()
+                    if unit_attr:
+                        if "nm" in unit_attr:
+                            units_detected = units_detected or "nm"
+                        elif "um" in unit_attr or "µm" in unit_attr or "microm" in unit_attr:
+                            units_detected = units_detected or "um"
+                    if wl_val is not None:
+                        break
+            # If not found in children, check attributes on the BAND element itself
+            if wl_val is None:
+                for k, v in elem.attrib.items():
+                    ku = k.upper()
+                    if any(x in ku for x in wavelength_like_subtags):
+                        wl_val = to_float_safe(v)
+                        unit_attr = (elem.attrib.get("unit") or elem.attrib.get("units") or "").lower()
+                        if unit_attr:
+                            if "nm" in unit_attr:
+                                units_detected = units_detected or "nm"
+                            elif "um" in unit_attr or "µm" in unit_attr or "microm" in unit_attr:
+                                units_detected = units_detected or "um"
+                        break
             if wl_val is not None:
                 wavelengths.append(wl_val)
 
-    wls = np.array(wavelengths, dtype=float)
+    # Strategy B: Some schemas store a vector list under e.g. CENTER_WAVELENGTHS
+    if len(wavelengths) == 0:
+        vector_like_tags = (
+            "WAVELENGTHS", "CENTER_WAVELENGTHS", "CENTRAL_WAVELENGTHS",
+            "BAND_CENTERS", "WAVELENGTH_LIST"
+        )
+        for elem in root.iter():
+            tag_u = strip(elem.tag).upper()
+            if any(vtag == tag_u or vtag in tag_u for vtag in vector_like_tags):
+                text = (elem.text or "").strip()
+                if text:
+                    # Split by any whitespace or comma/semicolon
+                    parts = [p for ch in [",", ";"] for p in text.replace(ch, " ").split()]
+                    # Deduplicate split since above double loops can over-split
+                    parts = text.replace(",", " ").replace(";", " ").split()
+                    vals = []
+                    for p in parts:
+                        f = to_float_safe(p)
+                        if f is not None:
+                            vals.append(f)
+                    if len(vals) > 0:
+                        wavelengths = vals
+                        unit_attr = (elem.attrib.get("unit") or elem.attrib.get("units") or "").lower()
+                        if unit_attr:
+                            if "nm" in unit_attr:
+                                units_detected = units_detected or "nm"
+                            elif "um" in unit_attr or "µm" in unit_attr or "microm" in unit_attr:
+                                units_detected = units_detected or "um"
+                        break
+
+    wls = np.array(wavelengths, dtype=float) if len(wavelengths) > 0 else np.array([], dtype=float)
+
     if wls.size == 0:
         print(f"[EnMap] parse_enmap_wavelengths: No wavelengths parsed from {os.path.basename(xml_path)}")
         return wls
 
-    # If values look like micrometers (e.g., 0.4–2.5), convert to nm
+    # Decide units and convert to nm if necessary
     converted = False
-    if np.nanmax(wls) < 10.0:
+    if units_detected == "um" or (units_detected is None and np.nanmax(wls) < 10.0):
         wls = wls * 1000.0
         converted = True
 
-    print(f"[EnMap] Wavelengths: count={wls.size}, min={np.min(wls):.2f} nm, max={np.max(wls):.2f} nm, converted_from_um={converted}")
+    print(
+        f"[EnMap] Wavelengths: count={wls.size}, min={np.nanmin(wls):.2f} nm, max={np.nanmax(wls):.2f} nm, converted_from_um={converted}"
+    )
 
     return wls  # in nm
 
