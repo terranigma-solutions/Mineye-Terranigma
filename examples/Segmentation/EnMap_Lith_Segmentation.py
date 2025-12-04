@@ -31,7 +31,7 @@ import numpy as np
 import rasterio
 from rasterio.io import MemoryFile
 
-from mineye.BayesianSegmentation.EnMap_feature_extraction import enmap_to_feature_stack
+from mineye.BayesianSegmentation.EnMap_feature_extraction import enmap_to_feature_stack, create_rasterio_layer
 from mineye.BayesianSegmentation.full_workflow import run_workflow
 
 
@@ -55,19 +55,29 @@ def _percentile_scale(arr, p_lo=2.0, p_hi=98.0):
 def plot_feature_quicklooks(features: Dict[str, np.ndarray], out_prefix: str, max_panels: int = 9):
     """Create quicklook plots of feature bands for QA.
 
+    Accepts feature values that are either 2D numpy arrays or rasterio DatasetReader objects.
     - If MNF_01..MNF_03 exist, an RGB composite is saved.
     - Up to `max_panels` single-band quicklooks are tiled and saved.
     """
     os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
+
+    def as_array(val):
+        # Rasterio dataset -> read first band
+        if hasattr(val, "read") and hasattr(val, "profile"):
+            try:
+                return val.read(1)
+            except Exception:
+                pass
+        return np.asarray(val)
 
     # 1) RGB composite from first three MNF components (if present)
     mnf_keys = [k for k in features.keys() if k.startswith("MNF_")]
     if len(mnf_keys) >= 3:
         # Sort to ensure MNF_01, MNF_02, MNF_03 order
         mnf_keys_sorted = sorted(mnf_keys)[:3]
-        r = _percentile_scale(features[mnf_keys_sorted[0]])
-        g = _percentile_scale(features[mnf_keys_sorted[1]])
-        b = _percentile_scale(features[mnf_keys_sorted[2]])
+        r = _percentile_scale(as_array(features[mnf_keys_sorted[0]]))
+        g = _percentile_scale(as_array(features[mnf_keys_sorted[1]]))
+        b = _percentile_scale(as_array(features[mnf_keys_sorted[2]]))
         rgb = np.dstack([r, g, b])
         plt.figure(figsize=(6, 6))
         plt.imshow(rgb)
@@ -88,7 +98,7 @@ def plot_feature_quicklooks(features: Dict[str, np.ndarray], out_prefix: str, ma
         plt.figure(figsize=(4 * cols, 4 * rows))
         for i, k in enumerate(sel, 1):
             plt.subplot(rows, cols, i)
-            img = _percentile_scale(features[k])
+            img = _percentile_scale(as_array(features[k]))
             plt.imshow(img, cmap='viridis')
             plt.title(k)
             plt.axis('off')
@@ -99,6 +109,8 @@ def plot_feature_quicklooks(features: Dict[str, np.ndarray], out_prefix: str, ma
 
 def _features_to_memory_datasets(features: Dict[str, np.ndarray], meta: dict):
     """Create in-memory rasterio datasets for each 2D feature layer.
+
+    Accepts either 2D numpy arrays or already-wrapped rasterio DatasetReader objects.
 
     Returns:
         bands_dict: dict[str, rasterio DatasetReader]
@@ -111,10 +123,31 @@ def _features_to_memory_datasets(features: Dict[str, np.ndarray], meta: dict):
     width = meta.get("width")
 
     bands_dict: Dict[str, rasterio.io.DatasetReader] = {}
-    datasets: List[rasterio.io.DatasetWriter] = []
+    datasets: List[rasterio.io.DatasetReader] = []
     memfiles: List[MemoryFile] = []
 
-    for name, arr in features.items():
+    for name, val in features.items():
+        # Case 1: already a rasterio dataset
+        if hasattr(val, "read") and hasattr(val, "profile"):
+            ds = val
+            # Basic sanity checks on shape
+            try:
+                h, w = ds.height, ds.width
+            except Exception:
+                h, w = None, None
+            if h is not None and w is not None:
+                if (height is not None and h != height) or (width is not None and w != width):
+                    raise ValueError(f"Feature '{name}' dataset size ({h},{w}) does not match meta ({height},{width}).")
+            # Keep underlying MemoryFile alive if attached
+            mf = getattr(ds, "_memfile", None)
+            if isinstance(mf, MemoryFile):
+                memfiles.append(mf)
+            bands_dict[name] = ds
+            datasets.append(ds)
+            continue
+
+        # Case 2: numpy array -> wrap into rasterio MemoryFile
+        arr = np.asarray(val)
         if arr.ndim != 2:
             raise ValueError(f"Feature '{name}' must be a 2D array, got shape {arr.shape}")
         if arr.shape != (height, width):
@@ -124,30 +157,116 @@ def _features_to_memory_datasets(features: Dict[str, np.ndarray], meta: dict):
                 raise ValueError(
                     f"Feature '{name}' has shape {arr.shape}, expected ({height}, {width})"
                 )
-
-        data = np.asarray(arr, dtype=np.float32)
-        nodata = -9999.0
-        data = np.where(np.isfinite(data), data, nodata)
-
-        mem = MemoryFile()
-        profile = {
-            "driver": "GTiff",
-            "dtype": "float32",
-            "count": 1,
-            "height": height,
-            "width": width,
-            "transform": transform,
-            "crs": crs,
-            "nodata": nodata,
-        }
-        ds = mem.open(**profile)
-        ds.write(data, 1)
-
+        # Use existing helper to wrap and keep MemoryFile attached
+        ds = create_rasterio_layer(arr.astype(np.float32, copy=False), meta)
         bands_dict[name] = ds
         datasets.append(ds)
-        memfiles.append(mem)
+        mf = getattr(ds, "_memfile", None)
+        if isinstance(mf, MemoryFile):
+            memfiles.append(mf)
 
     return bands_dict, datasets, memfiles
+
+
+def _sanitize_feature_name(name: str) -> str:
+    import re
+    s = re.sub(r"[^A-Za-z0-9_]+", "_", str(name)).strip("_")
+    return s or "layer"
+
+
+def _write_features_to_files(features: Dict[str, np.ndarray], meta: dict, out_prefix: str,
+                             preferred_driver: str = "JP2OpenJPEG") -> Dict[str, str]:
+    """Save each feature layer to a single-band raster file and return dict of name -> path.
+
+    Ensures all output rasters have the same (height, width) as provided in meta.
+    If an input array is accidentally transposed (width, height), it will be
+    auto-transposed to (height, width). Any other mismatch raises a ValueError.
+
+    Tries to write JPEG2000 (JP2OpenJPEG). If the driver is unavailable or writing fails,
+    falls back to GeoTIFF. Preserves CRS/transform and writes float32.
+    """
+    os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
+
+    files: Dict[str, str] = {}
+
+    # Expected size from meta
+    expected_h = int(meta.get("height"))
+    expected_w = int(meta.get("width"))
+    if not expected_h or not expected_w:
+        raise ValueError("meta must include valid 'height' and 'width' for writing features")
+
+    # Base profile from meta (fixed size for all outputs)
+    sentinel = -9999.0
+    base_profile = {
+        "dtype": "float32",
+        "count": 1,
+        "crs": meta.get("crs"),
+        "transform": meta.get("transform"),
+        "height": expected_h,
+        "width": expected_w,
+        "nodata": sentinel,
+    }
+
+    for name, val in features.items():
+        safe = _sanitize_feature_name(name)
+        # Prepare data as 2D float32 array
+        if hasattr(val, "read") and hasattr(val, "profile"):
+            data = val.read(1).astype(np.float32, copy=False)
+        else:
+            arr = np.asarray(val)
+            if arr.ndim == 3 and arr.shape[0] == 1:
+                arr = arr[0]
+            if arr.ndim != 2:
+                raise ValueError(f"Feature '{name}' must be 2D for writing, got shape {arr.shape}")
+            data = arr.astype(np.float32, copy=False)
+
+        # Enforce expected shape (H, W)
+        if data.shape == (expected_w, expected_h):
+            # likely transposed; fix
+            data = data.T
+            print(f"[EnMap] Note: transposed feature '{name}' from (W,H) to (H,W) to match meta.")
+        elif data.shape != (expected_h, expected_w):
+            raise ValueError(
+                f"Feature '{name}' has shape {data.shape}, expected ({expected_h}, {expected_w})."
+            )
+
+        # Attempt JP2 first
+        out_path_jp2 = f"{out_prefix}_{safe}.jp2"
+        out_path_tif = f"{out_prefix}_{safe}.tif"
+
+        profile = base_profile.copy()
+        profile.update({"driver": preferred_driver})
+
+        wrote_path = None
+        try:
+            with rasterio.open(out_path_jp2, "w", **profile) as dst:
+                dst.write(data, 1)
+            wrote_path = out_path_jp2
+        except Exception as e:
+            print(f"[WARN] JP2 write failed for '{name}' with driver '{preferred_driver}': {e}. Falling back to GeoTIFF.")
+            # Fallback to GeoTIFF
+            profile_gtiff = base_profile.copy()
+            profile_gtiff.update({"driver": "GTiff"})
+            with rasterio.open(out_path_tif, "w", **profile_gtiff) as dst:
+                dst.write(data, 1)
+            wrote_path = out_path_tif
+
+        # Post-write validation: reopen and confirm shape
+        try:
+            with rasterio.open(wrote_path) as chk:
+                if (chk.height, chk.width) != (expected_h, expected_w):
+                    raise ValueError(
+                        f"Wrote feature '{name}' to {wrote_path} with wrong size "
+                        f"({chk.height},{chk.width}), expected ({expected_h},{expected_w})."
+                    )
+        except Exception as e:
+            # If validation fails, ensure we surface a clear error
+            raise
+
+        files[name] = wrote_path
+
+    print(f"[EnMap] Saved {len(files)} feature layers to files with prefix '{out_prefix}_*.(jp2|tif)', shape=({expected_h},{expected_w}).")
+    return files
 
 
 # %%
@@ -221,6 +340,9 @@ print(
     f"Bounds -> xmin={bounds[0]:.3f}, ymin={bounds[1]:.3f}, xmax={bounds[2]:.3f}, ymax={bounds[3]:.3f}"
 )
 
+# Persist features to disk as JP2 (fallback to GeoTIFF) and feed paths into workflow
+paths_dict = _write_features_to_files(bands_dict, meta, output_prefix)
+print(f"Prepared {len(paths_dict)} feature file paths for workflow input.")
 
 # %%
 # Run Bayesian Segmentation
@@ -229,7 +351,7 @@ print(
 
 try:
     run_workflow(
-        bands=bands_dict,  # dict of open rasterio datasets
+        bands=paths_dict,  # dict of file paths (JP2 or TIF)
         bounds=bounds,
         n_classes=n_classes,
         beta_init=beta_init,
