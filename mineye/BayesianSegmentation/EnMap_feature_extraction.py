@@ -3,8 +3,6 @@ import numpy as np
 import rasterio
 from rasterio.io import MemoryFile
 from scipy.signal import savgol_filter
-from sklearn.decomposition import PCA
-from sklearn.covariance import EmpiricalCovariance
 import xml.etree.ElementTree as ET
 
 
@@ -355,6 +353,11 @@ def _impute_nan_columns(X):
 
 
 def estimate_noise(cube):
+    # Lazy import to avoid hard dependency during module import in minimal environments
+    try:
+        from sklearn.covariance import EmpiricalCovariance
+    except Exception as e:
+        raise ImportError("scikit-learn is required for estimate_noise(). Please install scikit-learn.") from e
     diffs = cube[:, 1:, :] - cube[:, :-1, :]
     diffs = diffs.reshape(cube.shape[0], -1).T  # (n_samples, n_features)
     # Remove any samples (rows) containing NaNs/Infs
@@ -410,6 +413,11 @@ def run_mnf(cube, n_components=12):
     if k < 1:
         raise ValueError("[EnMap] run_mnf: n_components invalid after masking.")
 
+    # Lazy import to avoid hard dependency at module import time
+    try:
+        from sklearn.decomposition import PCA
+    except Exception as e:
+        raise ImportError("scikit-learn is required for run_mnf(). Please install scikit-learn.") from e
     pca = PCA(n_components=k)
     pca.fit(Xw_valid)
 
@@ -449,7 +457,11 @@ def continuum_removed_depth(cube, wavelengths, center_range):
     cr = 1.0 - (sub / continuum)
     # Clamp to finite range
     cr = np.where(np.isfinite(cr), cr, np.nan)
-    return np.nanmax(cr, axis=0)
+    # Safe column-wise max without RuntimeWarning for all-NaN slices
+    cr_finite = np.where(np.isfinite(cr), cr, -np.inf)
+    m = np.max(cr_finite, axis=0)
+    m[~np.isfinite(m) | (m == -np.inf)] = np.nan
+    return m
 
 
 # ============================================================
@@ -543,6 +555,11 @@ def derivative_pca(cube, wavelengths, n_components=3, swir_range="auto"):
     if k < 1:
         raise ValueError("[EnMap] derivative_pca: n_components invalid after masking.")
 
+    # Lazy import to avoid hard dependency at module import time
+    try:
+        from sklearn.decomposition import PCA
+    except Exception as e:
+        raise ImportError("scikit-learn is required for derivative_pca(). Please install scikit-learn.") from e
     pca = PCA(n_components=k)
     pca.fit(X_valid)
 
@@ -565,20 +582,88 @@ def derivative_pca(cube, wavelengths, n_components=3, swir_range="auto"):
 # 9. Wrap 2D array into an in-memory rasterio dataset
 # ============================================================
 
+def validate_features_dict(features, meta):
+    """Validate that features is a dict[str, rasterio DatasetReader] matching meta.
+
+    Requirements:
+    - features is a dict with string keys
+    - each value is a rasterio DatasetReader with:
+      - count == 1
+      - dtype == float32
+      - CRS and transform present
+      - height/width match meta
+    Returns True if valid; otherwise raises ValueError with an informative message.
+    """
+    if not isinstance(features, dict):
+        raise ValueError("features must be a dict of name -> rasterio dataset")
+    req_h = meta.get("height")
+    req_w = meta.get("width")
+    if req_h is None or req_w is None:
+        raise ValueError("meta must include 'height' and 'width'")
+    for k, v in features.items():
+        if not isinstance(k, str):
+            raise ValueError(f"Feature key must be str, got {type(k)} for key {k!r}")
+        if not (hasattr(v, "read") and hasattr(v, "profile")):
+            raise ValueError(f"Feature '{k}' must be a rasterio dataset, got {type(v)}")
+        try:
+            h, w = int(v.height), int(v.width)
+            count = int(v.count)
+            dtypes = list(v.dtypes)
+            crs = v.crs
+            transform = v.transform
+        except Exception as e:
+            raise ValueError(f"Feature '{k}' dataset is not readable: {e}")
+        if h != req_h or w != req_w:
+            raise ValueError(
+                f"Feature '{k}' has size ({h},{w}) but expected ({req_h},{req_w}) from meta"
+            )
+        if count != 1:
+            raise ValueError(f"Feature '{k}' must be single-band (count=1), got count={count}")
+        if not dtypes or dtypes[0] != "float32":
+            got = dtypes[0] if dtypes else "unknown"
+            raise ValueError(f"Feature '{k}' must have dtype float32, got {got}")
+        if crs is None:
+            raise ValueError(f"Feature '{k}' is missing CRS")
+        if transform is None:
+            raise ValueError(f"Feature '{k}' is missing transform")
+    return True
+
+
 def create_rasterio_layer(array, meta):
-    """Return a rasterio in-memory DatasetReader for a numpy array."""
-    array = array.astype("float32")
+    """Return a rasterio in-memory DatasetReader for a numpy array.
+
+    Important: Keeps the underlying MemoryFile alive by attaching it to
+    the returned dataset object (dataset._memfile), so callers can use the
+    dataset safely without immediately managing the MemoryFile lifetime.
+
+    Note on masking values:
+    - Internally, model fitting uses NaNs to exclude invalid pixels.
+    - For outputs consumed by downstream Bayesian segmentation, we replace
+      NaNs/Infs with a sentinel (-9999.0) because BaySeg cannot handle NaNs.
+    """
+    # Ensure float32 and replace non-finite values with sentinel
+    arr = np.asarray(array).astype("float32", copy=False)
+    # Replace NaN/Inf with sentinel to make downstream consumers robust
+    sentinel = -9999.0
+    arr = np.nan_to_num(arr, nan=sentinel, posinf=sentinel, neginf=sentinel)
+
     new_meta = meta.copy()
     new_meta.update({
         "count": 1,
         "dtype": "float32",
+        "height": arr.shape[-2],
+        "width": arr.shape[-1],
+        "nodata": sentinel,
     })
 
     memfile = MemoryFile()
+    # Write then reopen read-only; attach memfile to keep it alive
     with memfile.open(**new_meta) as dst:
-        dst.write(array, 1)
-
-    return memfile.open()   # <-- rasterio.io.DatasetReader
+        dst.write(arr, 1)
+    ds = memfile.open()  # rasterio.io.DatasetReader
+    # Attach the memfile so it doesn't get garbage-collected
+    setattr(ds, "_memfile", memfile)
+    return ds
 
 
 # ============================================================
@@ -621,19 +706,33 @@ def enmap_to_feature_stack(folder_path, n_mnf=12, n_deriv_pcs=3, destripe=True, 
 
     features = {}
 
-    # MNF components (return raw arrays; caller wraps into rasters)
+    # MNF components (wrapped into rasterio MemoryFile datasets)
     for i in range(mnf.shape[0]):
-        features[f"MNF_{i+1:02d}"] = mnf[i]
+        features[f"MNF_{i+1:02d}"] = create_rasterio_layer(mnf[i], meta)
 
-    # Absorption depths
-    if depth_2200 is not None: features["Depth_2200"] = depth_2200
-    if depth_2300 is not None: features["Depth_2300"] = depth_2300
-    if depth_2340 is not None: features["Depth_2340"] = depth_2340
-    if depth_1000 is not None: features["Depth_1000"] = depth_1000
-    if depth_1750 is not None: features["Depth_1750"] = depth_1750
+    # Absorption depths (wrapped if available)
+    if depth_2200 is not None:
+        features["Depth_2200"] = create_rasterio_layer(depth_2200, meta)
+    if depth_2300 is not None:
+        features["Depth_2300"] = create_rasterio_layer(depth_2300, meta)
+    if depth_2340 is not None:
+        features["Depth_2340"] = create_rasterio_layer(depth_2340, meta)
+    if depth_1000 is not None:
+        features["Depth_1000"] = create_rasterio_layer(depth_1000, meta)
+    if depth_1750 is not None:
+        features["Depth_1750"] = create_rasterio_layer(depth_1750, meta)
 
     # Derivative PCA
-    for i in range(n_deriv_pcs):
-        features[f"Deriv_PC{i+1}"] = deriv[i]
+    # Use the number of computed components to avoid indexing beyond available
+    n_deriv_out = deriv.shape[0]
+    for i in range(n_deriv_out):
+        features[f"Deriv_PC{i+1}"] = create_rasterio_layer(deriv[i], meta)
+
+    # Validate output conforms to expected dictionary schema (name -> rasterio dataset)
+    try:
+        validate_features_dict(features, meta)
+        print(f"[EnMap] Feature dict validated: {len(features)} layers, size=({meta.get('height')},{meta.get('width')})")
+    except Exception as e:
+        raise ValueError(f"[EnMap] Feature dict validation failed: {e}")
 
     return features, meta
