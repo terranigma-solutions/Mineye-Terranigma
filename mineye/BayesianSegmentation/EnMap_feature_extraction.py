@@ -15,8 +15,11 @@ import xml.etree.ElementTree as ET
 def parse_enmap_wavelengths(xml_path):
     """Parse center wavelengths from an EnMAP metadata XML file.
 
-    Returns wavelengths in nanometers (nm). Robust to namespaces and
-    multiple schema variants used by EnMAP/ESA products.
+    Preference order:
+    1) bandCharacterisation/bandID(@number)/wavelengthCenterOfBand (sorted by @number)
+    2) BAND-like elements with wavelength child tags
+    3) Vector list tags like CENTER_WAVELENGTHS
+    Returns wavelengths in nanometers (nm).
     """
     tree = ET.parse(xml_path)
     root = tree.getroot()
@@ -30,7 +33,6 @@ def parse_enmap_wavelengths(xml_path):
         s = text.strip()
         if not s:
             return None
-        # Remove common units if included inline, like "2200 nm" or "2.2 um"
         s_clean = (
             s.replace("nm", " ")
              .replace("nanometer", " ")
@@ -45,51 +47,77 @@ def parse_enmap_wavelengths(xml_path):
         except Exception:
             return None
 
-    wavelengths = []
     units_detected = None  # 'nm' or 'um'
 
-    # Strategy A: Iterate BAND(-like) elements and fetch child tags with wavelength info
-    band_like_names = {"BAND", "BAND_INFORMATION", "SPECTRALBAND", "CHANNEL"}
-    wavelength_like_subtags = (
-        "WAVELENGTH", "CENTER_WAVELENGTH", "CENTRAL_WAVELENGTH", "WAVELENGTH_CENTER",
-        "BAND_CENTER", "CENTER", "CWAVELENGTH"
-    )
-
+    # Strategy 1: Explicit EnMAP structure: bandCharacterisation > bandID number > wavelengthCenterOfBand
+    band_map = {}
     for elem in root.iter():
-        tag_u = strip(elem.tag).upper()
-        if tag_u in band_like_names:
-            wl_val = None
-            # Look in children
+        if strip(elem.tag).lower() == "bandid":
+            num_txt = elem.attrib.get("number")
+            try:
+                num = int(num_txt) if num_txt is not None else None
+            except Exception:
+                num = None
+            wl = None
             for child in list(elem):
-                ctag = strip(child.tag).upper()
-                if any(k in ctag for k in wavelength_like_subtags):
-                    wl_val = to_float_safe(child.text)
-                    # Unit via attribute (if any)
+                if strip(child.tag).lower() == "wavelengthcenterofband":
+                    wl = to_float_safe(child.text)
+                    # Unit attr if present
                     unit_attr = (child.attrib.get("unit") or child.attrib.get("units") or "").lower()
                     if unit_attr:
                         if "nm" in unit_attr:
                             units_detected = units_detected or "nm"
                         elif "um" in unit_attr or "µm" in unit_attr or "microm" in unit_attr:
                             units_detected = units_detected or "um"
-                    if wl_val is not None:
-                        break
-            # If not found in children, check attributes on the BAND element itself
-            if wl_val is None:
-                for k, v in elem.attrib.items():
-                    ku = k.upper()
-                    if any(x in ku for x in wavelength_like_subtags):
-                        wl_val = to_float_safe(v)
-                        unit_attr = (elem.attrib.get("unit") or elem.attrib.get("units") or "").lower()
+                    break
+            if num is not None and wl is not None:
+                band_map[num] = wl
+    if len(band_map) > 0:
+        # Sort by band number to ensure exactly described bands are used
+        numbers = sorted(band_map.keys())
+        wavelengths = [band_map[n] for n in numbers]
+    else:
+        wavelengths = []
+
+    # Strategy 2: Generic BAND-like scan (only if Strategy 1 yielded nothing)
+    if len(wavelengths) == 0:
+        band_like_names = {"BAND", "BAND_INFORMATION", "SPECTRALBAND", "CHANNEL", "BANDID"}
+        wavelength_like_subtags = (
+            "WAVELENGTH", "CENTER_WAVELENGTH", "CENTRAL_WAVELENGTH", "WAVELENGTH_CENTER",
+            "BAND_CENTER", "CENTER", "CWAVELENGTH", "WAVELENGTHCENTEROFBAND"
+        )
+        for elem in root.iter():
+            tag_u = strip(elem.tag).upper()
+            if tag_u in band_like_names:
+                wl_val = None
+                for child in list(elem):
+                    ctag = strip(child.tag).upper()
+                    if any(k in ctag for k in wavelength_like_subtags):
+                        wl_val = to_float_safe(child.text)
+                        unit_attr = (child.attrib.get("unit") or child.attrib.get("units") or "").lower()
                         if unit_attr:
                             if "nm" in unit_attr:
                                 units_detected = units_detected or "nm"
                             elif "um" in unit_attr or "µm" in unit_attr or "microm" in unit_attr:
                                 units_detected = units_detected or "um"
-                        break
-            if wl_val is not None:
-                wavelengths.append(wl_val)
+                        if wl_val is not None:
+                            break
+                if wl_val is None:
+                    for k, v in elem.attrib.items():
+                        ku = k.upper()
+                        if any(x in ku for x in wavelength_like_subtags):
+                            wl_val = to_float_safe(v)
+                            unit_attr = (elem.attrib.get("unit") or elem.attrib.get("units") or "").lower()
+                            if unit_attr:
+                                if "nm" in unit_attr:
+                                    units_detected = units_detected or "nm"
+                                elif "um" in unit_attr or "µm" in unit_attr or "microm" in unit_attr:
+                                    units_detected = units_detected or "um"
+                            break
+                if wl_val is not None:
+                    wavelengths.append(wl_val)
 
-    # Strategy B: Some schemas store a vector list under e.g. CENTER_WAVELENGTHS
+    # Strategy 3: Vector-like lists (only if still empty)
     if len(wavelengths) == 0:
         vector_like_tags = (
             "WAVELENGTHS", "CENTER_WAVELENGTHS", "CENTRAL_WAVELENGTHS",
@@ -100,9 +128,6 @@ def parse_enmap_wavelengths(xml_path):
             if any(vtag == tag_u or vtag in tag_u for vtag in vector_like_tags):
                 text = (elem.text or "").strip()
                 if text:
-                    # Split by any whitespace or comma/semicolon
-                    parts = [p for ch in [",", ";"] for p in text.replace(ch, " ").split()]
-                    # Deduplicate split since above double loops can over-split
                     parts = text.replace(",", " ").replace(";", " ").split()
                     vals = []
                     for p in parts:
@@ -125,16 +150,12 @@ def parse_enmap_wavelengths(xml_path):
         print(f"[EnMap] parse_enmap_wavelengths: No wavelengths parsed from {os.path.basename(xml_path)}")
         return wls
 
-    # Decide units and convert to nm if necessary
     converted = False
     if units_detected == "um" or (units_detected is None and np.nanmax(wls) < 10.0):
         wls = wls * 1000.0
         converted = True
 
-    print(
-        f"[EnMap] Wavelengths: count={wls.size}, min={np.nanmin(wls):.2f} nm, max={np.nanmax(wls):.2f} nm, converted_from_um={converted}"
-    )
-
+    print(f"[EnMap] Wavelengths: count={wls.size}, min={np.nanmin(wls):.2f} nm, max={np.nanmax(wls):.2f} nm, converted_from_um={converted}")
     return wls  # in nm
 
 
@@ -336,10 +357,18 @@ def create_rasterio_layer(array, meta):
 # 10. Main pipeline
 # ============================================================
 
+
+
 def enmap_to_feature_stack(folder_path, n_mnf=12, n_deriv_pcs=3):
     cube, meta, qa_masks, xml = load_enmap_dataset(folder_path)
 
     wavelengths = parse_enmap_wavelengths(xml)
+    # Enforce strict consistency with metadata (no assumptions/harmonization)
+    if wavelengths.size != cube.shape[0]:
+        raise ValueError(
+            f"[EnMap] Wavelength-band mismatch: wavelengths={wavelengths.size}, "
+            f"cube_bands={cube.shape[0]}. The parser only returns bands described in the metadata XML."
+        )
 
     mask = build_mask(qa_masks)
 
