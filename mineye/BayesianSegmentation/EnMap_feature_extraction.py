@@ -456,27 +456,76 @@ def continuum_removed_depth(cube, wavelengths, center_range):
 # 8. Derivative PCA
 # ============================================================
 
-def derivative_pca(cube, wavelengths, n_components=3, swir_range=(2000.0, 2400.0)):
+def _select_swir_window(wavelengths, preferred=(2000.0, 2400.0), fallback=(1900.0, 2450.0), min_bands=3):
+    """Return indices for an automatically selected SWIR window based on wavelengths.
+
+    Strategy:
+    - Prefer [2000, 2400] nm if it contains >= min_bands.
+    - Else try a broader window [1900, 2450] nm if it contains >= min_bands.
+    - Else return None to indicate 'use all bands'.
+    Returns: (idx, chosen_range or None)
+    """
+    wl = np.asarray(wavelengths, dtype=float)
+    if wl.ndim != 1 or wl.size == 0:
+        return None, None
+    if not np.isfinite(wl).any():
+        return None, None
+    # Clean inf/nan to avoid comparisons failing
+    finite_mask = np.isfinite(wl)
+    wl_clean = wl.copy()
+    wl_clean[~finite_mask] = np.nan
+
+    def pick(window):
+        lo, hi = float(window[0]), float(window[1])
+        idx = np.where((wl_clean >= lo) & (wl_clean <= hi))[0]
+        return idx
+
+    for window in (preferred, fallback):
+        idx = pick(window)
+        if idx.size >= int(min_bands):
+            return idx, window
+    return None, None
+
+
+def derivative_pca(cube, wavelengths, n_components=3, swir_range="auto"):
     """Compute derivative PCA restricted to a SWIR absorption region to reduce noise.
 
     Args:
         cube: array (bands, h, w)
         wavelengths: array (bands,) in nm
         n_components: number of PCs to return
-        swir_range: (min_nm, max_nm) tuple selecting wavelength window for derivative PCA.
-                    If fewer than 3 bands fall in the range, falls back to using all bands.
+        swir_range: one of
+            - "auto" (default): automatically select a SWIR window from wavelengths.
+            - None: use all bands.
+            - (min_nm, max_nm) tuple: explicit window.
+        If fewer than 3 bands fall in the selected range, falls back to using all bands.
     """
     wl = np.asarray(wavelengths).astype(float)
-    if swir_range is not None and np.isfinite(wl).all():
+
+    use_all = False
+    subcube = cube
+
+    if swir_range == "auto":
+        idx, chosen = _select_swir_window(wl)
+        if idx is not None and idx.size >= 3:
+            subcube = cube[idx]
+            print(f"[EnMap] derivative_pca(auto): using SWIR window {chosen} with {idx.size} bands.")
+        else:
+            use_all = True
+            print("[EnMap] derivative_pca(auto): no suitable SWIR window found (>=3 bands). Using all bands.")
+    elif swir_range is None:
+        use_all = True
+    else:
+        # Explicit tuple provided
         lo, hi = swir_range
         idx = np.where((wl >= float(lo)) & (wl <= float(hi)))[0]
         if idx.size >= 3:
             subcube = cube[idx]
         else:
-            # Fallback to all bands if too few in range
+            use_all = True
             print(f"[EnMap] derivative_pca: SWIR range {swir_range} yields {idx.size} bands (<3). Falling back to all bands.")
-            subcube = cube
-    else:
+
+    if use_all:
         subcube = cube
 
     deriv = np.gradient(subcube, axis=0)
