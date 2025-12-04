@@ -39,6 +39,63 @@ from mineye.BayesianSegmentation.full_workflow import run_workflow
 # Helper Functions
 # ----------------
 
+import matplotlib.pyplot as plt
+
+def _percentile_scale(arr, p_lo=2.0, p_hi=98.0):
+    a = np.asarray(arr, dtype=float)
+    vmin, vmax = np.nanpercentile(a, [p_lo, p_hi])
+    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
+        vmin, vmax = np.nanmin(a), np.nanmax(a)
+        if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
+            vmin, vmax = 0.0, 1.0
+    a = (a - vmin) / (vmax - vmin)
+    return np.clip(a, 0, 1)
+
+
+def plot_feature_quicklooks(features: Dict[str, np.ndarray], out_prefix: str, max_panels: int = 9):
+    """Create quicklook plots of feature bands for QA.
+
+    - If MNF_01..MNF_03 exist, an RGB composite is saved.
+    - Up to `max_panels` single-band quicklooks are tiled and saved.
+    """
+    os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
+
+    # 1) RGB composite from first three MNF components (if present)
+    mnf_keys = [k for k in features.keys() if k.startswith("MNF_")]
+    if len(mnf_keys) >= 3:
+        # Sort to ensure MNF_01, MNF_02, MNF_03 order
+        mnf_keys_sorted = sorted(mnf_keys)[:3]
+        r = _percentile_scale(features[mnf_keys_sorted[0]])
+        g = _percentile_scale(features[mnf_keys_sorted[1]])
+        b = _percentile_scale(features[mnf_keys_sorted[2]])
+        rgb = np.dstack([r, g, b])
+        plt.figure(figsize=(6, 6))
+        plt.imshow(rgb)
+        plt.title(f"RGB composite: {mnf_keys_sorted[0]}, {mnf_keys_sorted[1]}, {mnf_keys_sorted[2]}")
+        plt.axis('off')
+        plt.tight_layout()
+        plt.savefig(f"{out_prefix}_MNF_RGB.png", dpi=200)
+        plt.close()
+
+    # 2) Tile up to max_panels single-band quicklooks
+    keys = list(features.keys())
+    keys.sort()
+    sel = keys[:max_panels]
+    if sel:
+        n = len(sel)
+        cols = min(3, n)
+        rows = int(np.ceil(n / cols))
+        plt.figure(figsize=(4 * cols, 4 * rows))
+        for i, k in enumerate(sel, 1):
+            plt.subplot(rows, cols, i)
+            img = _percentile_scale(features[k])
+            plt.imshow(img, cmap='viridis')
+            plt.title(k)
+            plt.axis('off')
+        plt.tight_layout()
+        plt.savefig(f"{out_prefix}_feature_quicklooks.png", dpi=200)
+        plt.close()
+
 
 def _features_to_memory_datasets(features: Dict[str, np.ndarray], meta: dict):
     """Create in-memory rasterio datasets for each 2D feature layer.
@@ -100,7 +157,7 @@ def _features_to_memory_datasets(features: Dict[str, np.ndarray], meta: dict):
 
 # Example: enmap_folder = "/path/to/ENMAP_L2A_TILE/"
 
-enmap_folder: str = ""  # REQUIRED: EnMAP L2A folder path
+enmap_folder: str = "/Users/simonvirgo/Downloads/Enmap_data/ENMAP01-____L2A-DT0000026661_20230712T114038Z_001_V010402_20240818T134118Z"  # REQUIRED: EnMAP L2A folder path
 
 # Segmentation hyperparameters
 n_classes: int = 6
@@ -134,6 +191,14 @@ print(f"ENMAP folder: {enmap_folder}")
 
 features, meta = enmap_to_feature_stack(enmap_folder, n_mnf=12, n_deriv_pcs=3)
 print(f"Extracted {len(features)} feature layers")
+
+# QA quicklooks of feature bands (saves PNGs alongside output_prefix)
+try:
+    output_prefix_abs = os.path.abspath(output_prefix)
+    plot_feature_quicklooks(features, output_prefix_abs)
+    print(f"Saved feature quicklooks to {output_prefix_abs}_*.png")
+except Exception as e:
+    print(f"[WARN] Could not create feature quicklooks: {e}")
 
 
 # %%
