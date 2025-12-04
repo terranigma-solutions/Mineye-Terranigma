@@ -183,7 +183,8 @@ def run_workflow(bands: dict,
                  save_npy: bool = True,
                  plot_tci: bool = True,
                  ref_band: str = None,
-                 output_prefix: str = "segmentation"):
+                 output_prefix: str = "segmentation",
+                 stencil: str | None = "4p"):
     """
     Generalized segmentation workflow.
 
@@ -199,6 +200,7 @@ def run_workflow(bands: dict,
         plot_tci: whether to plot TCI if available in bands.
         ref_band: band name to use as georeferencing reference; if None, use 'B4' if present, else first band.
         output_prefix: prefix for output files (GeoTIFF and NPY outputs).
+        stencil: neighborhood stencil for BaySeg ('4p' or '8p'). Default '4p' avoids NumPy ragged-array issues in older bayseg.
     """
     # Choose a reference band for metadata/geotransform
     band_keys = [k for k in bands.keys() if k not in ("TCI", "SCL")]
@@ -225,19 +227,32 @@ def run_workflow(bands: dict,
 
     # Build stack from provided bands (exclude TCI and SCL)
     stack = []
-    for name, source in bands.items():
-        if name in ("TCI", "SCL"):
-            continue
+    band_names = sorted([k for k in bands.keys() if k not in ("TCI", "SCL")])
+    first_shape = None
+    for name in band_names:
+        source = bands[name]
         with _as_rio_dataset(source) as src:
+            if src.count != 1:
+                raise ValueError(f"Band '{name}' must be single-band (count=1), got count={src.count}")
             band_data = crop_to_bounds(src, bounds, src.transform)
             # Ensure 2D per-band array
-            if band_data.ndim == 3 and band_data.shape[0] == 1:
-                band_data = band_data[0]
+            if band_data.ndim == 3:
+                if band_data.shape[0] == 1:
+                    band_data = band_data[0]
+                else:
+                    raise ValueError(f"Band '{name}' returned {band_data.shape} after crop; expected single 2D layer")
+            if first_shape is None:
+                first_shape = band_data.shape
+            elif band_data.shape != first_shape:
+                raise ValueError(
+                    f"Band '{name}' shape {band_data.shape} does not match first band shape {first_shape}. "
+                    f"All bands must have identical size and coverage."
+                )
             stack.append(band_data)
 
-    # Stack into (rows, cols, bands)
+    # Stack into (rows, cols, bands) as required by BaySeg (Y,X,F)
     img_stack = np.stack(stack, axis=-1).astype(np.float64)
-    print(f"Image stack shape: {img_stack.shape}")
+    print(f"Image stack shape: {img_stack.shape} (rows, cols, features). Using stencil={stencil}.")
 
     # Apply soil mask if requested and SCL available
     if use_soil_mask:
@@ -273,7 +288,7 @@ def run_workflow(bands: dict,
     # Initialize segmenter
     print(f"Running segmentation with {n_classes} classes...")
     start_time = time.time()
-    seg = BaySeg(data=img_stack, n_labels=n_classes, beta_init=beta_init)
+    seg = BaySeg(data=img_stack, n_labels=n_classes, beta_init=beta_init, stencil=stencil)
 
     # Fit the model and get the labels
     seg.fit(n=n_iterations, beta_jump_length=beta_jump_length)
