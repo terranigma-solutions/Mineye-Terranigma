@@ -365,20 +365,38 @@ def estimate_noise(cube):
     cov = EmpiricalCovariance().fit(valid)
     return cov.covariance_
 
+def _whitening_matrix_from_cov(noise_cov, eps=0.0, rtol=1e-8):
+    """Compute symmetric whitening matrix W from noise covariance.
+    Given noise covariance N (bands x bands), compute eigendecomposition N = E Λ E^T
+    and return W = E Λ^{-1/2} E^T suitable for right-multiplication X @ W
+    where X is (n_samples x bands).
+    Small/negative eigenvalues are clamped using max(λ, eps, rtol*λ_max).
+    """
+    # Ensure symmetric
+    N = 0.5 * (noise_cov + noise_cov.T)
+    # Eigen decomposition for symmetric matrices
+    vals, vecs = np.linalg.eigh(N)
+    lam_max = float(np.max(vals)) if vals.size > 0 else 0.0
+    floor = max(eps, rtol * lam_max)
+    vals_clamped = np.clip(vals, floor, None)
+    inv_sqrt = 1.0 / np.sqrt(vals_clamped)
+    # Recompose whitening matrix: E * Λ^{-1/2} * E^T
+    W = (vecs * inv_sqrt) @ vecs.T  # vecs @ diag(inv_sqrt) @ vecs.T using broadcasting
+    return W.astype(np.float64, copy=False)
+
+
 def run_mnf(cube, n_components=12):
     bands, h, w = cube.shape
     X = cube.reshape(bands, -1).T  # (n_pixels, bands)
 
     # Estimate noise covariance robustly (handles NaNs internally)
     noise_cov = estimate_noise(cube)
-    # Invert (or pseudo-invert) noise covariance
-    try:
-        noise_inv = np.linalg.inv(noise_cov)
-    except np.linalg.LinAlgError:
-        noise_inv = np.linalg.pinv(noise_cov, rcond=1e-6)
 
-    # Noise-whiten features
-    Xw = X @ noise_inv
+    # Build proper eigen-based whitening matrix
+    W = _whitening_matrix_from_cov(noise_cov, eps=0.0, rtol=1e-8)
+
+    # Noise-whiten features using X_white = X @ W
+    Xw = X @ W
 
     # Impute NaNs/infs before PCA
     Xw = _impute_nan_columns(Xw)
