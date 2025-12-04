@@ -456,8 +456,30 @@ def continuum_removed_depth(cube, wavelengths, center_range):
 # 8. Derivative PCA
 # ============================================================
 
-def derivative_pca(cube, wavelengths, n_components=3):
-    deriv = np.gradient(cube, axis=0)
+def derivative_pca(cube, wavelengths, n_components=3, swir_range=(2000.0, 2400.0)):
+    """Compute derivative PCA restricted to a SWIR absorption region to reduce noise.
+
+    Args:
+        cube: array (bands, h, w)
+        wavelengths: array (bands,) in nm
+        n_components: number of PCs to return
+        swir_range: (min_nm, max_nm) tuple selecting wavelength window for derivative PCA.
+                    If fewer than 3 bands fall in the range, falls back to using all bands.
+    """
+    wl = np.asarray(wavelengths).astype(float)
+    if swir_range is not None and np.isfinite(wl).all():
+        lo, hi = swir_range
+        idx = np.where((wl >= float(lo)) & (wl <= float(hi)))[0]
+        if idx.size >= 3:
+            subcube = cube[idx]
+        else:
+            # Fallback to all bands if too few in range
+            print(f"[EnMap] derivative_pca: SWIR range {swir_range} yields {idx.size} bands (<3). Falling back to all bands.")
+            subcube = cube
+    else:
+        subcube = cube
+
+    deriv = np.gradient(subcube, axis=0)
     bands, h, w = deriv.shape
 
     X = deriv.reshape(bands, -1).T  # (n_pixels, bands)
