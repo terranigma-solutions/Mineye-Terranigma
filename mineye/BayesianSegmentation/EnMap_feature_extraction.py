@@ -398,13 +398,33 @@ def run_mnf(cube, n_components=12):
     # Noise-whiten features using X_white = X @ W
     Xw = X @ W
 
-    # Impute NaNs/infs before PCA
-    Xw = _impute_nan_columns(Xw)
+    # Mask-aware PCA fitting: fit only on fully finite rows
+    finite_rows = np.all(np.isfinite(Xw), axis=1)
+    Xw_valid = Xw[finite_rows]
 
-    # Ensure n_components <= bands
-    k = min(n_components, bands)
+    # Handle edge cases: if no valid samples, raise; if too few, adjust components
+    if Xw_valid.shape[0] == 0:
+        raise ValueError("[EnMap] run_mnf: No valid samples to fit PCA (after whitening).")
+
+    k = int(min(n_components, bands, Xw_valid.shape[1], Xw_valid.shape[0]))
+    if k < 1:
+        raise ValueError("[EnMap] run_mnf: n_components invalid after masking.")
+
     pca = PCA(n_components=k)
-    mnf = pca.fit_transform(Xw)
+    pca.fit(Xw_valid)
+
+    # For transforming all pixels, impute only non-finite entries using means from valid set
+    col_means = np.nanmean(Xw_valid, axis=0)
+    col_means = np.where(np.isfinite(col_means), col_means, 0.0)
+    Xw_for_transform = Xw.copy()
+    non_finite = ~np.isfinite(Xw_for_transform)
+    if np.any(non_finite):
+        # replace each non-finite entry with corresponding column mean
+        rows, cols = np.where(non_finite)
+        if rows.size > 0:
+            Xw_for_transform[rows, cols] = col_means[cols]
+
+    mnf = pca.transform(Xw_for_transform)
 
     return mnf.T.reshape(k, h, w)
 
@@ -441,12 +461,31 @@ def derivative_pca(cube, wavelengths, n_components=3):
     bands, h, w = deriv.shape
 
     X = deriv.reshape(bands, -1).T  # (n_pixels, bands)
-    # Impute NaNs/infs before PCA
-    X = _impute_nan_columns(X)
 
-    k = min(n_components, bands)
+    # Fit PCA on valid (fully finite) rows only
+    finite_rows = np.all(np.isfinite(X), axis=1)
+    X_valid = X[finite_rows]
+    if X_valid.shape[0] == 0:
+        raise ValueError("[EnMap] derivative_pca: No valid samples to fit PCA (after derivative).")
+
+    k = int(min(n_components, bands, X_valid.shape[1], X_valid.shape[0]))
+    if k < 1:
+        raise ValueError("[EnMap] derivative_pca: n_components invalid after masking.")
+
     pca = PCA(n_components=k)
-    pcs = pca.fit_transform(X)
+    pca.fit(X_valid)
+
+    # Prepare full transform: impute non-finite with column means from valid set
+    col_means = np.nanmean(X_valid, axis=0)
+    col_means = np.where(np.isfinite(col_means), col_means, 0.0)
+    X_for_transform = X.copy()
+    non_finite = ~np.isfinite(X_for_transform)
+    if np.any(non_finite):
+        rows, cols = np.where(non_finite)
+        if rows.size > 0:
+            X_for_transform[rows, cols] = col_means[cols]
+
+    pcs = pca.transform(X_for_transform)
 
     return pcs.T.reshape(k, h, w)
 
