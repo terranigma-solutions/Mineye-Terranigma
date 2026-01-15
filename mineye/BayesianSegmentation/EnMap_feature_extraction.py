@@ -9,7 +9,7 @@ except Exception:  # pragma: no cover
     rasterio = None
     MemoryFile = None
 from scipy.signal import savgol_filter
-from scipy.ndimage import gaussian_filter, median_filter, zoom
+from scipy.ndimage import gaussian_filter, median_filter, zoom, binary_erosion
 import xml.etree.ElementTree as ET
 import matplotlib
 matplotlib.use('Agg')
@@ -297,19 +297,26 @@ def smooth_cube(cube, window=11, poly=2):
     )
 
 
-def _masked_gaussian_lowpass(img2d: np.ndarray, valid2d: np.ndarray, sigma: float) -> np.ndarray:
+def _masked_gaussian_lowpass(img2d: np.ndarray, valid2d: np.ndarray, sigma: float) -> tuple[np.ndarray, np.ndarray]:
     """Mask-aware Gaussian low-pass.
 
     Computes:
         B = Gσ(I * V) / Gσ(V)
     where V is 1 for valid pixels and 0 otherwise.
+
+    Returns:
+        (B, den) where den = Gσ(V). `den` is useful to detect boundary/footprint
+        regions where the estimate is under-constrained (small den).
     """
     img = np.asarray(img2d, dtype=np.float32)
     v = np.asarray(valid2d, dtype=np.float32)
     if img.shape != v.shape:
         raise ValueError(f"valid2d must match img2d shape {img.shape}, got {v.shape}")
     if sigma is None or float(sigma) <= 0:
-        return img.astype(np.float32, copy=False)
+        # Degenerate "no filtering" path: treat the estimate as the input, and set the
+        # denominator to 1 on valid pixels (0 otherwise) so callers can still weight edges.
+        den = np.where(v > 0.0, 1.0, 0.0).astype(np.float32, copy=False)
+        return img.astype(np.float32, copy=False), den
 
     num = gaussian_filter(img * v, sigma=float(sigma), mode="nearest")
     den = gaussian_filter(v, sigma=float(sigma), mode="nearest")
@@ -317,7 +324,7 @@ def _masked_gaussian_lowpass(img2d: np.ndarray, valid2d: np.ndarray, sigma: floa
     # Avoid division by ~0 in fully-masked regions.
     eps = 1e-6
     b = num / np.maximum(den, eps)
-    return b.astype(np.float32, copy=False)
+    return b.astype(np.float32, copy=False), den.astype(np.float32, copy=False)
 
 
 def _masked_gaussian_lowpass_downsampled(
@@ -332,7 +339,8 @@ def _masked_gaussian_lowpass_downsampled(
     """
     ds = int(downsample)
     if ds <= 1:
-        return _masked_gaussian_lowpass(img2d, valid2d, sigma)
+        b, _ = _masked_gaussian_lowpass(img2d, valid2d, sigma)
+        return b
 
     img = np.asarray(img2d, dtype=np.float32)
     v = np.asarray(valid2d, dtype=np.float32)
@@ -357,7 +365,7 @@ def _masked_gaussian_lowpass_downsampled(
     sigma_small = float(sigma) / float(ds)
     sigma_small = max(sigma_small, 0.5)  # avoid too-tiny kernels
 
-    b_small = _masked_gaussian_lowpass(img_small, v_small > 0.0, sigma_small)
+    b_small, _ = _masked_gaussian_lowpass(img_small, v_small > 0.0, sigma_small)
     b_pad = zoom(b_small, zoom=(ds, ds), order=1, mode="nearest", prefilter=False)
     b = b_pad[:h, :w]
     return b.astype(np.float32, copy=False)
@@ -368,6 +376,8 @@ def remove_background_field(
         mask_bad: np.ndarray | None,
         sigma: float = 75.0,
         downsample: int | None = None,
+        buffer_px: int = 20,
+        den_thresh: float = 0.2,
         progress_every: int | None = 1,
 ) -> np.ndarray:
     """Remove a smooth 2D background field per band (detrending).
@@ -381,6 +391,11 @@ def remove_background_field(
         mask_bad: optional bool (rows, cols) where True pixels are invalid.
         sigma: Gaussian sigma in pixels (e.g. 50–100 for EnMAP 30 m).
         downsample: optional int for downsampled low-pass computation (e.g. 2 or 4).
+        buffer_px: erosion buffer (in pixels) to exclude footprint rims from driving the
+            background estimate. Use 0 to disable.
+        den_thresh: threshold for the low-pass denominator (`den`). Used to feather the
+            correction near footprint edges where the background estimate is under-constrained.
+            Interpreted as a fraction of `den.max()` when 0 < den_thresh <= 1.
         progress_every: optional int. If set, prints a progress line every N bands.
     Returns:
         cube_out float32 with background removed.
@@ -412,7 +427,8 @@ def remove_background_field(
     t0 = time.perf_counter()
     print(
         f"[EnMap] Detrending/background removal: bands={bands}, rows={rows}, cols={cols}, "
-        f"sigma={sigma}, downsample={ds}, mask_bad={'yes' if mb is not None else 'no'}"
+        f"sigma={sigma}, downsample={ds}, buffer_px={int(buffer_px)}, den_thresh={den_thresh}, "
+        f"mask_bad={'yes' if mb is not None else 'no'}"
     )
 
     for b in range(bands):
@@ -423,17 +439,42 @@ def remove_background_field(
         if mb is not None:
             finite = finite & (~mb)
 
+        finite_interior = finite
+        bp = int(buffer_px) if buffer_px is not None else 0
+        if bp > 0 and np.any(finite):
+            # Exclude a buffer zone around the valid footprint to avoid rim-driven estimates.
+            finite_interior = binary_erosion(finite, iterations=bp)
+
         valid_frac = float(np.mean(finite)) if img.size > 0 else 0.0
 
         # Fill non-finite with 0 for the numerator; validity mask handles normalization.
         filled = np.where(np.isfinite(img), img, 0.0).astype(np.float32, copy=False)
 
         if ds is not None:
-            bg = _masked_gaussian_lowpass_downsampled(filled, finite, sigma=float(sigma), downsample=ds)
+            # Downsampled path returns only the background estimate; compute den at full-res
+            # for stable edge weighting.
+            bg = _masked_gaussian_lowpass_downsampled(filled, finite_interior, sigma=float(sigma), downsample=ds)
+            _, den = _masked_gaussian_lowpass(
+                np.zeros_like(filled, dtype=np.float32),
+                finite_interior,
+                sigma=float(sigma),
+            )
         else:
-            bg = _masked_gaussian_lowpass(filled, finite, sigma=float(sigma))
+            bg, den = _masked_gaussian_lowpass(filled, finite_interior, sigma=float(sigma))
 
-        corr = img - bg
+        # Feather the correction near edges where the estimate is under-constrained.
+        den_max = float(np.nanmax(den)) if den.size > 0 else 0.0
+        if den_thresh is None or float(den_thresh) <= 0 or not np.isfinite(den_max) or den_max <= 0.0:
+            w = 1.0
+        else:
+            dt = float(den_thresh)
+            thresh = (dt * den_max) if 0.0 < dt <= 1.0 else dt
+            thresh = max(thresh, 1e-6)
+            w = np.clip(den / thresh, 0.0, 1.0).astype(np.float32, copy=False)
+
+        corr = img - (w * bg if isinstance(w, np.ndarray) else bg)
+        # Preserve the original invalid footprint semantics.
+        corr = np.where(finite, corr, np.nan)
         out[b] = corr.astype(np.float32, copy=False)
 
         # Lightweight diagnostics
@@ -448,7 +489,7 @@ def remove_background_field(
             print(
                 f"[EnMap] Detrending progress: band {b + 1}/{bands} "
                 f"(dt={dt_band:.2f}s, total={dt_total:.1f}s, valid={valid_frac * 100.0:.1f}%, "
-                f"background_std={bg_std:.4g}, corrected_std={corr_std:.4g})"
+                f"background_std={bg_std:.4g}, corrected_std={corr_std:.4g}, den_max={den_max:.3g})"
             )
 
     return out
@@ -732,7 +773,7 @@ def _impute_nan_columns(X):
     return X.astype(np.float32, copy=False)
 
 
-def estimate_noise(cube):
+def estimate_noise(cube, valid_mask: np.ndarray | None = None):
     # Lazy import to avoid hard dependency during module import in minimal environments
     try:
         from sklearn.covariance import EmpiricalCovariance
@@ -742,6 +783,17 @@ def estimate_noise(cube):
     diffs = diffs.reshape(cube.shape[0], -1).T  # (n_samples, n_features)
     # Remove any samples (rows) containing NaNs/Infs
     mask = np.all(np.isfinite(diffs), axis=1)
+
+    # Optional: restrict noise estimation to an interior footprint (avoid rim-driven statistics).
+    if valid_mask is not None:
+        vm = np.asarray(valid_mask, dtype=bool)
+        if vm.shape != (cube.shape[1], cube.shape[2]):
+            raise ValueError(
+                f"[EnMap] estimate_noise: valid_mask must have shape (rows, cols)={(cube.shape[1], cube.shape[2])}, got {vm.shape}"
+            )
+        # A diff sample at (y,x) uses cube[:, y+1, x] - cube[:, y, x]. Require both pixels valid.
+        vm_pairs = (vm[1:, :] & vm[:-1, :]).reshape(-1)
+        mask = mask & vm_pairs
     valid = diffs[mask]
     if valid.shape[0] == 0:
         raise ValueError("[EnMap] estimate_noise: No valid (finite) samples available for noise covariance estimation.")
@@ -768,12 +820,24 @@ def _whitening_matrix_from_cov(noise_cov, eps=0.0, rtol=1e-8):
     return W.astype(np.float64, copy=False)
 
 
-def run_mnf(cube, n_components=12):
+def run_mnf(cube, n_components=12, mask_bad: np.ndarray | None = None, buffer_px: int = 0):
     bands, h, w = cube.shape
     X = cube.reshape(bands, -1).T  # (n_pixels, bands)
 
-    # Estimate noise covariance robustly (handles NaNs internally)
-    noise_cov = estimate_noise(cube)
+    valid_interior = None
+    if mask_bad is not None:
+        mb = np.asarray(mask_bad, dtype=bool)
+        if mb.shape != (h, w):
+            raise ValueError(f"[EnMap] run_mnf: mask_bad must have shape (rows, cols)={(h, w)}, got {mb.shape}")
+        valid = (~mb) & np.all(np.isfinite(cube), axis=0)
+        bp = int(buffer_px) if buffer_px is not None else 0
+        if bp > 0 and np.any(valid):
+            valid_interior = binary_erosion(valid, iterations=bp)
+        else:
+            valid_interior = valid
+
+    # Estimate noise covariance robustly; optionally restrict to interior pixels.
+    noise_cov = estimate_noise(cube, valid_mask=valid_interior)
 
     # Build proper eigen-based whitening matrix
     W = _whitening_matrix_from_cov(noise_cov, eps=0.0, rtol=1e-8)
@@ -781,8 +845,10 @@ def run_mnf(cube, n_components=12):
     # Noise-whiten features using X_white = X @ W
     Xw = X @ W
 
-    # Mask-aware PCA fitting: fit only on fully finite rows
+    # Mask-aware PCA fitting: fit only on fully finite rows; optionally restrict to interior footprint.
     finite_rows = np.all(np.isfinite(Xw), axis=1)
+    if valid_interior is not None:
+        finite_rows = finite_rows & valid_interior.reshape(-1)
     Xw_valid = Xw[finite_rows]
 
     # Handle edge cases: if no valid samples, raise; if too few, adjust components
@@ -1061,6 +1127,9 @@ def enmap_to_feature_stack(
         detrend=False,
         detrend_sigma=75.0,
         detrend_downsample=None,
+        detrend_buffer_px: int = 20,
+        detrend_den_thresh: float = 0.2,
+        mnf_buffer_px: int | None = None,
         destripe=True,
         destripe_frac=1.0,
         destripe_poly=1,
@@ -1085,6 +1154,7 @@ def enmap_to_feature_stack(
     if detrend:
         print(
             f"[EnMap] Detrending config: enabled={detrend}, sigma={detrend_sigma}, downsample={detrend_downsample}, "
+            f"buffer_px={int(detrend_buffer_px)}, den_thresh={detrend_den_thresh}, "
             f"mask_bad={'yes' if mask is not None else 'no'}"
         )
         cube = remove_background_field(
@@ -1092,10 +1162,18 @@ def enmap_to_feature_stack(
             mask_bad=mask,
             sigma=float(detrend_sigma),
             downsample=detrend_downsample,
+            buffer_px=int(detrend_buffer_px),
+            den_thresh=float(detrend_den_thresh) if detrend_den_thresh is not None else None,
             progress_every=1,
         )
 
-    # Savitzky–Golay smoothing (spectral). Must run before injecting NaNs.
+        # Sanity: enforce NaNs immediately after detrending so subsequent steps do not
+        # learn from nodata/bad-pixel geometry.
+        if mask is not None:
+            cube[:, mask] = np.nan
+
+    # Savitzky–Golay smoothing (spectral). Safe with our masking semantics because masked
+    # pixels are NaN for all bands (per-pixel), and valid pixels remain fully finite.
     cube = smooth_cube(cube)
 
     # Apply QA mask for downstream steps that are NaN-aware (MNF, depths, derivative PCA).
@@ -1127,7 +1205,8 @@ def enmap_to_feature_stack(
     if mask is not None:
         cube[:, mask] = np.nan
 
-    mnf = run_mnf(cube, n_components=n_mnf)
+    mnf_bp = int(detrend_buffer_px) if mnf_buffer_px is None else int(mnf_buffer_px)
+    mnf = run_mnf(cube, n_components=n_mnf, mask_bad=mask, buffer_px=mnf_bp)
 
     depth_2200 = continuum_removed_depth(cube, wavelengths, (2200, 2230))
     depth_2300 = continuum_removed_depth(cube, wavelengths, (2300, 2330))
