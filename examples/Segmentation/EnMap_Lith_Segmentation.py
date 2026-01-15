@@ -65,7 +65,18 @@ def plot_feature_quicklooks(features: Dict[str, np.ndarray], out_prefix: str, ma
         # Rasterio dataset -> read first band
         if hasattr(val, "read") and hasattr(val, "profile"):
             try:
-                return val.read(1)
+                arr = val.read(1)
+                # Respect nodata on quicklooks (our pipeline uses -9999.0 sentinel)
+                nodata = getattr(val, "nodata", None)
+                if nodata is None:
+                    try:
+                        nodata = val.profile.get("nodata")
+                    except Exception:
+                        nodata = None
+                if nodata is not None:
+                    arr = arr.astype(np.float32, copy=False)
+                    arr = np.where(arr == nodata, np.nan, arr)
+                return arr
             except Exception:
                 pass
         return np.asarray(val)
@@ -279,12 +290,31 @@ def _write_features_to_files(features: Dict[str, np.ndarray], meta: dict, out_pr
 enmap_folder: str = "/Users/simonvirgo/Downloads/Enmap_data/ENMAP01-____L2A-DT0000026661_20230712T114038Z_001_V010402_20240818T134118Z"  # REQUIRED: EnMAP L2A folder path
 
 # Segmentation hyperparameters
-n_classes: int = 6
+n_classes: int = 8
 iterations: int = 400
 beta_init: float = 30.0
 beta_jump: float = 0.1
 output_prefix: str = "examples/Segmentation/EnMap"  # output prefix for results
 save_npy: bool = True  # save intermediate arrays from full_workflow
+
+# Destriping (recommended: keep enabled; tune if you see vertical striping)
+destripe: bool = True
+destripe_frac: float = 1.0
+
+# Recommended settings (geology-safe): residual-based destriping + column-bias smoothing.
+# Important: disable `destripe_poly` in residual mode; polyfit can warp low-frequency signal.
+destripe_poly: int | None = None
+
+# New destriper options (implemented in `destripe_columns` and exposed via `enmap_to_feature_stack`)
+# - `destripe_reference_kernel`: enables residual-based destriping (median-filter reference)
+# - `destripe_smooth_cols`: median smooth the per-column bias vector to reduce overfitting
+destripe_reference_kernel: int | None = 51
+destripe_smooth_cols: int | None = 21
+
+# Runtime optimization for residual-based destriping.
+# Computes the low-frequency reference on a downsampled grid (block-mean) and upsamples it back.
+# Typical values: 2 or 4. Set to None to use full-resolution reference (slower).
+destripe_reference_downsample: int | None = 4
 
 # Derived features are not raw spectral bands, so we disable soil mask and TCI plotting
 use_soil_mask: bool = False
@@ -308,7 +338,17 @@ print(f"ENMAP folder: {enmap_folder}")
 # ------------------
 # Compute a stack of features from the EnMAP spectral cube.
 
-features, meta = enmap_to_feature_stack(enmap_folder, n_mnf=12, n_deriv_pcs=3)
+features, meta = enmap_to_feature_stack(
+    enmap_folder,
+    n_mnf=12,
+    n_deriv_pcs=3,
+    destripe=destripe,
+    destripe_frac=destripe_frac,
+    destripe_poly=destripe_poly,
+    destripe_reference_kernel=destripe_reference_kernel,
+    destripe_reference_downsample=destripe_reference_downsample,
+    destripe_smooth_cols=destripe_smooth_cols,
+)
 print(f"Extracted {len(features)} feature layers")
 
 # QA quicklooks of feature bands (saves PNGs alongside output_prefix)
