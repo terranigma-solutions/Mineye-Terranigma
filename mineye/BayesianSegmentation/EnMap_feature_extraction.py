@@ -9,7 +9,7 @@ except Exception:  # pragma: no cover
     rasterio = None
     MemoryFile = None
 from scipy.signal import savgol_filter
-from scipy.ndimage import median_filter, zoom
+from scipy.ndimage import gaussian_filter, median_filter, zoom
 import xml.etree.ElementTree as ET
 import matplotlib
 matplotlib.use('Agg')
@@ -295,6 +295,163 @@ def smooth_cube(cube, window=11, poly=2):
         cube, axis=0, mode="mirror",
         window_length=window, polyorder=poly
     )
+
+
+def _masked_gaussian_lowpass(img2d: np.ndarray, valid2d: np.ndarray, sigma: float) -> np.ndarray:
+    """Mask-aware Gaussian low-pass.
+
+    Computes:
+        B = Gσ(I * V) / Gσ(V)
+    where V is 1 for valid pixels and 0 otherwise.
+    """
+    img = np.asarray(img2d, dtype=np.float32)
+    v = np.asarray(valid2d, dtype=np.float32)
+    if img.shape != v.shape:
+        raise ValueError(f"valid2d must match img2d shape {img.shape}, got {v.shape}")
+    if sigma is None or float(sigma) <= 0:
+        return img.astype(np.float32, copy=False)
+
+    num = gaussian_filter(img * v, sigma=float(sigma), mode="nearest")
+    den = gaussian_filter(v, sigma=float(sigma), mode="nearest")
+
+    # Avoid division by ~0 in fully-masked regions.
+    eps = 1e-6
+    b = num / np.maximum(den, eps)
+    return b.astype(np.float32, copy=False)
+
+
+def _masked_gaussian_lowpass_downsampled(
+        img2d: np.ndarray,
+        valid2d: np.ndarray,
+        sigma: float,
+        downsample: int,
+) -> np.ndarray:
+    """Downsample→Gaussian→upsample mask-aware low-pass for speed.
+
+    This is an approximation of `_masked_gaussian_lowpass`.
+    """
+    ds = int(downsample)
+    if ds <= 1:
+        return _masked_gaussian_lowpass(img2d, valid2d, sigma)
+
+    img = np.asarray(img2d, dtype=np.float32)
+    v = np.asarray(valid2d, dtype=np.float32)
+    h, w = img.shape
+
+    # Block-mean downsample (pad to multiples of ds)
+    pad_h = (-h) % ds
+    pad_w = (-w) % ds
+    if pad_h or pad_w:
+        img_pad = np.pad(img, ((0, pad_h), (0, pad_w)), mode="edge")
+        v_pad = np.pad(v, ((0, pad_h), (0, pad_w)), mode="edge")
+    else:
+        img_pad = img
+        v_pad = v
+
+    hp, wp = img_pad.shape
+    h2, w2 = hp // ds, wp // ds
+    img_small = img_pad.reshape(h2, ds, w2, ds).mean(axis=(1, 3)).astype(np.float32, copy=False)
+    v_small = v_pad.reshape(h2, ds, w2, ds).mean(axis=(1, 3)).astype(np.float32, copy=False)
+
+    # Scale sigma into low-res space.
+    sigma_small = float(sigma) / float(ds)
+    sigma_small = max(sigma_small, 0.5)  # avoid too-tiny kernels
+
+    b_small = _masked_gaussian_lowpass(img_small, v_small > 0.0, sigma_small)
+    b_pad = zoom(b_small, zoom=(ds, ds), order=1, mode="nearest", prefilter=False)
+    b = b_pad[:h, :w]
+    return b.astype(np.float32, copy=False)
+
+
+def remove_background_field(
+        cube: np.ndarray,
+        mask_bad: np.ndarray | None,
+        sigma: float = 75.0,
+        downsample: int | None = None,
+        progress_every: int | None = 1,
+) -> np.ndarray:
+    """Remove a smooth 2D background field per band (detrending).
+
+    Implements additive correction:
+        I_corr = I - B
+    where B is a very smooth, mask-aware low-frequency field.
+
+    Args:
+        cube: array (bands, rows, cols)
+        mask_bad: optional bool (rows, cols) where True pixels are invalid.
+        sigma: Gaussian sigma in pixels (e.g. 50–100 for EnMAP 30 m).
+        downsample: optional int for downsampled low-pass computation (e.g. 2 or 4).
+        progress_every: optional int. If set, prints a progress line every N bands.
+    Returns:
+        cube_out float32 with background removed.
+    """
+    cube = np.asarray(cube)
+    if cube.ndim != 3:
+        raise ValueError(f"cube must be 3D (bands, rows, cols), got shape {cube.shape}")
+    bands, rows, cols = cube.shape
+    out = cube.astype(np.float32, copy=True)
+
+    mb = None
+    if mask_bad is not None:
+        if mask_bad.shape != (rows, cols):
+            raise ValueError(
+                f"[EnMap] remove_background_field: mask_bad must have shape (rows, cols)={(rows, cols)}, got {mask_bad.shape}"
+            )
+        mb = mask_bad.astype(bool, copy=False)
+
+    ds = int(downsample) if downsample is not None else None
+    if ds is not None and ds <= 1:
+        ds = None
+
+    pe = None
+    if progress_every is not None:
+        pe = int(progress_every)
+        if pe <= 0:
+            pe = None
+
+    t0 = time.perf_counter()
+    print(
+        f"[EnMap] Detrending/background removal: bands={bands}, rows={rows}, cols={cols}, "
+        f"sigma={sigma}, downsample={ds}, mask_bad={'yes' if mb is not None else 'no'}"
+    )
+
+    for b in range(bands):
+        tb = time.perf_counter()
+        img = out[b]
+
+        finite = np.isfinite(img)
+        if mb is not None:
+            finite = finite & (~mb)
+
+        valid_frac = float(np.mean(finite)) if img.size > 0 else 0.0
+
+        # Fill non-finite with 0 for the numerator; validity mask handles normalization.
+        filled = np.where(np.isfinite(img), img, 0.0).astype(np.float32, copy=False)
+
+        if ds is not None:
+            bg = _masked_gaussian_lowpass_downsampled(filled, finite, sigma=float(sigma), downsample=ds)
+        else:
+            bg = _masked_gaussian_lowpass(filled, finite, sigma=float(sigma))
+
+        corr = img - bg
+        out[b] = corr.astype(np.float32, copy=False)
+
+        # Lightweight diagnostics
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="All-NaN slice encountered")
+            bg_std = float(np.nanstd(bg))
+            corr_std = float(np.nanstd(corr))
+
+        if pe is not None and ((b + 1) % pe == 0 or (b + 1) == bands):
+            dt_band = time.perf_counter() - tb
+            dt_total = time.perf_counter() - t0
+            print(
+                f"[EnMap] Detrending progress: band {b + 1}/{bands} "
+                f"(dt={dt_band:.2f}s, total={dt_total:.1f}s, valid={valid_frac * 100.0:.1f}%, "
+                f"background_std={bg_std:.4g}, corrected_std={corr_std:.4g})"
+            )
+
+    return out
 
 
 def _lowfreq_reference_median_filter(img, kernel):
@@ -901,6 +1058,9 @@ def enmap_to_feature_stack(
         folder_path,
         n_mnf=12,
         n_deriv_pcs=3,
+        detrend=False,
+        detrend_sigma=75.0,
+        detrend_downsample=None,
         destripe=True,
         destripe_frac=1.0,
         destripe_poly=1,
@@ -922,10 +1082,23 @@ def enmap_to_feature_stack(
 
     cube, wavelengths, _ = drop_bad_bands(cube, wavelengths)
 
+    if detrend:
+        print(
+            f"[EnMap] Detrending config: enabled={detrend}, sigma={detrend_sigma}, downsample={detrend_downsample}, "
+            f"mask_bad={'yes' if mask is not None else 'no'}"
+        )
+        cube = remove_background_field(
+            cube,
+            mask_bad=mask,
+            sigma=float(detrend_sigma),
+            downsample=detrend_downsample,
+            progress_every=1,
+        )
+
+    # Savitzky–Golay smoothing (spectral). Must run before injecting NaNs.
     cube = smooth_cube(cube)
 
-    # Note: savgol_filter does not handle NaNs well, so we apply QA masking after smoothing.
-    # We still mask before destriping so stripe estimation can ignore bad pixels via NaNs.
+    # Apply QA mask for downstream steps that are NaN-aware (MNF, depths, derivative PCA).
     if mask is not None:
         cube[:, mask] = np.nan
 

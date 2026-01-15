@@ -297,23 +297,20 @@ beta_jump: float = 0.1
 output_prefix: str = "examples/Segmentation/EnMap"  # output prefix for results
 save_npy: bool = True  # save intermediate arrays from full_workflow
 
-# Destriping (recommended: keep enabled; tune if you see vertical striping)
-destripe: bool = True
+# Detrending / background-field removal (recommended for the current EnMAP dataset)
+# The dominant artifact here is typically a smooth 2D cross-track bias (not narrow detector stripes).
+detrend: bool = True
+detrend_sigma: float = 75.0  # pixels; try 50–100
+detrend_downsample: int | None = 4  # 2/4 for speed; set None for full-res
+
+# Destriping (keep available for datasets that truly have detector striping)
+destripe: bool = False
 destripe_frac: float = 1.0
 
-# Recommended settings (geology-safe): residual-based destriping + column-bias smoothing.
-# Important: disable `destripe_poly` in residual mode; polyfit can warp low-frequency signal.
+# Residual-based destriping settings (only used if destripe=True)
 destripe_poly: int | None = None
-
-# New destriper options (implemented in `destripe_columns` and exposed via `enmap_to_feature_stack`)
-# - `destripe_reference_kernel`: enables residual-based destriping (median-filter reference)
-# - `destripe_smooth_cols`: median smooth the per-column bias vector to reduce overfitting
 destripe_reference_kernel: int | None = 51
 destripe_smooth_cols: int | None = 21
-
-# Runtime optimization for residual-based destriping.
-# Computes the low-frequency reference on a downsampled grid (block-mean) and upsamples it back.
-# Typical values: 2 or 4. Set to None to use full-resolution reference (slower).
 destripe_reference_downsample: int | None = 4
 
 # Derived features are not raw spectral bands, so we disable soil mask and TCI plotting
@@ -342,6 +339,9 @@ features, meta = enmap_to_feature_stack(
     enmap_folder,
     n_mnf=12,
     n_deriv_pcs=3,
+    detrend=detrend,
+    detrend_sigma=detrend_sigma,
+    detrend_downsample=detrend_downsample,
     destripe=destripe,
     destripe_frac=destripe_frac,
     destripe_poly=destripe_poly,
