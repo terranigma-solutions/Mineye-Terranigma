@@ -1,9 +1,19 @@
 import os
 import numpy as np
-import rasterio
-from rasterio.io import MemoryFile
+import time
+import warnings
+try:
+    import rasterio
+    from rasterio.io import MemoryFile
+except Exception:  # pragma: no cover
+    rasterio = None
+    MemoryFile = None
 from scipy.signal import savgol_filter
+from scipy.ndimage import median_filter, zoom
 import xml.etree.ElementTree as ET
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 
 # ============================================================
@@ -162,6 +172,8 @@ def parse_enmap_wavelengths(xml_path):
 # ============================================================
 
 def load_enmap_dataset(path):
+    if rasterio is None:
+        raise ImportError("rasterio is required for load_enmap_dataset(). Please install rasterio.")
     files = os.listdir(path)
 
     cube_path = next(f for f in files if "SPECTRAL_IMAGE" in f and f.upper().endswith((".TIF", ".TIFF")))
@@ -285,7 +297,96 @@ def smooth_cube(cube, window=11, poly=2):
     )
 
 
-def destripe_columns(cube, frac=1.0, polyfit_order=None):
+def _lowfreq_reference_median_filter(img, kernel):
+    """Compute a low-frequency reference image via 2D median filter.
+
+    Notes
+    -----
+    - NaNs/Infs are filled with the global median before filtering.
+    - This function is intentionally lightweight and self-contained.
+
+    Args:
+        img: 2D array (rows, cols)
+        kernel: int, median filter window size (odd recommended)
+    Returns:
+        ref: 2D float32 array
+    """
+    if kernel is None or int(kernel) <= 1:
+        return img.astype(np.float32, copy=False)
+
+    k = int(kernel)
+    if k % 2 == 0:
+        k += 1
+
+    img = img.astype(np.float32, copy=False)
+    finite = np.isfinite(img)
+    fill = np.nanmedian(img[finite]) if np.any(finite) else 0.0
+    filled = np.where(finite, img, fill)
+    ref = median_filter(filled, size=(k, k), mode="nearest")
+    return ref.astype(np.float32, copy=False)
+
+
+def _lowfreq_reference_median_filter_downsampled(img, kernel, downsample):
+    """Compute a low-frequency reference via downsample→median-filter→upsample.
+
+    This is a speed optimization for residual-based destriping.
+
+    Args:
+        img: 2D array (rows, cols)
+        kernel: int, median filter window size (odd recommended)
+        downsample: int, factor (>=2) used for block-mean downsampling
+    Returns:
+        ref: 2D float32 array with the same shape as img
+    """
+    if kernel is None or int(kernel) <= 1:
+        return img.astype(np.float32, copy=False)
+
+    ds = int(downsample)
+    if ds <= 1:
+        return _lowfreq_reference_median_filter(img, kernel)
+
+    k = int(kernel)
+    if k % 2 == 0:
+        k += 1
+
+    img = img.astype(np.float32, copy=False)
+    h, w = img.shape
+
+    finite = np.isfinite(img)
+    fill = np.nanmedian(img[finite]) if np.any(finite) else 0.0
+    filled = np.where(finite, img, fill)
+
+    # Pad to multiples of ds for block aggregation
+    pad_h = (-h) % ds
+    pad_w = (-w) % ds
+    if pad_h or pad_w:
+        filled_pad = np.pad(filled, ((0, pad_h), (0, pad_w)), mode="edge")
+    else:
+        filled_pad = filled
+
+    hp, wp = filled_pad.shape
+    h2, w2 = hp // ds, wp // ds
+    small = filled_pad.reshape(h2, ds, w2, ds).mean(axis=(1, 3)).astype(np.float32, copy=False)
+
+    # Apply median filter in low-res space
+    ref_small = median_filter(small, size=(k, k), mode="nearest").astype(np.float32, copy=False)
+
+    # Upsample back; use bilinear interpolation for a smooth low-frequency reference
+    ref_pad = zoom(ref_small, zoom=(ds, ds), order=1, mode="nearest", prefilter=False)
+    ref = ref_pad[:h, :w]
+    return ref.astype(np.float32, copy=False)
+
+
+def destripe_columns(
+        cube,
+        frac=1.0,
+        polyfit_order=None,
+        mask_bad=None,
+        reference_kernel=None,
+        reference_downsample=None,
+        smooth_cols=None,
+        progress_every: int | None = 1,
+):
     """Lightweight destriping along columns for each band.
 
     - Computes per-band column medians ignoring NaNs and subtracts them.
@@ -293,10 +394,29 @@ def destripe_columns(cube, frac=1.0, polyfit_order=None):
       remove very low-frequency trends (set polyfit_order to 1 or 2).
     - Adds back the global median per band to preserve overall level.
 
+    Optional extensions (backwards-compatible):
+    - mask_bad: 2D boolean mask (rows, cols) where True pixels are excluded
+      from stripe estimation (internally treated as NaN for estimating column
+      medians). The correction is still applied to the full image.
+    - reference_kernel: if set (e.g., 31 or 51), estimate the column bias on a
+      high-pass residual E = I - R, where R is a low-frequency median-filter
+      reference. This reduces the risk of removing real broad gradients.
+    - reference_downsample: if set (e.g., 2 or 4), computes the low-frequency
+      reference on a downsampled image and upsamples it back. This can drastically
+      reduce runtime for large images/kernels at the cost of a small approximation.
+    - smooth_cols: if set (e.g., 11 or 21), apply a 1D median filter to the
+      estimated column bias vector across columns.
+
     Args:
         cube: array (bands, rows, cols)
         frac: scale factor for subtraction (1.0 = full, 0.5 = half)
         polyfit_order: None or int for polynomial fit across columns.
+        mask_bad: optional bool array (rows, cols), True = exclude from estimation
+        reference_kernel: optional int, median-filter window for low-frequency reference
+        reference_downsample: optional int, factor for downsample→filter→upsample reference computation
+        smooth_cols: optional int, median-filter window across columns
+        progress_every: optional int. If set, prints a progress line every N bands.
+            Default is 1 (print after each band) to give interactive feedback on long runs.
     Returns:
         cube_out with reduced column striping.
     """
@@ -305,24 +425,127 @@ def destripe_columns(cube, frac=1.0, polyfit_order=None):
     bands, rows, cols = cube.shape
     out = cube.astype(np.float32, copy=True)
     x = np.arange(cols, dtype=np.float32)
+
+    # NOTE: `reference_kernel` triggers a 2D median filter per band, which can be very
+    # expensive for large images / large kernels.
+    t0 = time.perf_counter()
+    rk = int(reference_kernel) if reference_kernel is not None else None
+    rds = int(reference_downsample) if reference_downsample is not None else None
+    if rds is not None and rds <= 1:
+        rds = None
+    if rk is not None and rk > 1:
+        k_eff = rk + (1 if rk % 2 == 0 else 0)
+        px = rows * cols
+        print(
+            f"[EnMap] Destriping {bands} bands (rows={rows}, cols={cols}), "
+            f"mode=residual(reference_kernel={k_eff}, downsample={rds}), smooth_cols={smooth_cols}, poly_order={polyfit_order}, "
+            f"frac={frac}, mask_bad={'yes' if mask_bad is not None else 'no'}. "
+            f"This can take a long time for large kernels (median filter per band over {px:,} pixels)."
+        )
+    else:
+        print(
+            f"[EnMap] Destriping {bands} bands (rows={rows}, cols={cols}), "
+            f"mode=direct, smooth_cols={smooth_cols}, poly_order={polyfit_order}, "
+            f"frac={frac}, mask_bad={'yes' if mask_bad is not None else 'no'}."
+        )
+
+    if mask_bad is not None:
+        if mask_bad.shape != (rows, cols):
+            raise ValueError(
+                f"[EnMap] destripe_columns: mask_bad must have shape (rows, cols)={(rows, cols)}, got {mask_bad.shape}"
+            )
+        mask_bad = mask_bad.astype(bool, copy=False)
+
+    smooth_k = None
+    if smooth_cols is not None:
+        smooth_k = int(smooth_cols)
+        if smooth_k <= 1:
+            smooth_k = None
+        elif smooth_k % 2 == 0:
+            smooth_k += 1
+
+    pe = None
+    if progress_every is not None:
+        pe = int(progress_every)
+        if pe <= 0:
+            pe = None
+
     for b in range(bands):
+        tb = time.perf_counter()
         img = out[b]
-        # Column medians ignoring NaNs
-        col_med = np.nanmedian(img, axis=0)
+        est_img = img
+        if mask_bad is not None:
+            est_img = img.copy()
+            est_img[mask_bad] = np.nan
+
+        if reference_kernel is not None and int(reference_kernel) > 1:
+            if rds is not None:
+                ref = _lowfreq_reference_median_filter_downsampled(est_img, reference_kernel, rds)
+            else:
+                ref = _lowfreq_reference_median_filter(est_img, reference_kernel)
+            est = est_img - ref
+        else:
+            est = est_img
+
+        # Lightweight per-band stats (computed on the estimation image) for logging.
+        finite_est = np.isfinite(est)
+        valid_frac = float(np.mean(finite_est)) if est.size > 0 else 0.0
+        valid_cols = int(np.sum(np.any(finite_est, axis=0))) if cols > 0 else 0
+
+        # Column medians ignoring NaNs.
+        # Some columns may be fully masked -> expected "All-NaN slice" warnings.
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="All-NaN slice encountered")
+            col_med = np.nanmedian(est, axis=0)
         # Replace non-finite with overall median
-        base_med = np.nanmedian(col_med) if np.isfinite(col_med).any() else 0.0
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="All-NaN slice encountered")
+            base_med = np.nanmedian(col_med) if np.isfinite(col_med).any() else 0.0
         col_med = np.where(np.isfinite(col_med), col_med, base_med)
+
         trend = col_med
+        if smooth_k is not None:
+            trend = median_filter(trend.astype(np.float32, copy=False), size=smooth_k, mode="nearest")
+
         if polyfit_order is not None and polyfit_order >= 1:
             try:
-                coeffs = np.polyfit(x, col_med, deg=int(polyfit_order))
+                coeffs = np.polyfit(x, trend, deg=int(polyfit_order))
                 trend = np.polyval(coeffs, x)
             except Exception:
-                trend = col_med
-        # Scale subtraction and preserve level
-        img_med = np.nanmedian(img) if np.isfinite(img).any() else 0.0
+                # Fall back to the non-polyfit trend
+                pass
+
+        # Informative per-band destriping metrics.
+        # - correction_std: magnitude of applied per-column correction (offset units)
+        # - stripe_score: high-frequency column variation remaining in the estimated column medians
+        #   after removing the (smoothed/polyfit) trend. Lower is better.
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="All-NaN slice encountered")
+            correction_std = float(np.nanstd(trend))
+            stripe_score = float(np.nanstd(col_med - trend))
+
         correction = (frac * trend)[None, :]
-        out[b] = img - correction + img_med
+        if reference_kernel is not None and int(reference_kernel) > 1:
+            # Residual-based correction: apply directly (do not add band median).
+            out[b] = img - correction
+        else:
+            # Original behavior: scale subtraction and preserve level.
+            # If mask_bad is provided, preserve the level relative to the valid pixels
+            # used for estimation (i.e., ignore masked-out outliers when computing the band median).
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="All-NaN slice encountered")
+                img_med = np.nanmedian(est_img) if np.isfinite(est_img).any() else 0.0
+            out[b] = img - correction + img_med
+
+        if pe is not None and ((b + 1) % pe == 0 or (b + 1) == bands):
+            dt_band = time.perf_counter() - tb
+            dt_total = time.perf_counter() - t0
+            print(
+                f"[EnMap] Destriping progress: band {b + 1}/{bands} "
+                f"(dt={dt_band:.2f}s, total={dt_total:.1f}s, "
+                f"valid={valid_frac * 100.0:.1f}%, valid_cols={valid_cols}/{cols}, "
+                f"correction_std={correction_std:.4g}, stripe_score={stripe_score:.4g})"
+            )
     return out
 
 
@@ -641,6 +864,8 @@ def create_rasterio_layer(array, meta):
     - For outputs consumed by downstream Bayesian segmentation, we replace
       NaNs/Infs with a sentinel (-9999.0) because BaySeg cannot handle NaNs.
     """
+    if MemoryFile is None:
+        raise ImportError("rasterio is required for create_rasterio_layer(). Please install rasterio.")
     # Ensure float32 and replace non-finite values with sentinel
     arr = np.asarray(array).astype("float32", copy=False)
     # Replace NaN/Inf with sentinel to make downstream consumers robust
@@ -672,7 +897,17 @@ def create_rasterio_layer(array, meta):
 
 
 
-def enmap_to_feature_stack(folder_path, n_mnf=12, n_deriv_pcs=3, destripe=True, destripe_frac=1.0, destripe_poly=1):
+def enmap_to_feature_stack(
+        folder_path,
+        n_mnf=12,
+        n_deriv_pcs=3,
+        destripe=True,
+        destripe_frac=1.0,
+        destripe_poly=1,
+        destripe_reference_kernel=None,
+        destripe_reference_downsample=None,
+        destripe_smooth_cols=None,
+):
     cube, meta, qa_masks, xml = load_enmap_dataset(folder_path)
 
     wavelengths = parse_enmap_wavelengths(xml)
@@ -688,9 +923,34 @@ def enmap_to_feature_stack(folder_path, n_mnf=12, n_deriv_pcs=3, destripe=True, 
     cube, wavelengths, _ = drop_bad_bands(cube, wavelengths)
 
     cube = smooth_cube(cube)
+
+    # Note: savgol_filter does not handle NaNs well, so we apply QA masking after smoothing.
+    # We still mask before destriping so stripe estimation can ignore bad pixels via NaNs.
+    if mask is not None:
+        cube[:, mask] = np.nan
+
     if destripe:
-        cube = destripe_columns(cube, frac=destripe_frac, polyfit_order=destripe_poly)
-        print(f"[EnMap] Applied column destriping: frac={destripe_frac}, poly_order={destripe_poly}")
+        print(
+            f"[EnMap] Destriping config: enabled={destripe}, frac={destripe_frac}, poly_order={destripe_poly}, "
+            f"reference_kernel={destripe_reference_kernel}, reference_downsample={destripe_reference_downsample}, "
+            f"smooth_cols={destripe_smooth_cols}, mask_bad={'yes' if mask is not None else 'no'}"
+        )
+        cube = destripe_columns(
+            cube,
+            frac=destripe_frac,
+            polyfit_order=destripe_poly,
+            mask_bad=mask,
+            reference_kernel=destripe_reference_kernel,
+            reference_downsample=destripe_reference_downsample,
+            smooth_cols=destripe_smooth_cols,
+        )
+        print(
+            f"[EnMap] Applied column destriping: frac={destripe_frac}, poly_order={destripe_poly}, "
+            f"reference_kernel={destripe_reference_kernel}, reference_downsample={destripe_reference_downsample}, "
+            f"smooth_cols={destripe_smooth_cols}"
+        )
+
+    # Keep as a safeguard in case future pipeline edits insert operations that reintroduce non-NaNs.
     if mask is not None:
         cube[:, mask] = np.nan
 
@@ -736,3 +996,110 @@ def enmap_to_feature_stack(folder_path, n_mnf=12, n_deriv_pcs=3, destripe=True, 
         raise ValueError(f"[EnMap] Feature dict validation failed: {e}")
 
     return features, meta
+
+
+# ============================================================
+# 11. Visualization utility: save per-band plots
+# ============================================================
+
+def save_enmap_band_plots(folder_path, apply_mask=True, pmin=2.0, pmax=98.0, vmin=None, vmax=None, dpi=150, figsize=(6, 5)):
+    """Save PNG plots for all bands in an EnMAP dataset using viridis colorscale.
+
+    Parameters
+    ----------
+    folder_path : str
+        Path to the EnMAP product folder containing SPECTRAL_IMAGE*.tif and METADATA*.xml.
+    apply_mask : bool
+        If True, combine available QA layers and mask bad pixels (set to NaN) before plotting.
+    pmin, pmax : float
+        Percentiles (0-100) for per-band dynamic range if vmin/vmax are not provided.
+    vmin, vmax : float or None
+        Global display range for all bands. If both provided, overrides per-band percentiles.
+    dpi : int
+        Output image DPI.
+    figsize : tuple
+        Matplotlib figure size in inches.
+
+    Output
+    ------
+    Creates a directory '<folder_path>/intermediate_Data/plots_<dataset_name>' and saves one PNG per band:
+      band_###_wlXXXXnm.png (wavelength shown if available).
+    """
+    if rasterio is None:
+        raise ImportError("rasterio is required for save_enmap_band_plots(). Please install rasterio.")
+    # Load cube and metadata
+    cube, meta, qa_masks, xml = load_enmap_dataset(folder_path)
+
+    # Parse wavelengths (may be empty)
+    try:
+        wavelengths = parse_enmap_wavelengths(xml)
+    except Exception as e:
+        print(f"[EnMap] Wavelength parse failed: {e}")
+        wavelengths = np.array([], dtype=float)
+
+    # Build mask
+    mask = build_mask(qa_masks) if apply_mask else None
+
+    # Prepare output directory
+    dataset_name = os.path.basename(os.path.abspath(folder_path)) or "dataset"
+    out_dir = os.path.join(folder_path, "intermediate_Data", f"plots_{dataset_name}")
+    os.makedirs(out_dir, exist_ok=True)
+    print(f"[EnMap] Saving per-band plots to: {out_dir}")
+
+    H = meta.get('height')
+    W = meta.get('width')
+    nbands = cube.shape[0]
+
+    # Flatten mask for fast nan assignment
+    if mask is not None:
+        if mask.shape != (H, W):
+            print(f"[EnMap] Warning: QA mask shape {mask.shape} != raster shape {(H, W)}; ignoring mask.")
+            mask = None
+
+    # Determine global limits if requested
+    if vmin is not None and vmax is not None:
+        global_vmin, global_vmax = float(vmin), float(vmax)
+    else:
+        global_vmin = global_vmax = None
+
+    for i in range(nbands):
+        img = cube[i].astype(np.float32)
+        if mask is not None:
+            img = img.copy()
+            img[mask] = np.nan
+
+        # Compute display limits
+        if global_vmin is not None:
+            lo, hi = global_vmin, global_vmax
+        else:
+            finite = np.isfinite(img)
+            if not np.any(finite):
+                print(f"[EnMap] Band {i+1}: all values NaN/inf, skipping percentile stretch; using defaults 0..1")
+                lo, hi = 0.0, 1.0
+            else:
+                lo = float(np.nanpercentile(img[finite], pmin))
+                hi = float(np.nanpercentile(img[finite], pmax))
+                if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
+                    lo, hi = 0.0, 1.0
+
+        # Title and filename
+        if wavelengths.size == nbands:
+            wl = wavelengths[i]
+            title = f"Band {i+1} — {wl:.1f} nm"
+            fname = f"band_{i+1:03d}_wl{int(round(wl)):04d}nm.png"
+        else:
+            title = f"Band {i+1}"
+            fname = f"band_{i+1:03d}.png"
+
+        fig, ax = plt.subplots(1, 1, figsize=figsize, dpi=dpi)
+        im = ax.imshow(img, cmap='viridis', vmin=lo, vmax=hi)
+        ax.set_title(title)
+        ax.set_axis_off()
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label('Reflectance')
+        out_path = os.path.join(out_dir, fname)
+        fig.tight_layout()
+        fig.savefig(out_path, dpi=dpi)
+        plt.close(fig)
+
+    print(f"[EnMap] Saved {nbands} band plot(s) to {out_dir}")
