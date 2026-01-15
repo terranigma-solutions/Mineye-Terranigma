@@ -31,7 +31,13 @@ import numpy as np
 import rasterio
 from rasterio.io import MemoryFile
 
-from mineye.BayesianSegmentation.EnMap_feature_extraction import enmap_to_feature_stack, create_rasterio_layer
+from mineye.BayesianSegmentation.EnMap_feature_extraction import (
+    enmap_to_feature_stack,
+    create_rasterio_layer,
+    parse_enmap_wavelengths,
+    build_mask,
+    remove_background_field,
+)
 from mineye.BayesianSegmentation.full_workflow import run_workflow
 
 
@@ -40,6 +46,87 @@ from mineye.BayesianSegmentation.full_workflow import run_workflow
 # ----------------
 
 import matplotlib.pyplot as plt
+
+
+def save_detrended_swir_column_median_plot(
+        enmap_folder: str,
+        out_prefix: str,
+        target_nm: float = 2200.0,
+        use_qa_mask: bool = True,
+        detrend_sigma: float = 80.0,
+        detrend_downsample: int | None = 4,
+        detrend_buffer_px: int = 20,
+        detrend_den_thresh: float = 0.2,
+) -> str:
+    """Save a diagnostic plot of the per-column median after detrending for a SWIR band.
+
+    This is a lightweight check to see whether any systematic cross-track structure remains.
+    The plot is saved as a PNG (no interactive window required).
+
+    Returns:
+        Path to the written PNG.
+    """
+    files = os.listdir(enmap_folder)
+
+    cube_name = next(f for f in files if "SPECTRAL_IMAGE" in f and f.upper().endswith((".TIF", ".TIFF")))
+    xml_name = next(f for f in files if "METADATA.XML" in f.upper())
+    cube_path = os.path.join(enmap_folder, cube_name)
+    xml_path = os.path.join(enmap_folder, xml_name)
+
+    wls = parse_enmap_wavelengths(xml_path)
+    if wls.size == 0:
+        raise ValueError("No wavelengths parsed from metadata XML; cannot select SWIR band.")
+
+    band0 = int(np.nanargmin(np.abs(wls - float(target_nm))))
+    wl = float(wls[band0])
+
+    mask_bad = None
+    if use_qa_mask:
+        qa_masks = {}
+        for f in files:
+            fu = f.upper()
+            if ("QL_PIXELMASK" in fu or "QL_QUALITY" in fu) and fu.endswith((".TIF", ".TIFF")):
+                fp = os.path.join(enmap_folder, f)
+                with rasterio.open(fp) as src:
+                    qa_masks[f] = src.read(1)
+        if qa_masks:
+            mask_bad = build_mask(qa_masks)
+
+    with rasterio.open(cube_path) as src:
+        img = src.read(band0 + 1).astype(np.float32, copy=False)
+
+    # Mirror the scaling heuristic used in `load_enmap_dataset`.
+    mx = float(np.nanmax(img))
+    mn = float(np.nanmin(img))
+    if 2.0 < mx <= 10000.0 and mn >= 0.0:
+        img = img / 10000.0
+
+    img_dt = remove_background_field(
+        img[None, :, :],
+        mask_bad=mask_bad,
+        sigma=float(detrend_sigma),
+        downsample=detrend_downsample,
+        buffer_px=int(detrend_buffer_px),
+        den_thresh=float(detrend_den_thresh),
+        progress_every=None,
+    )[0]
+
+    if mask_bad is not None:
+        img_dt = np.where(mask_bad, np.nan, img_dt)
+
+    col = np.nanmedian(img_dt, axis=0)
+
+    out_path = f"{out_prefix}_column_median_after_detrend_wl{wl:.1f}nm_band{band0 + 1:03d}.png"
+    plt.figure(figsize=(10, 3))
+    plt.plot(col)
+    plt.title(f"column median (after detrending) — {wl:.1f} nm (band {band0 + 1})")
+    plt.xlabel("column")
+    plt.ylabel("nanmedian")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=200)
+    plt.close()
+
+    return out_path
 
 def _percentile_scale(arr, p_lo=2.0, p_hi=98.0):
     a = np.asarray(arr, dtype=float)
@@ -52,12 +139,20 @@ def _percentile_scale(arr, p_lo=2.0, p_hi=98.0):
     return np.clip(a, 0, 1)
 
 
-def plot_feature_quicklooks(features: Dict[str, np.ndarray], out_prefix: str, max_panels: int = 9):
-    """Create quicklook plots of feature bands for QA.
+def plot_feature_quicklooks(
+        features: Dict[str, np.ndarray],
+        out_prefix: str,
+        max_panels: int = 9,
+        panels_per_page: int = 12,
+):
+    """Create quicklook plots of feature layers for QA.
 
     Accepts feature values that are either 2D numpy arrays or rasterio DatasetReader objects.
-    - If MNF_01..MNF_03 exist, an RGB composite is saved.
-    - Up to `max_panels` single-band quicklooks are tiled and saved.
+
+    Outputs:
+    - If `MNF_01..MNF_03` exist, an RGB composite is saved.
+    - Grouped quicklook pages for *all* `MNF_*`, `Depth_*`, and `Deriv_*` layers.
+    - A small mixed overview (up to `max_panels` layers across all keys) for convenience.
     """
     os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
 
@@ -81,41 +176,82 @@ def plot_feature_quicklooks(features: Dict[str, np.ndarray], out_prefix: str, ma
                 pass
         return np.asarray(val)
 
+    def _plot_tiles(keys: List[str], out_path: str, title: str | None = None):
+        if not keys:
+            return
+        n = len(keys)
+        cols = min(3, n)
+        rows = int(np.ceil(n / cols))
+        plt.figure(figsize=(4 * cols, 4 * rows))
+        for i, k in enumerate(keys, 1):
+            plt.subplot(rows, cols, i)
+            img = _percentile_scale(as_array(features[k]))
+            plt.imshow(img, cmap="viridis")
+            plt.title(k)
+            plt.axis("off")
+        if title:
+            plt.suptitle(title)
+        plt.tight_layout()
+        plt.savefig(out_path, dpi=200)
+        plt.close()
+
+    def _plot_group_all(prefix: str, label: str):
+        group_keys = sorted([k for k in features.keys() if k.startswith(prefix)])
+        if not group_keys:
+            return
+        pp = int(panels_per_page)
+        if pp <= 0:
+            pp = len(group_keys)
+        pages = int(np.ceil(len(group_keys) / pp))
+        for p in range(pages):
+            start = p * pp
+            end = min((p + 1) * pp, len(group_keys))
+            chunk = group_keys[start:end]
+            suffix = f"_p{p + 1:02d}" if pages > 1 else ""
+            _plot_tiles(
+                chunk,
+                out_path=f"{out_prefix}_{label}_quicklooks{suffix}.png",
+                title=f"{label} quicklooks ({start + 1}–{end} / {len(group_keys)})",
+            )
+
     # 1) RGB composite from first three MNF components (if present)
-    mnf_keys = [k for k in features.keys() if k.startswith("MNF_")]
-    if len(mnf_keys) >= 3:
-        # Sort to ensure MNF_01, MNF_02, MNF_03 order
-        mnf_keys_sorted = sorted(mnf_keys)[:3]
-        r = _percentile_scale(as_array(features[mnf_keys_sorted[0]]))
-        g = _percentile_scale(as_array(features[mnf_keys_sorted[1]]))
-        b = _percentile_scale(as_array(features[mnf_keys_sorted[2]]))
+    mnf_keys = sorted([k for k in features.keys() if k.startswith("MNF_")])
+    if all(k in features for k in ("MNF_01", "MNF_02", "MNF_03")):
+        r = _percentile_scale(as_array(features["MNF_01"]))
+        g = _percentile_scale(as_array(features["MNF_02"]))
+        b = _percentile_scale(as_array(features["MNF_03"]))
         rgb = np.dstack([r, g, b])
         plt.figure(figsize=(6, 6))
         plt.imshow(rgb)
-        plt.title(f"RGB composite: {mnf_keys_sorted[0]}, {mnf_keys_sorted[1]}, {mnf_keys_sorted[2]}")
-        plt.axis('off')
+        plt.title("RGB composite: MNF_01, MNF_02, MNF_03")
+        plt.axis("off")
+        plt.tight_layout()
+        plt.savefig(f"{out_prefix}_MNF_RGB.png", dpi=200)
+        plt.close()
+    elif len(mnf_keys) >= 3:
+        # Fallback: use the first 3 MNF_* keys if naming differs.
+        r = _percentile_scale(as_array(features[mnf_keys[0]]))
+        g = _percentile_scale(as_array(features[mnf_keys[1]]))
+        b = _percentile_scale(as_array(features[mnf_keys[2]]))
+        rgb = np.dstack([r, g, b])
+        plt.figure(figsize=(6, 6))
+        plt.imshow(rgb)
+        plt.title(f"RGB composite: {mnf_keys[0]}, {mnf_keys[1]}, {mnf_keys[2]}")
+        plt.axis("off")
         plt.tight_layout()
         plt.savefig(f"{out_prefix}_MNF_RGB.png", dpi=200)
         plt.close()
 
-    # 2) Tile up to max_panels single-band quicklooks
-    keys = list(features.keys())
-    keys.sort()
-    sel = keys[:max_panels]
+    # 2) Grouped quicklooks for all layers of interest
+    _plot_group_all("Depth_", "Depth")
+    _plot_group_all("Deriv_", "Deriv")
+    _plot_group_all("MNF_", "MNF")
+
+    # 3) Small mixed overview (legacy behavior) for a quick glance
+    keys = sorted(list(features.keys()))
+    sel = keys[: int(max_panels) if max_panels is not None else len(keys)]
     if sel:
-        n = len(sel)
-        cols = min(3, n)
-        rows = int(np.ceil(n / cols))
-        plt.figure(figsize=(4 * cols, 4 * rows))
-        for i, k in enumerate(sel, 1):
-            plt.subplot(rows, cols, i)
-            img = _percentile_scale(as_array(features[k]))
-            plt.imshow(img, cmap='viridis')
-            plt.title(k)
-            plt.axis('off')
-        plt.tight_layout()
-        plt.savefig(f"{out_prefix}_feature_quicklooks.png", dpi=200)
-        plt.close()
+        _plot_tiles(sel, out_path=f"{out_prefix}_feature_quicklooks.png", title="Feature overview")
 
 
 def _features_to_memory_datasets(features: Dict[str, np.ndarray], meta: dict):
@@ -300,8 +436,14 @@ save_npy: bool = True  # save intermediate arrays from full_workflow
 # Detrending / background-field removal (recommended for the current EnMAP dataset)
 # The dominant artifact here is typically a smooth 2D cross-track bias (not narrow detector stripes).
 detrend: bool = True
-detrend_sigma: float = 75.0  # pixels; try 50–100
+detrend_sigma: float = 80.0  # pixels; try 50–100
 detrend_downsample: int | None = 4  # 2/4 for speed; set None for full-res
+detrend_buffer_px: int = 20  # erode footprint to avoid rim-driven background estimates
+detrend_den_thresh: float = 0.2  # feather correction where G(V) is small (fraction of den.max)
+
+# MNF rim handling: fit MNF/noise on an eroded interior footprint.
+# Default: reuse the detrending buffer.
+mnf_buffer_px: int | None = None
 
 # Destriping (keep available for datasets that truly have detector striping)
 destripe: bool = False
@@ -342,6 +484,9 @@ features, meta = enmap_to_feature_stack(
     detrend=detrend,
     detrend_sigma=detrend_sigma,
     detrend_downsample=detrend_downsample,
+    detrend_buffer_px=detrend_buffer_px,
+    detrend_den_thresh=detrend_den_thresh,
+    mnf_buffer_px=mnf_buffer_px,
     destripe=destripe,
     destripe_frac=destripe_frac,
     destripe_poly=destripe_poly,
@@ -358,6 +503,23 @@ try:
     print(f"Saved feature quicklooks to {output_prefix_abs}_*.png")
 except Exception as e:
     print(f"[WARN] Could not create feature quicklooks: {e}")
+
+# Column-median diagnostic on a SWIR band after detrending (saves PNG alongside output_prefix)
+try:
+    output_prefix_abs = os.path.abspath(output_prefix)
+    diag_path = save_detrended_swir_column_median_plot(
+        enmap_folder=enmap_folder,
+        out_prefix=output_prefix_abs,
+        target_nm=2200.0,
+        use_qa_mask=True,
+        detrend_sigma=detrend_sigma,
+        detrend_downsample=detrend_downsample,
+        detrend_buffer_px=detrend_buffer_px,
+        detrend_den_thresh=detrend_den_thresh,
+    )
+    print(f"Saved detrended SWIR column-median diagnostic to {diag_path}")
+except Exception as e:
+    print(f"[WARN] Could not create SWIR column-median diagnostic: {e}")
 
 
 # %%
