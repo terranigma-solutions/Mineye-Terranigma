@@ -53,6 +53,7 @@ def save_detrended_swir_column_median_plot(
         out_prefix: str,
         target_nm: float = 2200.0,
         use_qa_mask: bool = True,
+        edge_px: int = 0,
         detrend_sigma: float = 80.0,
         detrend_downsample: int | None = 4,
         detrend_buffer_px: int = 20,
@@ -100,6 +101,21 @@ def save_detrended_swir_column_median_plot(
     mn = float(np.nanmin(img))
     if 2.0 < mx <= 10000.0 and mn >= 0.0:
         img = img / 10000.0
+
+    # Optional: exclude a fixed-width rim at array borders (helps prevent edge artifacts from
+    # dominating this diagnostic on rotated/partial footprints).
+    if edge_px is not None and int(edge_px) > 0:
+        ep = int(edge_px)
+        rows, cols = img.shape
+        y = np.minimum(np.arange(rows), np.arange(rows)[::-1])
+        x = np.minimum(np.arange(cols), np.arange(cols)[::-1])
+        Y, X = np.meshgrid(y, x, indexing="ij")
+        edge_valid = (np.minimum(Y, X) >= ep)
+        edge_bad = ~edge_valid
+        if mask_bad is None:
+            mask_bad = edge_bad
+        else:
+            mask_bad = (mask_bad | edge_bad)
 
     img_dt = remove_background_field(
         img[None, :, :],
@@ -185,7 +201,12 @@ def plot_feature_quicklooks(
         plt.figure(figsize=(4 * cols, 4 * rows))
         for i, k in enumerate(keys, 1):
             plt.subplot(rows, cols, i)
-            img = _percentile_scale(as_array(features[k]))
+            arr = as_array(features[k])
+
+            if k.startswith("Depth_"):
+                img = _percentile_scale(arr, 10.0, 99.5)  # tighter stretch for QA
+            else:
+                img = _percentile_scale(arr, 2.0, 98.0)
             plt.imshow(img, cmap="viridis")
             plt.title(k)
             plt.axis("off")
@@ -436,10 +457,13 @@ save_npy: bool = True  # save intermediate arrays from full_workflow
 # Detrending / background-field removal (recommended for the current EnMAP dataset)
 # The dominant artifact here is typically a smooth 2D cross-track bias (not narrow detector stripes).
 detrend: bool = True
-detrend_sigma: float = 80.0  # pixels; try 50–100
+detrend_sigma: float = 120.0  # pixels; larger sigma removes broader cross-track fields
 detrend_downsample: int | None = 4  # 2/4 for speed; set None for full-res
 detrend_buffer_px: int = 20  # erode footprint to avoid rim-driven background estimates
 detrend_den_thresh: float = 0.2  # feather correction where G(V) is small (fraction of den.max)
+
+# Additional hard edge exclusion (array border), independent of QA and footprint erosion.
+edge_px: int = 40
 
 # MNF rim handling: fit MNF/noise on an eroded interior footprint.
 # Default: reuse the detrending buffer.
@@ -479,14 +503,18 @@ print(f"ENMAP folder: {enmap_folder}")
 
 features, meta = enmap_to_feature_stack(
     enmap_folder,
-    n_mnf=12,
-    n_deriv_pcs=3,
+    # Conservative initial feature set:
+    # - MNF_01 only
+    # - Derivative PCs 1–2 only
+    n_mnf=1,
+    n_deriv_pcs=2,
     detrend=detrend,
     detrend_sigma=detrend_sigma,
     detrend_downsample=detrend_downsample,
     detrend_buffer_px=detrend_buffer_px,
     detrend_den_thresh=detrend_den_thresh,
     mnf_buffer_px=mnf_buffer_px,
+    edge_px=edge_px,
     destripe=destripe,
     destripe_frac=destripe_frac,
     destripe_poly=destripe_poly,
@@ -512,6 +540,7 @@ try:
         out_prefix=output_prefix_abs,
         target_nm=2200.0,
         use_qa_mask=True,
+        edge_px=edge_px,
         detrend_sigma=detrend_sigma,
         detrend_downsample=detrend_downsample,
         detrend_buffer_px=detrend_buffer_px,
