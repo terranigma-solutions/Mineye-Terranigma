@@ -16,6 +16,30 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
+def _edge_buffer_mask(shape: tuple[int, int], edge_px: int = 0) -> np.ndarray:
+    """Return a boolean mask that is True for pixels sufficiently far from the array border.
+
+    This is a simple way to exclude unstable edge regions from driving statistics.
+
+    Args:
+        shape: (rows, cols)
+        edge_px: number of pixels to exclude from each border. If <= 0, returns all True.
+    Returns:
+        mask: bool array (rows, cols) where True indicates interior pixels.
+    """
+    rows, cols = int(shape[0]), int(shape[1])
+    ep = int(edge_px) if edge_px is not None else 0
+    if ep <= 0:
+        return np.ones((rows, cols), dtype=bool)
+
+    # Distance to closest border for each pixel.
+    y = np.minimum(np.arange(rows), np.arange(rows)[::-1])
+    x = np.minimum(np.arange(cols), np.arange(cols)[::-1])
+    Y, X = np.meshgrid(y, x, indexing="ij")
+    d = np.minimum(Y, X)
+    return (d >= ep)
+
+
 # ============================================================
 # 1. Parse wavelengths from ENMAP metadata XML
 # ============================================================
@@ -286,6 +310,73 @@ def drop_bad_bands(cube, wavelengths):
     return cube[keep], wavelengths[keep], keep
 
 
+def drop_fully_nan_bands(cube, wavelengths):
+    """Drop bands that contain no finite pixels at all.
+
+    This is a critical first-pass cleanup step for EnMAP cubes where some wavelength
+    regions (e.g., ~1340–1390 nm) may be entirely non-finite across the footprint.
+
+    Returns:
+        (cube_out, wavelengths_out, keep_indices)
+    """
+    cube = np.asarray(cube)
+    wl = np.asarray(wavelengths, dtype=float)
+    if cube.ndim != 3:
+        raise ValueError(f"cube must have shape (bands, rows, cols), got {cube.shape}")
+    if wl.ndim != 1 or wl.size != cube.shape[0]:
+        raise ValueError(
+            f"wavelengths must be 1D with length == cube bands ({cube.shape[0]}), got {wl.shape}"
+        )
+
+    finite_any = np.isfinite(cube).reshape(cube.shape[0], -1).any(axis=1)
+    keep = np.where(finite_any)[0]
+    drop = np.where(~finite_any)[0]
+
+    if drop.size > 0:
+        dropped_wl = wl[drop]
+        wl_min = float(np.nanmin(dropped_wl)) if dropped_wl.size > 0 and np.isfinite(dropped_wl).any() else float("nan")
+        wl_max = float(np.nanmax(dropped_wl)) if dropped_wl.size > 0 and np.isfinite(dropped_wl).any() else float("nan")
+        print(
+            f"[EnMap] drop_fully_nan_bands: removed {int(drop.size)} fully-nonfinite bands "
+            f"(wavelength range approx {wl_min:.1f}–{wl_max:.1f} nm)."
+        )
+
+    if keep.size == 0:
+        raise ValueError("[EnMap] drop_fully_nan_bands: No bands contain any finite pixels.")
+
+    return cube[keep], wl[keep], keep.tolist()
+
+
+def normalize_feature_layer(x2d: np.ndarray, valid_for_stats: np.ndarray, clip_sigma: float = 5.0) -> np.ndarray:
+    """Robust-ish z-score normalization for BaySeg-friendly features.
+
+    Uses median for centering and standard deviation for scale, computed on valid pixels.
+    Values are then clipped to +/- clip_sigma.
+    """
+    x = np.asarray(x2d, dtype=np.float32)
+    vm = np.asarray(valid_for_stats, dtype=bool)
+    if x.shape != vm.shape:
+        raise ValueError(f"normalize_feature_layer: x2d shape {x.shape} != valid_for_stats shape {vm.shape}")
+
+    vals = x[vm]
+    vals = vals[np.isfinite(vals)]
+    if vals.size == 0:
+        out = x.astype(np.float32, copy=True)
+        out[:] = np.nan
+        return out
+
+    m = np.nanmedian(vals)
+    s = float(np.nanstd(vals))
+    if not np.isfinite(s) or s <= 0:
+        s = 1.0
+
+    z = (x - np.float32(m)) / np.float32(s)
+    if clip_sigma is not None:
+        cs = float(clip_sigma)
+        z = np.clip(z, -cs, cs)
+    return z.astype(np.float32, copy=False)
+
+
 # ============================================================
 # 5. Savitzky–Golay smoothing
 # ============================================================
@@ -295,6 +386,79 @@ def smooth_cube(cube, window=11, poly=2):
         cube, axis=0, mode="mirror",
         window_length=window, polyorder=poly
     )
+
+
+def smooth_cube_nan_safe(
+        cube: np.ndarray,
+        window: int = 11,
+        poly: int = 2,
+        mask_bad: np.ndarray | None = None,
+        valid_for_stats: np.ndarray | None = None,
+) -> np.ndarray:
+    """NaN-safe spectral Savitzky–Golay smoothing.
+
+    Strategy:
+    - Fill bad pixels with a per-band robust statistic (median over valid_for_stats)
+      so SG doesn't see NaNs.
+    - Run SG along spectral axis.
+    - Restore NaNs at mask_bad locations.
+
+    Args:
+        cube: (bands, rows, cols) float32-like
+        window, poly: SG params
+        mask_bad: 2D bool mask; pixels set to NaN after smoothing
+        valid_for_stats: 2D bool mask used to compute per-band medians
+    """
+    cube = np.asarray(cube, dtype=np.float32)
+
+    if cube.ndim != 3:
+        raise ValueError(f"smooth_cube_nan_safe: cube must have shape (bands, rows, cols), got {cube.shape}")
+
+    if mask_bad is None:
+        # Nothing to restore, but still replace non-finite to avoid SG blowups.
+        mask_bad = ~np.all(np.isfinite(cube), axis=0)
+
+    mb = np.asarray(mask_bad, dtype=bool)
+    bands, rows, cols = cube.shape
+    if mb.shape != (rows, cols):
+        raise ValueError(f"smooth_cube_nan_safe: mask_bad must be shape {(rows, cols)}, got {mb.shape}")
+
+    out = cube.copy()
+
+    if valid_for_stats is None:
+        # Use all pixels that are not hard-bad.
+        valid_for_stats = ~mb
+
+    vfs = np.asarray(valid_for_stats, dtype=bool)
+    if vfs.shape != (rows, cols):
+        raise ValueError(f"smooth_cube_nan_safe: valid_for_stats must be shape {(rows, cols)}, got {vfs.shape}")
+
+    # Fill values so SG does not see NaNs/Inf.
+    for b in range(bands):
+        band = out[b]
+        # Robust median computed only on good interior pixels & finite values.
+        vals = band[vfs]
+        vals = vals[np.isfinite(vals)]
+        fill = float(np.nanmedian(vals)) if vals.size else 0.0
+
+        # Replace non-finite anywhere + hard bad mask.
+        bad_here = mb | (~np.isfinite(band))
+        band = band.copy()
+        band[bad_here] = fill
+        out[b] = band
+
+    # Run SG (now safe).
+    out = savgol_filter(
+        out,
+        axis=0,
+        mode="mirror",
+        window_length=int(window),
+        polyorder=int(poly),
+    ).astype(np.float32, copy=False)
+
+    # Restore NaNs for truly bad pixels.
+    out[:, mb] = np.nan
+    return out
 
 
 def _masked_gaussian_lowpass(img2d: np.ndarray, valid2d: np.ndarray, sigma: float) -> tuple[np.ndarray, np.ndarray]:
@@ -894,8 +1058,10 @@ def continuum_removed_depth(cube, wavelengths, center_range):
         return None
 
     sub = cube[idx].astype(np.float32, copy=False)
-    left = sub[0]
-    right = sub[-1]
+    k = 2  # robust continuum endpoints (median of first/last k bands)
+    k = int(max(1, min(k, sub.shape[0] // 2)))
+    left = np.nanmedian(sub[:k], axis=0)
+    right = np.nanmedian(sub[-k:], axis=0)
     continuum = np.linspace(left, right, sub.shape[0]).astype(np.float32, copy=False)
     # Avoid division by near-zero continuum values
     eps = 1e-6
@@ -945,7 +1111,7 @@ def _select_swir_window(wavelengths, preferred=(2000.0, 2400.0), fallback=(1900.
     return None, None
 
 
-def derivative_pca(cube, wavelengths, n_components=3, swir_range="auto"):
+def derivative_pca(cube, wavelengths, n_components=3, swir_range="auto", valid_for_stats: np.ndarray | None = None):
     """Compute derivative PCA restricted to a SWIR absorption region to reduce noise.
 
     Args:
@@ -991,8 +1157,15 @@ def derivative_pca(cube, wavelengths, n_components=3, swir_range="auto"):
 
     X = deriv.reshape(bands, -1).T  # (n_pixels, bands)
 
-    # Fit PCA on valid (fully finite) rows only
+    # Fit PCA on valid (fully finite) rows only; optionally restrict to an interior/statistics mask.
     finite_rows = np.all(np.isfinite(X), axis=1)
+    if valid_for_stats is not None:
+        vm = np.asarray(valid_for_stats, dtype=bool)
+        if vm.shape != (h, w):
+            raise ValueError(
+                f"[EnMap] derivative_pca: valid_for_stats must have shape (rows, cols)={(h, w)}, got {vm.shape}"
+            )
+        finite_rows = finite_rows & vm.reshape(-1)
     X_valid = X[finite_rows]
     if X_valid.shape[0] == 0:
         raise ValueError("[EnMap] derivative_pca: No valid samples to fit PCA (after derivative).")
@@ -1130,12 +1303,15 @@ def enmap_to_feature_stack(
         detrend_buffer_px: int = 20,
         detrend_den_thresh: float = 0.2,
         mnf_buffer_px: int | None = None,
+        edge_px: int = 0,
         destripe=True,
         destripe_frac=1.0,
         destripe_poly=1,
         destripe_reference_kernel=None,
         destripe_reference_downsample=None,
         destripe_smooth_cols=None,
+        normalize_features: bool = True,
+        clip_sigma: float = 5.0,
 ):
     cube, meta, qa_masks, xml = load_enmap_dataset(folder_path)
 
@@ -1147,19 +1323,43 @@ def enmap_to_feature_stack(
             f"cube_bands={cube.shape[0]}. The parser only returns bands described in the metadata XML."
         )
 
-    mask = build_mask(qa_masks)
+    mask_qa = build_mask(qa_masks)
 
+    # First-pass cleanup: drop fully non-finite bands (prevents PCA/MNF conditioning issues).
+    cube, wavelengths, _ = drop_fully_nan_bands(cube, wavelengths)
+
+    # Second-pass cleanup: wavelength-window dropping.
     cube, wavelengths, _ = drop_bad_bands(cube, wavelengths)
+
+    # Build masks.
+    # - mask_bad: pixels we should never trust (QA bad and/or non-finite)
+    # - edge_buffer_mask: fixed rim excluded from fitting/stats (but retained in outputs)
+    # - valid_for_stats: pixels used for detrend/MNF/PCA/normalization statistics
+    nonfinite_any = ~np.all(np.isfinite(cube), axis=0)
+    if mask_qa is None:
+        mask_bad = nonfinite_any
+    else:
+        mask_bad = (np.asarray(mask_qa, dtype=bool) | nonfinite_any)
+
+    edge_valid = _edge_buffer_mask((cube.shape[1], cube.shape[2]), edge_px=edge_px)
+    edge_buffer_mask = ~edge_valid
+    valid_for_stats = (~mask_bad) & (~edge_buffer_mask)
+
+    valid_frac = float(np.sum(valid_for_stats)) / float(valid_for_stats.size) if valid_for_stats.size > 0 else 0.0
+    print(f"[EnMap] valid_for_stats: {valid_frac * 100.0:.2f}% of pixels (edge_px={int(edge_px) if edge_px is not None else 0}).")
+
+    # Mask used for fitting/stats-only stages.
+    mask_bad_for_stats = ~valid_for_stats
 
     if detrend:
         print(
             f"[EnMap] Detrending config: enabled={detrend}, sigma={detrend_sigma}, downsample={detrend_downsample}, "
             f"buffer_px={int(detrend_buffer_px)}, den_thresh={detrend_den_thresh}, "
-            f"mask_bad={'yes' if mask is not None else 'no'}"
+            f"edge_px={int(edge_px) if edge_px is not None else 0}, mask_bad_for_stats=yes"
         )
         cube = remove_background_field(
             cube,
-            mask_bad=mask,
+            mask_bad=mask_bad_for_stats,
             sigma=float(detrend_sigma),
             downsample=detrend_downsample,
             buffer_px=int(detrend_buffer_px),
@@ -1167,30 +1367,33 @@ def enmap_to_feature_stack(
             progress_every=1,
         )
 
-        # Sanity: enforce NaNs immediately after detrending so subsequent steps do not
-        # learn from nodata/bad-pixel geometry.
-        if mask is not None:
-            cube[:, mask] = np.nan
+    # Enforce NaNs for truly bad pixels only (QA/non-finite). Do NOT NaN-out edge buffer pixels;
+    # they are excluded from fitting/stats via `valid_for_stats` but retained for output layers.
+    cube = cube.astype(np.float32, copy=False)
+    if mask_bad is not None:
+        cube[:, mask_bad] = np.nan
 
-    # Savitzky–Golay smoothing (spectral). Safe with our masking semantics because masked
-    # pixels are NaN for all bands (per-pixel), and valid pixels remain fully finite.
-    cube = smooth_cube(cube)
-
-    # Apply QA mask for downstream steps that are NaN-aware (MNF, depths, derivative PCA).
-    if mask is not None:
-        cube[:, mask] = np.nan
+    # NaN-safe Savitzky–Golay smoothing (spectral).
+    cube = smooth_cube_nan_safe(
+        cube,
+        window=11,
+        poly=2,
+        mask_bad=mask_bad,
+        valid_for_stats=valid_for_stats,
+    )
 
     if destripe:
         print(
             f"[EnMap] Destriping config: enabled={destripe}, frac={destripe_frac}, poly_order={destripe_poly}, "
             f"reference_kernel={destripe_reference_kernel}, reference_downsample={destripe_reference_downsample}, "
-            f"smooth_cols={destripe_smooth_cols}, mask_bad={'yes' if mask is not None else 'no'}"
+            f"smooth_cols={destripe_smooth_cols}, edge_px={int(edge_px) if edge_px is not None else 0}, "
+            f"mask_bad_for_stats=yes"
         )
         cube = destripe_columns(
             cube,
             frac=destripe_frac,
             polyfit_order=destripe_poly,
-            mask_bad=mask,
+            mask_bad=mask_bad_for_stats,
             reference_kernel=destripe_reference_kernel,
             reference_downsample=destripe_reference_downsample,
             smooth_cols=destripe_smooth_cols,
@@ -1201,44 +1404,70 @@ def enmap_to_feature_stack(
             f"smooth_cols={destripe_smooth_cols}"
         )
 
-    # Keep as a safeguard in case future pipeline edits insert operations that reintroduce non-NaNs.
-    if mask is not None:
-        cube[:, mask] = np.nan
-
     mnf_bp = int(detrend_buffer_px) if mnf_buffer_px is None else int(mnf_buffer_px)
-    mnf = run_mnf(cube, n_components=n_mnf, mask_bad=mask, buffer_px=mnf_bp)
+    mnf = run_mnf(cube, n_components=n_mnf, mask_bad=mask_bad_for_stats, buffer_px=mnf_bp)
 
-    depth_2200 = continuum_removed_depth(cube, wavelengths, (2200, 2230))
-    depth_2300 = continuum_removed_depth(cube, wavelengths, (2300, 2330))
-    depth_2340 = continuum_removed_depth(cube, wavelengths, (2320, 2350))
-    depth_1000 = continuum_removed_depth(cube, wavelengths, (900, 1030))
+    # Widened depth windows (BaySeg-friendly + EnMAP SNR).
+    depth_2200 = continuum_removed_depth(cube, wavelengths, (2170, 2250))
+    depth_2300 = continuum_removed_depth(cube, wavelengths, (2280, 2350))
+    depth_2340 = continuum_removed_depth(cube, wavelengths, (2310, 2380))
+    depth_1000 = continuum_removed_depth(cube, wavelengths, (900, 1100))
     depth_1750 = continuum_removed_depth(cube, wavelengths, (1700, 1800))
 
-    deriv = derivative_pca(cube, wavelengths, n_components=n_deriv_pcs)
+    deriv = derivative_pca(cube, wavelengths, n_components=n_deriv_pcs, swir_range="auto", valid_for_stats=valid_for_stats)
 
     features = {}
 
-    # MNF components (wrapped into rasterio MemoryFile datasets)
+    def _print_percentiles(name: str, arr2d: np.ndarray):
+        vals = np.asarray(arr2d, dtype=np.float32)[valid_for_stats]
+        vals = vals[np.isfinite(vals)]
+        if vals.size == 0:
+            print(f"[EnMap] Feature '{name}': no valid pixels for percentiles.")
+            return
+        p = np.percentile(vals, [1, 5, 50, 95, 99])
+        print(f"[EnMap] Feature '{name}' percentiles [1,5,50,95,99] -> {p}")
+
+    # MNF components (normalize/clip if enabled) and wrap into rasterio layers.
     for i in range(mnf.shape[0]):
-        features[f"MNF_{i+1:02d}"] = create_rasterio_layer(mnf[i], meta)
+        name = f"MNF_{i+1:02d}"
+        layer = mnf[i]
+        _print_percentiles(name, layer)
+        if normalize_features:
+            layer = normalize_feature_layer(layer, valid_for_stats=valid_for_stats, clip_sigma=clip_sigma)
+        features[name] = create_rasterio_layer(layer, meta)
 
     # Absorption depths (wrapped if available)
     if depth_2200 is not None:
-        features["Depth_2200"] = create_rasterio_layer(depth_2200, meta)
+        _print_percentiles("Depth_2200", depth_2200)
+        d = normalize_feature_layer(depth_2200, valid_for_stats, clip_sigma) if normalize_features else depth_2200
+        features["Depth_2200"] = create_rasterio_layer(d, meta)
     if depth_2300 is not None:
-        features["Depth_2300"] = create_rasterio_layer(depth_2300, meta)
+        _print_percentiles("Depth_2300", depth_2300)
+        d = normalize_feature_layer(depth_2300, valid_for_stats, clip_sigma) if normalize_features else depth_2300
+        features["Depth_2300"] = create_rasterio_layer(d, meta)
     if depth_2340 is not None:
-        features["Depth_2340"] = create_rasterio_layer(depth_2340, meta)
+        _print_percentiles("Depth_2340", depth_2340)
+        d = normalize_feature_layer(depth_2340, valid_for_stats, clip_sigma) if normalize_features else depth_2340
+        features["Depth_2340"] = create_rasterio_layer(d, meta)
     if depth_1000 is not None:
-        features["Depth_1000"] = create_rasterio_layer(depth_1000, meta)
+        _print_percentiles("Depth_1000", depth_1000)
+        d = normalize_feature_layer(depth_1000, valid_for_stats, clip_sigma) if normalize_features else depth_1000
+        features["Depth_1000"] = create_rasterio_layer(d, meta)
     if depth_1750 is not None:
-        features["Depth_1750"] = create_rasterio_layer(depth_1750, meta)
+        _print_percentiles("Depth_1750", depth_1750)
+        d = normalize_feature_layer(depth_1750, valid_for_stats, clip_sigma) if normalize_features else depth_1750
+        features["Depth_1750"] = create_rasterio_layer(d, meta)
 
     # Derivative PCA
     # Use the number of computed components to avoid indexing beyond available
     n_deriv_out = deriv.shape[0]
     for i in range(n_deriv_out):
-        features[f"Deriv_PC{i+1}"] = create_rasterio_layer(deriv[i], meta)
+        name = f"Deriv_PC{i+1}"
+        layer = deriv[i]
+        _print_percentiles(name, layer)
+        if normalize_features:
+            layer = normalize_feature_layer(layer, valid_for_stats=valid_for_stats, clip_sigma=clip_sigma)
+        features[name] = create_rasterio_layer(layer, meta)
 
     # Validate output conforms to expected dictionary schema (name -> rasterio dataset)
     try:
