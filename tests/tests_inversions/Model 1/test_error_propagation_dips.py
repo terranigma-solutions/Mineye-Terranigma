@@ -10,7 +10,7 @@ from gempy_probability.modules.plot.plot_gempy import plot_gempy
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel
 from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier
-from mineye.GeoModel.model_one.visualization import plot, gempy_viz
+from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots, gempy_viz
 # noinspection PyUnusedImports
 from tests import conftest
 
@@ -140,7 +140,7 @@ class TestErrorPropagationDips:
 
         # region EXTRACT NORMALIZED SAMPLES ============
         gravity_samples_norm = prior_inference_data.prior[r'gravity_response'].values[0, :]  # (n_samples, n_devices)
-        gravity_samples_norm, unit_label = plot(
+        gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
             gravity_samples_norm=gravity_samples_norm,
             observed_gravity_ugal=observed_gravity_ugal,
             xy_ravel=xy_ravel

@@ -200,7 +200,8 @@ plot_gempy(
     n_samples=20,
     samples=(prior_inference_data.prior[r'$\mu_{top}$'].values[0, :]),
     update_model_fn=update_model_for_plotting,
-    gempy_plot=p2d
+    gempy_plot=p2d,
+    ve=5
 )
 
 print("✓ Visualization complete")
@@ -216,3 +217,5 @@ print(f"  Std: {samples.std():.4f}")
 print(f"  Min: {samples.min():.4f}")
 print(f"  Max: {samples.max():.4f}")
 print(f"  Original: {original_z:.4f}")
+
+# sphinx_gallery_thumbnail_number = -1

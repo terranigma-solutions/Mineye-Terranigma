@@ -1,40 +1,42 @@
 from typing import Any
 
 import numpy as np
+import torch
 from matplotlib import pyplot as plt
 from pandas import DataFrame
 
 from mineye.GeoModel.geophysics import compute_alignment_params, align_forward_to_observed
 
 
-def _plot_comparison(observed_gravity, grav, xy_ravel,
-                     normalization_method='align_to_reference'):
+def plot_comparison(observed, fw_values, xy_ravel, unit_label,
+                    normalization_method='align_to_reference'):
     import matplotlib.pyplot as plt
     print("\n=== Observed vs Predicted Comparison ===")
 
     # Convert units: observed is in mGal, predicted in μGal
-    observed_ugal = observed_gravity * 1000  # Convert mGal to μGal
-    forward_model = -grav
+    observed_ugal = observed * 1000  # Convert mGal to μGal
+    forward_model = -fw_values
 
-    
     params = compute_alignment_params(
         observed=observed_ugal,
-        baseline_forward=forward_model
+        baseline_forward=forward_model,
+        method=normalization_method
     )
 
     forward_norm = align_forward_to_observed(
         forward=forward_model,
-        params=params
+        params=params,
     )
-    
-    forward_norm = forward_norm.numpy()
 
-    plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel)
+    if isinstance(forward_norm, torch.Tensor):
+        forward_norm = forward_norm.numpy()
+
+    plot_geophysics_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel, unit_label=unit_label)
 
 
-def plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, xy_ravel):
+def plot_geophysics_comparison(forward_norm, normalization_method, observed_ugal,
+                               xy_ravel, show=True, unit_label=r'$\mu$Gal'):
     observed_norm = observed_ugal
-    unit_label = r'$\mu$Gal'
 
     residuals_norm = observed_norm - forward_norm
 
@@ -49,7 +51,7 @@ def plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, x
     scatter1 = ax1.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=observed_norm,
                            s=30, cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5,
                            vmin=vmin_shared, vmax=vmax_shared)
-    ax1.set_title(f'Observed Gravity{"" if not True else f" ({normalization_method})"}')
+    ax1.set_title(f'Observed {"" if not True else f" ({normalization_method})"}')
     ax1.set_xlabel('X (m)')
     ax1.set_ylabel('Y (m)')
     cbar1 = plt.colorbar(scatter1, ax=ax1)
@@ -59,7 +61,7 @@ def plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, x
     scatter2 = ax2.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=forward_norm,
                            s=30, cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5,
                            vmin=vmin_shared, vmax=vmax_shared)
-    ax2.set_title(f'Forward Model Gravity{"" if not True else f" ({normalization_method})"}')
+    ax2.set_title(f'Forward Model {"" if not True else f" ({normalization_method})"}')
     ax2.set_xlabel('X (m)')
     ax2.set_ylabel('Y (m)')
     cbar2 = plt.colorbar(scatter2, ax=ax2)
@@ -96,36 +98,37 @@ def plot_gravity_comparison(forward_norm, normalization_method, observed_ugal, x
     ax4.text(0.05, 0.95, f'R = {correlation:.3f}', transform=ax4.transAxes,
              bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontsize=12)
 
-    plt.show()
+    if show:
+        plt.show()
 
 
-def _plot_fw_gravity(grav, gravity_data: DataFrame, xy_ravel: np.ndarray[tuple[Any, ...], np.dtype]):
+def plot_fw_geophysics(fw_values, observed_data: DataFrame, xy_ravel: np.ndarray[tuple[Any, ...], np.dtype], label: str, title: str):
     import matplotlib.pyplot as plt
-    scatter = plt.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=grav, s=30,
+    scatter = plt.scatter(xy_ravel[:, 0], xy_ravel[:, 1], c=fw_values, s=30,
                           cmap='viridis_r', alpha=0.8, edgecolors='black', linewidth=0.5)
 
     # Add colorbar for scatter plot
     cbar = plt.colorbar(scatter)
-    cbar.set_label(r'Forward Model Gravity ($\mu$gal)')
+    cbar.set_label(label)
 
     print(f"Plotting {len(xy_ravel)} actual measurement locations")
 
     # Always show actual measurement point locations regardless of grid type
     actual_measurement_points = np.column_stack([
-            np.array(gravity_data.geometry.x.values),
-            np.array(gravity_data.geometry.y.values)
+            np.array(observed_data.geometry.x.values),
+            np.array(observed_data.geometry.y.values)
     ])
 
     plt.scatter(actual_measurement_points[:, 0], actual_measurement_points[:, 1],
-                s=15, c='red', marker='x', alpha=0.8, linewidth=1.5,
+                s=15, c='red', marker='x', alpha=0.5, linewidth=1.5,
                 label=f'Actual Measurement Points (n={len(actual_measurement_points)})')
 
     plt.legend(loc='upper right', framealpha=0.9)
-    plt.title('Forward Gravity Model Results')
+    plt.title(title)
     plt.show()
 
 
-def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.ndarray, 
+def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.ndarray,
                                   observed_data: np.ndarray = None,
                                   confidence_level: float = 0.95,
                                   title: str = "Gravity Prediction with Uncertainty"):
@@ -156,42 +159,42 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
 
     # ============ Plot 1: Mean gravity with uncertainty visualization ============
     ax1 = axes[0, 0]
-    
+
     # Adaptive error bar scaling based on spatial extent
     spatial_extent = max(
         xy_coords[:, 0].max() - xy_coords[:, 0].min(),
         xy_coords[:, 1].max() - xy_coords[:, 1].min()
     )
     mean_std = np.mean(std_gravity)
-    
+
     # Calculate adaptive scale: make error bars ~2% of spatial extent on average
     target_size = 0.02 * spatial_extent  # Target error bar size
     error_scale = target_size / mean_std if mean_std > 0 else 1.0
-    
+
     # Cap the error scale to avoid extreme values
     error_scale = np.clip(error_scale, 0.1, 1000)
-    
+
     # Main scatter plot with mean gravity
-    scatter1 = ax1.scatter(xy_coords[:, 0], xy_coords[:, 1], 
-                          c=mean_gravity, s=100, cmap='viridis_r',
-                          edgecolors='black', linewidth=1, zorder=3)
+    scatter1 = ax1.scatter(xy_coords[:, 0], xy_coords[:, 1],
+                           c=mean_gravity, s=100, cmap='viridis_r',
+                           edgecolors='black', linewidth=1, zorder=3)
 
     # Add adaptive error bars
     # Only show if they won't dominate the plot
     if error_scale * mean_std < 0.1 * spatial_extent:
-        ax1.errorbar(xy_coords[:, 0], xy_coords[:, 1], 
-                    xerr=std_gravity * error_scale, yerr=std_gravity * error_scale,
-                    fmt='none', ecolor='red', alpha=0.3, capsize=3, zorder=2,
-                    label=f'Uncertainty (scaled {error_scale:.1f}×)')
+        ax1.errorbar(xy_coords[:, 0], xy_coords[:, 1],
+                     xerr=std_gravity * error_scale, yerr=std_gravity * error_scale,
+                     fmt='none', ecolor='red', alpha=0.3, capsize=3, zorder=2,
+                     label=f'Uncertainty (scaled {error_scale:.1f}×)')
         ax1.legend(fontsize=9, loc='upper right')
     else:
         # If error bars would be too large, show text warning instead
-        ax1.text(0.02, 0.98, 
-                f'⚠ Large uncertainty\n(mean σ = {mean_std:.1f} μGal)\nSee Plot 2 for details',
-                transform=ax1.transAxes, fontsize=10, verticalalignment='top',
-                bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.7))
+        ax1.text(0.02, 0.98,
+                 f'⚠ Large uncertainty\n(mean σ = {mean_std:.1f} μGal)\nSee Plot 2 for details',
+                 transform=ax1.transAxes, fontsize=10, verticalalignment='top',
+                 bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.7))
 
-    ax1.set_title(f'Mean Gravity ± {confidence_level*100:.0f}% CI', fontsize=14, fontweight='bold')
+    ax1.set_title(f'Mean Gravity ± {confidence_level * 100:.0f}% CI', fontsize=14, fontweight='bold')
     ax1.set_xlabel('X (m)', fontsize=12)
     ax1.set_ylabel('Y (m)', fontsize=12)
     cbar1 = plt.colorbar(scatter1, ax=ax1)
@@ -200,9 +203,9 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
 
     # ============ Plot 2: Uncertainty (standard deviation) ============
     ax2 = axes[0, 1]
-    scatter2 = ax2.scatter(xy_coords[:, 0], xy_coords[:, 1], 
-                          c=std_gravity, s=100, cmap='YlOrRd',
-                          edgecolors='black', linewidth=1)
+    scatter2 = ax2.scatter(xy_coords[:, 0], xy_coords[:, 1],
+                           c=std_gravity, s=100, cmap='YlOrRd',
+                           edgecolors='black', linewidth=1)
 
     ax2.set_title('Prediction Uncertainty (Std. Dev.)', fontsize=14, fontweight='bold')
     ax2.set_xlabel('X (m)', fontsize=12)
@@ -214,9 +217,9 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
     # ============ Plot 3: Coefficient of Variation (relative uncertainty) ============
     ax3 = axes[1, 0]
     cv = (std_gravity / np.abs(mean_gravity)) * 100  # in percentage
-    scatter3 = ax3.scatter(xy_coords[:, 0], xy_coords[:, 1], 
-                          c=cv, s=100, cmap='plasma',
-                          edgecolors='black', linewidth=1)
+    scatter3 = ax3.scatter(xy_coords[:, 0], xy_coords[:, 1],
+                           c=cv, s=100, cmap='plasma',
+                           edgecolors='black', linewidth=1)
 
     ax3.set_title('Coefficient of Variation (Relative Uncertainty)', fontsize=14, fontweight='bold')
     ax3.set_xlabel('X (m)', fontsize=12)
@@ -237,13 +240,13 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
                      fmt='o', alpha=0.6, ecolor='gray', capsize=4, markersize=6,
                      label='Predictions with CI')
         # 1:1 line
-        lims = [min(np.min(observed_data), np.min(lower_ci)), 
+        lims = [min(np.min(observed_data), np.min(lower_ci)),
                 max(np.max(observed_data), np.max(upper_ci))]
         ax4.plot(lims, lims, 'r--', alpha=0.75, linewidth=2, label='1:1 line')
 
         # Calculate metrics
         residuals = observed_data - mean_gravity
-        rmse = np.sqrt(np.mean(residuals**2))
+        rmse = np.sqrt(np.mean(residuals ** 2))
         correlation = np.corrcoef(observed_data, mean_gravity)[0, 1]
 
         ax4.set_xlabel('Observed Gravity (μGal)', fontsize=12)
@@ -255,15 +258,15 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
         # Add metrics text box
         textstr = f'R = {correlation:.3f}\nRMSE = {rmse:.2f} μGal'
         ax4.text(0.05, 0.95, textstr, transform=ax4.transAxes, fontsize=11,
-                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+                 verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     else:
         # Distribution of predictions at each location (violin-style)
         n_devices = min(10, gravity_samples.shape[1])  # Limit to first 10 devices for clarity
         positions = np.arange(n_devices)
 
         violin_parts = ax4.violinplot([gravity_samples[:, i] for i in range(n_devices)],
-                                     positions=positions, widths=0.7,
-                                     showmeans=True, showmedians=True)
+                                      positions=positions, widths=0.7,
+                                      showmeans=True, showmedians=True)
 
         ax4.set_xlabel('Device Index', fontsize=12)
         ax4.set_ylabel('Gravity (μGal)', fontsize=12)
@@ -275,9 +278,9 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
     plt.show()
 
     # Print summary statistics
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("UNCERTAINTY SUMMARY STATISTICS")
-    print("="*60)
+    print("=" * 60)
     print(f"Mean gravity:        {np.mean(mean_gravity):.2f} ± {np.std(mean_gravity):.2f} μGal")
     print(f"Mean uncertainty:    {np.mean(std_gravity):.2f} μGal")
     print(f"Max uncertainty:     {np.max(std_gravity):.2f} μGal")
@@ -286,7 +289,7 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
     if observed_data is not None:
         print(f"RMSE:                {rmse:.2f} μGal")
         print(f"Correlation (R):     {correlation:.3f}")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
 
 def plot_gravity_uncertainty_profiles(gravity_samples: np.ndarray, xy_coords: np.ndarray,
@@ -343,22 +346,22 @@ def plot_gravity_uncertainty_profiles(gravity_samples: np.ndarray, xy_coords: np
 
         # Plot confidence band
         ax.fill_between(distance, lower_ci[sort_idx], upper_ci[sort_idx],
-                       alpha=0.3, color='lightblue', label=f'{confidence_level*100:.0f}% CI')
+                        alpha=0.3, color='lightblue', label=f'{confidence_level * 100:.0f}% CI')
 
         # Plot mean
         ax.plot(distance, mean_gravity[sort_idx], 'b-', linewidth=2, label='Mean prediction')
 
         # Plot individual samples (subset for clarity)
         n_sample_lines = min(20, gravity_samples.shape[0])
-        sample_indices = np.linspace(0, gravity_samples.shape[0]-1, n_sample_lines, dtype=int)
+        sample_indices = np.linspace(0, gravity_samples.shape[0] - 1, n_sample_lines, dtype=int)
         for sample_idx in sample_indices:
-            ax.plot(distance, gravity_samples[sample_idx, sort_idx], 
-                   'gray', alpha=0.1, linewidth=0.5)
+            ax.plot(distance, gravity_samples[sample_idx, sort_idx],
+                    'gray', alpha=0.1, linewidth=0.5)
 
         # Plot observed data if available
         if observed_data is not None:
-            ax.scatter(distance, observed_data[sort_idx], c='red', s=30, 
-                      zorder=5, label='Observed', edgecolors='black', linewidth=0.5)
+            ax.scatter(distance, observed_data[sort_idx], c='red', s=30,
+                       zorder=5, label='Observed', edgecolors='black', linewidth=0.5)
 
         ax.set_xlabel(xlabel, fontsize=11)
         ax.set_ylabel('Gravity (μGal)', fontsize=11)
@@ -404,13 +407,13 @@ def plot_gravity_uncertainty_map_interpolated(gravity_samples: np.ndarray, xy_co
     # Plot 1: Mean gravity (interpolated)
     ax1 = axes[0]
     im1 = ax1.contourf(xi_grid, yi_grid, mean_interp, levels=20, cmap='viridis_r')
-    ax1.scatter(xy_coords[:, 0], xy_coords[:, 1], c='red', s=20, 
-               marker='x', linewidth=1.5, label='Measurement locations')
+    ax1.scatter(xy_coords[:, 0], xy_coords[:, 1], c='red', s=20,
+                marker='x', linewidth=1.5, label='Measurement locations')
     if observed_data is not None:
         # Add contour lines for observed data
         obs_interp = griddata(xy_coords[:, :2], observed_data, (xi_grid, yi_grid), method='cubic')
-        ax1.contour(xi_grid, yi_grid, obs_interp, levels=10, colors='white', 
-                   linewidths=0.5, alpha=0.5, linestyles='dashed')
+        ax1.contour(xi_grid, yi_grid, obs_interp, levels=10, colors='white',
+                    linewidths=0.5, alpha=0.5, linestyles='dashed')
     ax1.set_title('Mean Gravity (Interpolated)', fontsize=13, fontweight='bold')
     ax1.set_xlabel('X (m)', fontsize=11)
     ax1.set_ylabel('Y (m)', fontsize=11)
@@ -422,7 +425,7 @@ def plot_gravity_uncertainty_map_interpolated(gravity_samples: np.ndarray, xy_co
     ax2 = axes[1]
     im2 = ax2.contourf(xi_grid, yi_grid, std_interp, levels=20, cmap='YlOrRd')
     ax2.scatter(xy_coords[:, 0], xy_coords[:, 1], c='blue', s=20,
-               marker='x', linewidth=1.5, label='Measurement locations')
+                marker='x', linewidth=1.5, label='Measurement locations')
     ax2.set_title('Prediction Uncertainty (Std. Dev.)', fontsize=13, fontweight='bold')
     ax2.set_xlabel('X (m)', fontsize=11)
     ax2.set_ylabel('Y (m)', fontsize=11)
