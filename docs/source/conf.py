@@ -23,11 +23,6 @@ import sys
 import warnings
 
 import dotenv
-import pykeops
-
-import sphinx_gallery
-from sphinx_gallery.sorting import FileNameSortKey
-import numpy as np
 import pyvista
 from sphinx_gallery.sorting import FileNameSortKey
 
@@ -178,6 +173,8 @@ sphinx_gallery_conf = {
         },
         "nested_sections"        : False,
 }
+
+sphinx_gallery_conf.update(only_warn_on_example_error=True)
 
 # endregion
 
