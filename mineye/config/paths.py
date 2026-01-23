@@ -3,9 +3,9 @@ import os
 
 # Define input paths similar to GemPy's conftest pattern
 # Primary path: relative to this file (for installed/development use)
-input_path = os.path.dirname(__file__) + '/../../examples/Data/Input_Data'
+input_path = os.path.dirname(__file__) + '/../../examples/Data/General_Input_Data'
 # Alternative path: for test/example contexts
-input_path2 = os.path.dirname(__file__) + '/../../examples/Data/Input_Data/'
+input_path2 = os.path.dirname(__file__) + '/../../examples/Data/General_Input_Data/'
 
 def get_base_dir():
     """Get the base directory for the project (project root)."""
@@ -24,7 +24,7 @@ def get_data_dir():
         return primary
 
     # Fall back to base_dir construction
-    fallback = os.path.abspath(os.path.join(get_base_dir(), 'examples', 'Data', 'Input_Data'))
+    fallback = os.path.abspath(os.path.join(get_base_dir(), 'examples', 'Data', 'General_Input_Data'))
     if os.path.exists(fallback):
         return fallback
 
@@ -33,7 +33,7 @@ def get_data_dir():
 
 
 def get_geomodel_dir():
-    return os.path.abspath(os.path.join(get_base_dir(), 'examples', 'Data', 'Output_Data'))
+    return os.path.abspath(os.path.join(get_base_dir(), 'examples', 'Data', 'Model_Input_Data'))
 
 
 def get_topography_dir():
@@ -45,7 +45,14 @@ def get_topography_dir():
 def get_tmp_dir():
     """Get the temporary directory for model inputs."""
     geomodel_dir = get_geomodel_dir()
-    tmp_dir = os.path.join(geomodel_dir, 'Simple-Models', 'temp_inputs')
+    tmp_dir = os.path.join(geomodel_dir, 'Simple-Models', 'Simpel-Model-Inputs')
+    os.makedirs(tmp_dir, exist_ok=True)
+    return tmp_dir
+
+def get_complex_dir():
+    """Get the temporary directory for model inputs."""
+    geomodel_dir = get_geomodel_dir()
+    tmp_dir = os.path.join(geomodel_dir, 'Complex-Models')
     os.makedirs(tmp_dir, exist_ok=True)
     return tmp_dir
 
@@ -80,7 +87,7 @@ def get_topography_path(base_dir=None):
     """
     if base_dir is not None:
         # Legacy compatibility: base_dir points to project root
-        data_dir = os.path.join(base_dir, 'examples', 'Data', 'Input_Data')
+        data_dir = os.path.join(base_dir, 'examples', 'Data', 'General_Input_Data')
     else:
         data_dir = get_data_dir()
     return os.path.join(data_dir, 'Topographic_Data', 'topo_reduced_sf0.1.tif')
@@ -98,7 +105,7 @@ def get_orientations_path(base_dir=None):
     """
     if base_dir is not None:
         # Legacy compatibility: base_dir points to project root
-        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Output_Data', 'Simple-Models', 'temp_inputs')
+        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Simple-Models', 'Simpel-Model-Inputs')
     else:
         tmp_dir = get_tmp_dir()
     return os.path.join(tmp_dir, 'orientations_mod.csv')
@@ -112,9 +119,36 @@ def get_points_path(base_dir=None):
     """
     if base_dir is not None:
         # Legacy compatibility: base_dir points to project root
-        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Output_Data', 'Simple-Models', 'temp_inputs')
+        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Simple-Models', 'Simpel-Model-Inputs')
     else:
         tmp_dir = get_tmp_dir()
+    return os.path.join(tmp_dir, 'points_mod.csv')
+
+def get_orientations_path_complex(base_dir=None):
+    """Get path to the modified orientations CSV file.
+
+    Args:
+        base_dir: Optional base directory (for compatibility). If None, uses get_tmp_dir().
+    """
+    if base_dir is not None:
+        # Legacy compatibility: base_dir points to project root
+        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Complex-Models')
+    else:
+        tmp_dir = get_complex_dir()
+    return os.path.join(tmp_dir, 'orientations_mod.csv')
+
+
+def get_points_path_complex(base_dir=None):
+    """Get path to the modified points CSV file.
+
+    Args:
+        base_dir: Optional base directory (for compatibility). If None, uses get_tmp_dir().
+    """
+    if base_dir is not None:
+        # Legacy compatibility: base_dir points to project root
+        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Complex-Models')
+    else:
+        tmp_dir = get_complex_dir()
     return os.path.join(tmp_dir, 'points_mod.csv')
 
 

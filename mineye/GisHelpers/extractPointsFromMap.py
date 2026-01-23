@@ -8,12 +8,12 @@ import os
 # ========== CONFIG ==========
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.join(script_dir, '..')
-data_input_dir = os.path.join(project_root, 'Data', 'Input_Data')
+data_input_dir = os.path.join(project_root, 'Data', 'General_Input_Data')
 
 POLYGON_PATH = os.path.join(data_input_dir, 'Stratigraphic_Data', 'QGIS', 'plutonite_outline.gpkg')
 DEM_PATH = os.path.join(data_input_dir, 'Topographic_Data', 'topo_reduced_sf0.1.tif')
 POINT_SPACING = 500
-OUTPUT_CSV = os.path.join(project_root, 'Data', 'Output_Data', 'Simple-Models', 'contact_points.csv')
+OUTPUT_CSV = os.path.join(project_root, 'Data', 'Model_Input_Data', 'Simple-Models', 'contact_points.csv')
 
 # Simple formation settings - all points get same formation
 FORMATION_NAME = "Tournaisian Plutonites"
