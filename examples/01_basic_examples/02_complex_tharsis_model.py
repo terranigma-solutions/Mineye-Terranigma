@@ -49,6 +49,41 @@ print(f"Orientations: {mod_or_path}")
 print(f"Points: {mod_pts_path}")
 
 # %%
+# Create Stratigraphic Stack Model
+# ------------------------------
+from mineye.GeoModel import helper_plotter
+
+stratigraphic_geo_model = gp.create_geomodel(
+    project_name='stratigraphic_stack_model',
+    extent=extent,
+    refinement=refinement,
+    resolution=resolution,
+    importer_helper=gp.data.ImporterHelper(
+        path_to_orientations=os.path.join(BASE_DIR, "points_orientations_incl_topo_all_df.csv"),
+        path_to_surface_points=os.path.join(BASE_DIR, "points_incl_topo_all_df.csv"),
+    )
+)
+
+gp.map_stack_to_surfaces(
+    gempy_model=stratigraphic_geo_model,
+    mapping_object={
+        "Strat_Series1": ("Upper Carboniferous Volcanics","Mid Carboniferous Shales", "Visean Shales", "Upper Devonian Siliciclastics")
+    }
+)
+
+topography_path = paths.get_topography_path()
+gp.set_topography_from_file(
+    grid=stratigraphic_geo_model.grid,
+    filepath=topography_path,
+    crop_to_extent=[-695558, stratigraphic_geo_model.grid.extent[2],
+                    stratigraphic_geo_model.grid.extent[1], stratigraphic_geo_model.grid.extent[3]]
+)
+
+gempy_model = gp.compute_model(stratigraphic_geo_model)
+helper_plotter.create_cross_section(stratigraphic_geo_model, cross_section=5, vertical_exaggeration=10)
+
+
+# %%
 # Create GemPy Geological Model
 # ------------------------------
 
@@ -105,11 +140,5 @@ print("✓ Model computed successfully")
 # -------------------
 
 import gempy_viewer as gpv
-import pyvista as pv
-
-# Configure PyVista to use smaller fonts for axes
-pv.global_theme.font.size = 10
-pv.global_theme.font.label_size = 10
-pv.global_theme.font.title_size = 12
-
 gpv.plot_3d(geo_model, ve=5, image=False)
+
