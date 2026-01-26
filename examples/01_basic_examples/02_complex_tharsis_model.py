@@ -12,6 +12,7 @@ It features an erosive Tournaisian Plutonite unit overlying a conformable Devoni
 
 import numpy as np
 import gempy as gp
+import matplotlib.pyplot as plt
 
 # Set random seed for reproducibility
 np.random.seed(1234)
@@ -45,6 +46,12 @@ refinement = 5
 mod_or_path = paths.get_orientations_path_complex()
 mod_pts_path = paths.get_points_path_complex()
 
+mod_or_sed_path = paths.get_orientations_path_sed_complex()
+mod_pts_sed_path = paths.get_points_path_sed_complex()
+
+mod_or_plut_path = paths.get_orientations_path_magmatic_complex()
+mod_pts_plut_path = paths.get_points_path_magmatic_complex()
+
 print(f"Orientations: {mod_or_path}")
 print(f"Points: {mod_pts_path}")
 
@@ -57,10 +64,10 @@ stratigraphic_geo_model = gp.create_geomodel(
     project_name='stratigraphic_stack_model',
     extent=extent,
     refinement=refinement,
-    resolution=resolution,
+    resolution=[64, 64, 64],  # Need regular grid for cross-sections and merging
     importer_helper=gp.data.ImporterHelper(
-        path_to_orientations=os.path.join(BASE_DIR, "points_orientations_incl_topo_all_df.csv"),
-        path_to_surface_points=os.path.join(BASE_DIR, "points_incl_topo_all_df.csv"),
+        path_to_orientations=mod_or_sed_path,
+        path_to_surface_points=mod_pts_sed_path,
     )
 )
 
@@ -82,63 +89,84 @@ gp.set_topography_from_file(
 gempy_model = gp.compute_model(stratigraphic_geo_model)
 helper_plotter.create_cross_section(stratigraphic_geo_model, cross_section=5, vertical_exaggeration=10)
 
-
 # %%
-# Create GemPy Geological Model
+# Adding Plutonite Unit
 # ------------------------------
+# Create a separate model for the plutonite body, then merge with stratigraphic model
 
-geo_model = gp.create_geomodel(
-    project_name='complex_tharsis_model',
+plutonite_id = 1
+
+# Need resolution set to get a regular grid for merging
+plutonite_geo_model = gp.create_geomodel(
+    project_name='plutonite_model',
     extent=extent,
     refinement=refinement,
-    resolution=resolution,
+    resolution=[64, 64, 64],  # Need regular grid for merging
     importer_helper=gp.data.ImporterHelper(
-        path_to_orientations=mod_or_path,
-        path_to_surface_points=mod_pts_path,
+        path_to_orientations=mod_or_plut_path,
+        path_to_surface_points=mod_pts_plut_path,
     )
 )
 
-# %%
-# Map Geological Units
-# --------------------
-
+# Map the plutonite surface
 gp.map_stack_to_surfaces(
-    gempy_model=geo_model,
+    gempy_model=plutonite_geo_model,
     mapping_object={
-        "Tournaisian_Series": ["Tournaisian Plutonites"],
-        "Devonian_Series": [
-            "Famennian Siliciclastics"
-        ]
+        "Plutonite_Series": ["Tournaisian Plutonites"]
     }
 )
 
-# Verify stack order
-print(geo_model.structural_frame)
+# Compute the plutonite model
+gp.compute_model(plutonite_geo_model)
+print("Plutonite model computed")
 
-# %%
-# Model with Topography
-# ---------------------
-# Add topographic surface from DEM
+# Get plutonite lithology block
+plut_lith_block = plutonite_geo_model.solutions.raw_arrays.lith_block
+plut_lith_block_reshaped = plut_lith_block.reshape(64, 64, 64)
+plutonite_mask = plut_lith_block_reshaped == plutonite_id
 
-topography_path = paths.get_topography_path()
-gp.set_topography_from_file(
-    grid=geo_model.grid,
-    filepath=topography_path,
-    crop_to_extent=[-695558, geo_model.grid.extent[2],
-                    geo_model.grid.extent[1], geo_model.grid.extent[3]]
-)
+# The interpolated grid of formation IDs is stored here
+lith_block = stratigraphic_geo_model.solutions.raw_arrays.lith_block
+lith_block_reshaped = lith_block.reshape(64, 64, 64)
 
-# %%
-# Compute the Model
-# -----------------
+# Get the coordinates of these voxels
+voxel_coords = stratigraphic_geo_model.grid.regular_grid.values
+voxel_coords_reshaped = voxel_coords.reshape(64, 64, 64, 3)
 
-gp.compute_model(geo_model)
-print("✓ Model computed successfully")
+# Flip Y coordinate
+y_min, y_max = np.min(voxel_coords[:, 1]), np.max(voxel_coords[:, 1])
+voxel_coords_flipped = voxel_coords.copy()
+voxel_coords_flipped[:, 1] = y_max - (voxel_coords[:, 1] - y_min)
 
-# %%
-# Visualize the Model
-# -------------------
+# Insert the igneous rock locations into the stratigraphic model
+lith_block_reshaped[plutonite_mask] = 6
+lith_block_modified = lith_block_reshaped.flatten()
 
-import gempy_viewer as gpv
-gpv.plot_3d(geo_model, ve=5, image=False)
+# Plot the combined model
+sample_step = 10  # Take every 10th point
 
+# Create interactive 3D plot
+fig = plt.figure(figsize=(12, 9))
+ax = fig.add_subplot(111, projection='3d')
+
+# Create the scatter plot with color mapping based on Z values
+scatter = ax.scatter(voxel_coords_flipped[:,0][::sample_step],
+                    voxel_coords_flipped[:,1][::sample_step],
+                    voxel_coords_flipped[:,2][::sample_step],
+                    c=lith_block_modified[::sample_step],
+                    cmap='viridis',
+                    s=10,
+                    alpha=0.6)
+
+# Add colorbar
+plt.colorbar(scatter, ax=ax, label='Rock Type', shrink=0.5)
+
+# Set labels and title
+ax.set_xlabel('X Coordinate')
+ax.set_ylabel('Y Coordinate')
+ax.set_zlabel('Z Elevation')
+
+# Improve the view
+ax.view_init(elev=90, azim=270)
+plt.tight_layout()
+plt.show()
