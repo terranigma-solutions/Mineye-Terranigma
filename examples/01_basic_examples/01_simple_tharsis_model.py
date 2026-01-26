@@ -209,12 +209,6 @@ print("✓ Model with topography computed successfully")
 # of the geological model from any angle.
 
 import gempy_viewer as gpv
-import pyvista as pv
-
-# Configure PyVista to use smaller fonts for axes
-pv.global_theme.font.size = 10
-pv.global_theme.font.label_size = 10
-pv.global_theme.font.title_size = 12
 
 gpv.plot_3d(simple_geo_model, ve=5, image=True)
 
