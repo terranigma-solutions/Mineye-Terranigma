@@ -204,7 +204,11 @@ def plot_feature_quicklooks(
             arr = as_array(features[k])
 
             if k.startswith("Depth_"):
-                img = _percentile_scale(arr, 10.0, 99.5)  # tighter stretch for QA
+                # Use a very tight stretch for visual QA of depth layers
+                # (np.clip((depth - p95) / (p99 - p95), 0, 1))
+                # Note: arr here might already be normalized by normalize_depth_layer [0, 1]
+                # but we apply another stretch for better visualization of the sparse signal.
+                img = _percentile_scale(arr, 95.0, 99.0)
             else:
                 img = _percentile_scale(arr, 2.0, 98.0)
             plt.imshow(img, cmap="viridis")
