@@ -13,7 +13,7 @@ def create_cross_section(geo_model, cross_section: int, vertical_exaggeration: i
         if i % 2 == 0:
             gpv.plot_2d(geo_model, ve=vertical_exaggeration,
                         cell_number=i,
-                        show_topography=False,
+                        show_topography=True,
                         legend=True,
                         show_data=False,
                         direction="y")
@@ -25,7 +25,7 @@ def create_cross_section(geo_model, cross_section: int, vertical_exaggeration: i
         if i % 2 == 0:
             gpv.plot_2d(geo_model, ve=vertical_exaggeration,
                         cell_number=i,
-                        show_topography=False,
+                        show_topography=True,
                         legend=True,
                         show_data=False,
                         direction="x")
@@ -35,6 +35,132 @@ def create_cross_section(geo_model, cross_section: int, vertical_exaggeration: i
 def plot_3d_async(geo_model):
     gpv.plot_3d(geo_model, show_lith=True, show_boundaries=True, ve=10, legend=False, show_data=True,
                 show_topography=True, transformed_data=False)
+
+
+def plot_combined_model(
+        lith_block: np.ndarray,
+        voxel_coords: np.ndarray,
+        formation_id_map: dict,
+        formation_colors: dict,
+        topography_points: np.ndarray = None,
+        title: str = 'Combined Geological Model',
+        sample_step: int = 10,
+        figsize: tuple = (12, 10),
+        elev: float = 90,
+        azim: float = 270
+):
+    """
+    Plot a combined 3D geological model with proper legend.
+
+    Parameters
+    ----------
+    lith_block : np.ndarray
+        Flattened lithology block array with formation IDs.
+    voxel_coords : np.ndarray
+        Array of voxel coordinates (N, 3) for X, Y, Z.
+    formation_id_map : dict
+        Mapping of lithology IDs to formation names, e.g. {1: 'Formation A', 2: 'Formation B'}.
+    formation_colors : dict
+        Mapping of formation names to colors, e.g. {'Formation A': '#e74c3c'}.
+    topography_points : np.ndarray, optional
+        Topography as array of (X, Y, Z) points. If provided, voxels above
+        topography will be masked out.
+    title : str, optional
+        Plot title. Default is 'Combined Geological Model'.
+    sample_step : int, optional
+        Subsampling step for plotting (every nth point). Default is 10.
+    figsize : tuple, optional
+        Figure size. Default is (12, 10).
+    elev : float, optional
+        Elevation angle for 3D view. Default is 90.
+    azim : float, optional
+        Azimuth angle for 3D view. Default is 270.
+    """
+    from scipy.interpolate import LinearNDInterpolator
+
+    # Create a copy of coords and lith_block for masking
+    coords_to_plot = voxel_coords.copy()
+    lith_to_plot = lith_block.copy()
+
+    # Apply topography mask if provided
+    if topography_points is not None:
+        # Create interpolator from topography X, Y -> Z
+        topo_xy = topography_points[:, :2]  # X, Y
+        topo_z = topography_points[:, 2]     # Z elevations
+
+        interp = LinearNDInterpolator(topo_xy, topo_z)
+
+        # Get topography elevation at each voxel's X,Y position
+        topo_at_voxels = interp(voxel_coords[:, :2])
+
+        # Create mask: keep voxels that are below or at topography
+        # Handle NaN values (outside interpolation range) by keeping those voxels
+        below_topo_mask = (voxel_coords[:, 2] <= topo_at_voxels) | np.isnan(topo_at_voxels)
+
+        # Apply mask
+        coords_to_plot = voxel_coords[below_topo_mask]
+        lith_to_plot = lith_block[below_topo_mask]
+
+    # Flip Y coordinate for correct orientation
+    y_min, y_max = np.min(coords_to_plot[:, 1]), np.max(coords_to_plot[:, 1])
+    voxel_coords_flipped = coords_to_plot.copy()
+    voxel_coords_flipped[:, 1] = y_max - (coords_to_plot[:, 1] - y_min)
+
+    # Create 3D plot
+    fig = plt.figure(figsize=figsize)
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot each formation separately to create proper legend
+    for lith_id, formation_name in formation_id_map.items():
+        mask = lith_to_plot[::sample_step] == lith_id
+        if np.any(mask):
+            ax.scatter(
+                voxel_coords_flipped[:, 0][::sample_step][mask],
+                voxel_coords_flipped[:, 1][::sample_step][mask],
+                voxel_coords_flipped[:, 2][::sample_step][mask],
+                c=formation_colors.get(formation_name, '#888888'),
+                s=15,
+                alpha=0.7,
+                label=formation_name
+            )
+
+    # Add legend with formation names - positioned below the figure
+    legend = ax.legend(
+        loc='upper center',
+        bbox_to_anchor=(0.5, -0.05),
+        fontsize=14,
+        framealpha=0.95,
+        edgecolor='black',
+        fancybox=True,
+        shadow=True,
+        title='Formations',
+        title_fontsize=16,
+        markerscale=2.5,
+        ncol=2  # Arrange in 2 columns for horizontal layout
+    )
+    legend.get_title().set_fontweight('bold')
+
+    # Set labels and title with padding
+    ax.set_xlabel('X Coordinate', fontsize=12, labelpad=10)
+    ax.set_ylabel('Y Coordinate', fontsize=12, labelpad=10)
+    ax.set_zlabel('Z Elevation', fontsize=12, labelpad=10)
+    ax.set_title(title, fontsize=16, fontweight='bold', pad=15)
+
+    # Reduce number of ticks to avoid clutter
+    ax.xaxis.set_major_locator(plt.MaxNLocator(5))
+    ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+    ax.zaxis.set_major_locator(plt.MaxNLocator(5))
+
+    # Reduce tick label size
+    ax.tick_params(axis='x', labelsize=9, pad=2)
+    ax.tick_params(axis='y', labelsize=9, pad=2)
+    ax.zaxis.set_tick_params(labelsize=9, pad=2)
+
+    # Set view angle
+    ax.view_init(elev=elev, azim=azim)
+    plt.subplots_adjust(bottom=0.15)  # Make room for legend below
+    plt.show()
+
 
 def plot_initial_data_on_map(gis_map_info: str,
                              original_points: str,
