@@ -377,6 +377,30 @@ def normalize_feature_layer(x2d: np.ndarray, valid_for_stats: np.ndarray, clip_s
     return z.astype(np.float32, copy=False)
 
 
+def normalize_depth_layer(depth: np.ndarray, valid_mask: np.ndarray, p_lo: float = 2.0, p_hi: float = 99.5) -> np.ndarray:
+    """Robust min-max scaling for absorption depths.
+
+    Instead of z-scoring, we map a high percentile range to [0, 1].
+    This preserves the physical meaning of zero-depth while handling outliers.
+    """
+    depth = np.asarray(depth, dtype=np.float32)
+    vm = np.asarray(valid_mask, dtype=bool)
+    if depth.shape != vm.shape:
+        raise ValueError(f"normalize_depth_layer: depth shape {depth.shape} != valid_mask shape {vm.shape}")
+
+    vals = depth[vm]
+    vals = vals[np.isfinite(vals)]
+    if vals.size == 0:
+        return depth
+
+    lo, hi = np.percentile(vals, [p_lo, p_hi])
+    if hi <= lo:
+        return depth
+
+    out = (depth - lo) / (hi - lo)
+    return np.clip(out, 0.0, 1.0).astype(np.float32)
+
+
 # ============================================================
 # 5. Savitzky–Golay smoothing
 # ============================================================
@@ -1439,23 +1463,23 @@ def enmap_to_feature_stack(
     # Absorption depths (wrapped if available)
     if depth_2200 is not None:
         _print_percentiles("Depth_2200", depth_2200)
-        d = normalize_feature_layer(depth_2200, valid_for_stats, clip_sigma) if normalize_features else depth_2200
+        d = normalize_depth_layer(depth_2200, valid_for_stats) if normalize_features else depth_2200
         features["Depth_2200"] = create_rasterio_layer(d, meta)
     if depth_2300 is not None:
         _print_percentiles("Depth_2300", depth_2300)
-        d = normalize_feature_layer(depth_2300, valid_for_stats, clip_sigma) if normalize_features else depth_2300
+        d = normalize_depth_layer(depth_2300, valid_for_stats) if normalize_features else depth_2300
         features["Depth_2300"] = create_rasterio_layer(d, meta)
     if depth_2340 is not None:
         _print_percentiles("Depth_2340", depth_2340)
-        d = normalize_feature_layer(depth_2340, valid_for_stats, clip_sigma) if normalize_features else depth_2340
+        d = normalize_depth_layer(depth_2340, valid_for_stats) if normalize_features else depth_2340
         features["Depth_2340"] = create_rasterio_layer(d, meta)
     if depth_1000 is not None:
         _print_percentiles("Depth_1000", depth_1000)
-        d = normalize_feature_layer(depth_1000, valid_for_stats, clip_sigma) if normalize_features else depth_1000
+        d = normalize_depth_layer(depth_1000, valid_for_stats) if normalize_features else depth_1000
         features["Depth_1000"] = create_rasterio_layer(d, meta)
     if depth_1750 is not None:
         _print_percentiles("Depth_1750", depth_1750)
-        d = normalize_feature_layer(depth_1750, valid_for_stats, clip_sigma) if normalize_features else depth_1750
+        d = normalize_depth_layer(depth_1750, valid_for_stats) if normalize_features else depth_1750
         features["Depth_1750"] = create_rasterio_layer(d, meta)
 
     # Derivative PCA
