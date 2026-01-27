@@ -188,7 +188,6 @@ gp.set_topography_from_file(
 
 # Compute the model with topography
 gp.compute_model(simple_geo_model)
-print("✓ Model with topography computed successfully")
 
 # %%
 # Visualize the Model
@@ -210,7 +209,7 @@ print("✓ Model with topography computed successfully")
 
 import gempy_viewer as gpv
 
-gpv.plot_3d(simple_geo_model, ve=5, image=True)
+gpv.plot_3d(simple_geo_model, ve=5, image=False)
 
 # %%
 # Summary and Next Steps
