@@ -71,8 +71,7 @@ The forward model f involves:
 
 
 """
-import os
-import sys
+
 
 # %%
 # Import Libraries
@@ -85,11 +84,9 @@ from gempy_probability.modules.plot.plot_posterior import default_red, default_b
 from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward, generate_gravity_uncertainty_plots
 
 
-from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_geophysics_comparison
+from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 
 import numpy as np
-from whoami import whoami
-import multiprocessing as mp
 
 import gempy as gp
 import gempy_probability as gpp
@@ -113,8 +110,8 @@ np.random.seed(1234)
 from mineye.config import paths
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
-from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, set_priors
-from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, MultiGravityDiagonalLikelihood, generate_multigravity_likelihood_hierarchical_per_station
+from mineye.GeoModel.model_one.probabilistic_model import normalize, set_priors
+from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_hierarchical_per_station
 
 # %%
 # Define Model Extent and Resolution

@@ -23,13 +23,13 @@ def base_dir():
 @pytest.fixture(scope="session")
 def geomodel_dir(base_dir):
     """Directory containing geomodel data."""
-    return os.path.abspath(os.path.join(base_dir, 'examples', 'Data', 'Output_Data'))
+    return os.path.abspath(os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data'))
 
 
 @pytest.fixture(scope="session")
 def data_dir(base_dir):
     """Directory containing geomodel data."""
-    return os.path.abspath(os.path.join(base_dir, 'examples', 'Data', 'Input_Data'))
+    return os.path.abspath(os.path.join(base_dir, 'examples', 'Data', 'General_Input_Data'))
 
 
 # topography_path = os.path.join(data_dir, 'Topographic_Data', 'topo_reduced_sf0.1.tif')
@@ -42,7 +42,7 @@ def topography_dir(data_dir):
 @pytest.fixture(scope="session")
 def tmp_dir(geomodel_dir):
     """Temporary directory for model inputs."""
-    return os.path.join(geomodel_dir, 'Simple-Models', 'temp_inputs')
+    return os.path.join(geomodel_dir, 'Simple-Models', 'Simpel-Model-Inputs')
 
 
 @pytest.fixture(scope="session")
