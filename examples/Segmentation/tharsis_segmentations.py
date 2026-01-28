@@ -3,7 +3,7 @@ import os
 from mineye.BayesianSegmentation.full_workflow import run_workflow
 
 # %% Output directory
-output_dir = "examples/Data/Segmentation_Input_Data/Segmentation_Output_Data"
+output_dir = "examples/Data/Segmentation_Output_Data"
 
 # %%  20m resolution
 bands = {
