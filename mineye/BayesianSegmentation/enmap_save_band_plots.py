@@ -44,12 +44,13 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     # Default dataset path provided by the user/request
+    default_path = os.path.join(os.path.dirname(__file__), "../../examples/Data/Segmentation_Input_Data/Enmap/ENMAP01-____L2A-DT0000026661_20230712T114038Z_001_V010402_20240818T134118Z")
     parser.add_argument(
         "--folder",
         "-f",
         dest="folder_path",
         type=str,
-        default="/Volumes/macminiextern/EnMap_ROI1/ENMAP01-____L2A-DT0000026661_20230712T114043Z_002_V010402_20240818T134102Z",
+        default=default_path,
         help="Path to the EnMAP L2A product folder (contains SPECTRAL_IMAGE*.tif and METADATA*.xml)",
     )
     parser.add_argument(
