@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**01:53.482** total execution time for 6 files **from all galleries**:
+**00:29.753** total execution time for 8 files **from all galleries**:
 
 .. container::
 
@@ -32,21 +32,27 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_examples_probabilistic_04_gravity_inversion.py` (``../../examples/02_probabilistic_modeling/04_gravity_inversion.py``)
-     - 01:24.897
+   * - :ref:`sphx_glr_examples_basic_03_gravity_forward_model.py` (``..\..\examples\01_basic_examples\03_gravity_forward_model.py``)
+     - 00:22.910
      - 0.0
-   * - :ref:`sphx_glr_examples_probabilistic_02_error_propagation.py` (``../../examples/02_probabilistic_modeling/02_error_propagation.py``)
-     - 00:28.585
+   * - :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py` (``..\..\examples\01_basic_examples\01_simple_tharsis_model.py``)
+     - 00:06.748
      - 0.0
-   * - :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py` (``../../examples/01_basic_examples/01_simple_tharsis_model.py``)
+   * - :ref:`sphx_glr_examples_probabilistic_02_error_propagation.py` (``..\..\examples\02_probabilistic_modeling\02_error_propagation.py``)
+     - 00:00.089
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_04_gravity_inversion.py` (``..\..\examples\02_probabilistic_modeling\04_gravity_inversion.py``)
+     - 00:00.002
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_05_magnetics_inversion.py` (``..\..\examples\02_probabilistic_modeling\05_magnetics_inversion.py``)
+     - 00:00.002
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_03_error_propagation_dips.py` (``..\..\examples\02_probabilistic_modeling\03_error_propagation_dips.py``)
+     - 00:00.002
+     - 0.0
+   * - :ref:`sphx_glr_examples_basic_02_complex_tharsis_model.py` (``..\..\examples\01_basic_examples\02_complex_tharsis_model.py``)
      - 00:00.000
      - 0.0
-   * - :ref:`sphx_glr_examples_basic_02_gravity_forward_model.py` (``../../examples/01_basic_examples/02_gravity_forward_model.py``)
-     - 00:00.000
-     - 0.0
-   * - :ref:`sphx_glr_examples_basic_03_bayesian_segmentation.py` (``../../examples/01_basic_examples/03_bayesian_segmentation.py``)
-     - 00:00.000
-     - 0.0
-   * - :ref:`sphx_glr_examples_probabilistic_03_error_propagation_dips.py` (``../../examples/02_probabilistic_modeling/03_error_propagation_dips.py``)
+   * - :ref:`sphx_glr_examples_basic_04_bayesian_segmentation.py` (``..\..\examples\01_basic_examples\04_bayesian_segmentation.py``)
      - 00:00.000
      - 0.0

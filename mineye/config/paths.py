@@ -152,6 +152,60 @@ def get_points_path_complex(base_dir=None):
     return os.path.join(tmp_dir, 'points_mod.csv')
 
 
+def get_orientations_path_sed_complex(base_dir=None):
+    """Get path to the modified orientations CSV file.
+
+    Args:
+        base_dir: Optional base directory (for compatibility). If None, uses get_tmp_dir().
+    """
+    if base_dir is not None:
+        # Legacy compatibility: base_dir points to project root
+        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Complex-Models')
+    else:
+        tmp_dir = get_complex_dir()
+    return os.path.join(tmp_dir, 'orientation_large.csv')
+
+
+def get_points_path_sed_complex(base_dir=None):
+    """Get path to the modified points CSV file.
+
+    Args:
+        base_dir: Optional base directory (for compatibility). If None, uses get_tmp_dir().
+    """
+    if base_dir is not None:
+        # Legacy compatibility: base_dir points to project root
+        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Complex-Models')
+    else:
+        tmp_dir = get_complex_dir()
+    return os.path.join(tmp_dir, 'points_large.csv')
+
+def get_orientations_path_magmatic_complex(base_dir=None):
+    """Get path to the modified orientations CSV file.
+
+    Args:
+        base_dir: Optional base directory (for compatibility). If None, uses get_tmp_dir().
+    """
+    if base_dir is not None:
+        # Legacy compatibility: base_dir points to project root
+        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Complex-Models')
+    else:
+        tmp_dir = get_complex_dir()
+    return os.path.join(tmp_dir, 'orientation_plutonics.csv')
+
+
+def get_points_path_magmatic_complex(base_dir=None):
+    """Get path to the modified points CSV file.
+
+    Args:
+        base_dir: Optional base directory (for compatibility). If None, uses get_tmp_dir().
+    """
+    if base_dir is not None:
+        # Legacy compatibility: base_dir points to project root
+        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Complex-Models')
+    else:
+        tmp_dir = get_complex_dir()
+    return os.path.join(tmp_dir, 'points_plutonics.csv')
+
 def get_gravity_data_path():
     """Get path to the cleaned gravity data GeoJSON file."""
     geophysical_dir = get_geophysical_dir()
