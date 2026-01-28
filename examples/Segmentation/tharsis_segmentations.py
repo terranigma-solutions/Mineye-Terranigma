@@ -1,6 +1,9 @@
 # Import the run_workflow function from full_workflow
+import os
 from mineye.BayesianSegmentation.full_workflow import run_workflow
 
+# %% Output directory
+output_dir = "examples/Data/Segmentation_Input_Data/Segmentation_Output_Data"
 
 # %%  20m resolution
 bands = {
@@ -43,7 +46,7 @@ run_workflow(
     save_npy=False,
     plot_tci=True,
     ref_band="B4",
-    output_prefix="ROI1",
+    output_prefix=os.path.join(output_dir, "ROI1"),
 )
 
 # %% Tharsis ROI 2 configuration
@@ -64,7 +67,7 @@ run_workflow(
     save_npy=False,
     plot_tci=True,
     ref_band="B4",
-    output_prefix="ROI2",
+    output_prefix=os.path.join(output_dir, "ROI2"),
 )
 
 # %% Tharsis ROI 3 configuration
@@ -85,7 +88,7 @@ run_workflow(
     save_npy=False,
     plot_tci=True,
     ref_band="B4",
-    output_prefix="ROI3",
+    output_prefix=os.path.join(output_dir, "ROI3"),
 )
 
 # %% Tharsis ROI 4 configuration
@@ -106,7 +109,7 @@ run_workflow(
     save_npy=False,
     plot_tci=True,
     ref_band="B4",
-    output_prefix="ROI4",
+    output_prefix=os.path.join(output_dir, "ROI4"),
 )
 
 # %% Tharsis ROI 5 configuration
@@ -129,5 +132,5 @@ run_workflow(
     save_npy=False,
     plot_tci=True,
     ref_band="B4",
-    output_prefix="ROI5",
+    output_prefix=os.path.join(output_dir, "ROI5"),
 )
