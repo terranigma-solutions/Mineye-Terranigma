@@ -183,7 +183,7 @@ def run_workflow(bands: dict,
                  save_npy: bool = True,
                  plot_tci: bool = True,
                  ref_band: str = None,
-                 output_prefix: str = "segmentation",
+                 output_prefix: str = None,
                  stencil: str | None = "4p"):
     """
     Generalized segmentation workflow.
@@ -199,9 +199,19 @@ def run_workflow(bands: dict,
         save_npy: whether to save intermediate input and results as .npy files.
         plot_tci: whether to plot TCI if available in bands.
         ref_band: band name to use as georeferencing reference; if None, use 'B4' if present, else first band.
-        output_prefix: prefix for output files (GeoTIFF and NPY outputs).
+        output_prefix: prefix for output files (GeoTIFF and NPY outputs). If None, defaults to 'segmentation' in the standard output directory.
         stencil: neighborhood stencil for BaySeg ('4p' or '8p'). Default '4p' avoids NumPy ragged-array issues in older bayseg.
     """
+    # 0. Output directory handling
+    output_dir = "examples/Data/Segmentation_Input_Data/Segmentation_Output_Data"
+    if output_prefix is None:
+        output_prefix = os.path.join(output_dir, "segmentation")
+    elif not os.path.isabs(output_prefix) and "/" not in output_prefix:
+        # If it's just a filename prefix, put it in the output_dir
+        output_prefix = os.path.join(output_dir, output_prefix)
+
+    os.makedirs(output_dir, exist_ok=True)
+
     # Choose a reference band for metadata/geotransform
     band_keys = [k for k in bands.keys() if k not in ("TCI", "SCL")]
     if not band_keys:
