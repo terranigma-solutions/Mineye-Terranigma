@@ -17,7 +17,7 @@ import sys
 sys.path.append('/Users/simonvirgo/PycharmProjects/Mineye-Terranigma/bayseg')
 
 from bayseg.bayseg import BaySeg
-from examples.Segmentation.full_workflow import crop_to_bounds, apply_soil_mask
+from mineye.BayesianSegmentation.Sentinel2_full_workflow import crop_to_bounds, apply_soil_mask
 
 
 import numpy as np  # scientific computing library
