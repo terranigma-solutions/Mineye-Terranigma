@@ -45,7 +45,7 @@ n_classes: int = 8
 iterations: int = 400
 beta_init: float = 30.0
 beta_jump: float = 0.1
-output_prefix: str = "examples/Data/Segmentation_Input_Data/Segmentation_Output_Data/EnMap"  # output prefix for results
+output_prefix: str = "examples/Data/Segmentation_Output_Data/EnMap"  # output prefix for results
 save_npy: bool = True  # save intermediate arrays from full_workflow
 
 # Detrending / background-field removal (recommended for the current EnMAP dataset)

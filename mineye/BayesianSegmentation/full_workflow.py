@@ -203,7 +203,7 @@ def run_workflow(bands: dict,
         stencil: neighborhood stencil for BaySeg ('4p' or '8p'). Default '4p' avoids NumPy ragged-array issues in older bayseg.
     """
     # 0. Output directory handling
-    output_dir = "examples/Data/Segmentation_Input_Data/Segmentation_Output_Data"
+    output_dir = "examples/Data/Segmentation_Output_Data"
     if output_prefix is None:
         output_prefix = os.path.join(output_dir, "segmentation")
     elif not os.path.isabs(output_prefix) and "/" not in output_prefix:

@@ -1527,9 +1527,9 @@ def save_detrended_swir_column_median_plot(
         Path to the written PNG.
     """
     if out_prefix is None:
-        out_prefix = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", "EnMap_Segmentation")
+        out_prefix = os.path.join("examples/Data/Segmentation_Output_Data", "EnMap_Segmentation")
     elif not os.path.isabs(out_prefix) and "/" not in out_prefix:
-        out_prefix = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", out_prefix)
+        out_prefix = os.path.join("examples/Data/Segmentation_Output_Data", out_prefix)
 
     files = os.listdir(enmap_folder)
 
@@ -1636,9 +1636,9 @@ def plot_feature_quicklooks(
     - A small mixed overview (up to `max_panels` layers across all keys) for convenience.
     """
     if out_prefix is None:
-        out_prefix = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", "EnMap_Segmentation")
+        out_prefix = os.path.join("examples/Data/Segmentation_Output_Data", "EnMap_Segmentation")
     elif not os.path.isabs(out_prefix) and "/" not in out_prefix:
-        out_prefix = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", out_prefix)
+        out_prefix = os.path.join("examples/Data/Segmentation_Output_Data", out_prefix)
 
     os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
 
@@ -1755,9 +1755,9 @@ def plot_feature_histograms(
 ):
     """Save a histogram for each Depth_* layer."""
     if out_prefix is None:
-        out_prefix = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", "EnMap_Segmentation")
+        out_prefix = os.path.join("examples/Data/Segmentation_Output_Data", "EnMap_Segmentation")
     elif not os.path.isabs(out_prefix) and "/" not in out_prefix:
-        out_prefix = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", out_prefix)
+        out_prefix = os.path.join("examples/Data/Segmentation_Output_Data", out_prefix)
     
     os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
 
@@ -1891,9 +1891,9 @@ def write_features_to_files(features: Dict[str, np.ndarray], meta: dict, out_pre
     falls back to GeoTIFF. Preserves CRS/transform and writes float32.
     """
     if out_prefix is None:
-        out_prefix = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", "EnMap_Segmentation")
+        out_prefix = os.path.join("examples/Data/Segmentation_Output_Data", "EnMap_Segmentation")
     elif not os.path.isabs(out_prefix) and "/" not in out_prefix:
-        out_prefix = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", out_prefix)
+        out_prefix = os.path.join("examples/Data/Segmentation_Output_Data", out_prefix)
     
     os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
 
@@ -2018,9 +2018,9 @@ def run_enmap_segmentation_workflow(
     from mineye.BayesianSegmentation.full_workflow import run_workflow
 
     if output_prefix is None:
-        output_prefix = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", "EnMap_Segmentation")
+        output_prefix = os.path.join("examples/Data/Segmentation_Output_Data", "EnMap_Segmentation")
     elif not os.path.isabs(output_prefix) and "/" not in output_prefix:
-        output_prefix = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", output_prefix)
+        output_prefix = os.path.join("examples/Data/Segmentation_Output_Data", output_prefix)
 
     if not enmap_folder or not os.path.isdir(enmap_folder):
         raise FileNotFoundError(
@@ -2167,7 +2167,7 @@ def save_enmap_band_plots(folder_path, apply_mask=True, pmin=2.0, pmax=98.0, vmi
 
     # Prepare output directory
     dataset_name = os.path.basename(os.path.abspath(folder_path)) or "dataset"
-    out_dir = os.path.join("examples/Data/Segmentation_Input_Data/Segmentation_Output_Data", "intermediate_Data", f"plots_{dataset_name}")
+    out_dir = os.path.join("examples/Data/Segmentation_Output_Data", "intermediate_Data", f"plots_{dataset_name}")
     os.makedirs(out_dir, exist_ok=True)
     print(f"[EnMap] Saving per-band plots to: {out_dir}")
 

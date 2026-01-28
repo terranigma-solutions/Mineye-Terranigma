@@ -1396,7 +1396,7 @@ def create_comparison_plots(results: Dict):
         ax4.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
     
     plt.tight_layout()
-    output_path = "examples/Data/Segmentation_Input_Data/Segmentation_Output_Data/performance_comparison.png"
+    output_path = "examples/Data/Segmentation_Output_Data/performance_comparison.png"
     plt.savefig(output_path, 
                 dpi=300, bbox_inches='tight')
     print(f"Comparison plots saved to: {output_path}")
