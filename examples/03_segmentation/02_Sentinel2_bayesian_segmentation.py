@@ -14,14 +14,14 @@ using the BaySeg algorithm for geological mapping.
 
 **Workflow:**
 
-1. Load preprocessed Sentinel-2 bands
+1. Load Sentinel-2 bands and crop to ROI
 2. Initialize BaySeg segmenter
 3. Run Bayesian segmentation
 4. Visualize results and diagnostics
 5. Analyze class distributions
 
 .. note::
-   This example requires preprocessed Sentinel-2 data and the bayseg package.
+   This example requires Sentinel-2 data and the bayseg package.
 """
 
 # %%
@@ -32,6 +32,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import time
+import os
 
 try:
     from bayseg import BaySeg
@@ -41,31 +42,52 @@ except ImportError:
     print("⚠ BaySeg package not installed")
     print("Install with: pip install bayseg")
 
-# %%
-# Load Preprocessed Data
-# ----------------------
-# Load the stacked Sentinel-2 bands
-
 try:
-    layers = np.load("sentinel2_bayseg_input.npy")
-    DATA_AVAILABLE = True
-    print(f"✓ Loaded satellite data")
-    print(f"  Shape: {layers.shape}")
-    print(f"  (rows, cols, bands): {layers.shape}")
-except FileNotFoundError:
-    DATA_AVAILABLE = False
-    print("⚠ Data file not found: sentinel2_bayseg_input.npy")
-    print("  Run prepare_data.py first to create input data")
+    from mineye.BayesianSegmentation.full_workflow import run_workflow
+    WORKFLOW_AVAILABLE = True
+except ImportError:
+    WORKFLOW_AVAILABLE = False
+    print("⚠ mineye package not correctly installed or full_workflow not found")
 
 # %%
 # Configuration
 # -------------
-# Set segmentation parameters
+# Set segmentation parameters and data paths
 
-n_classes = 6  # Number of lithological classes
-beta_init = 10.0  # Initial spatial smoothness parameter
-n_iterations = 200  # Number of MCMC iterations
-beta_jump_length = 0.1  # Step size for beta updates
+# Robust path handling: determine project root
+try:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    script_dir = os.getcwd()
+
+# If we are in 'examples/03_segmentation', project root is 2 levels up
+if 'examples/03_segmentation' in script_dir:
+    project_root = os.path.abspath(os.path.join(script_dir, "../../"))
+else:
+    project_root = os.getcwd()
+
+# Data paths for Sentinel-2 bands
+data_subdir = "examples/Data/Segmentation_Input_Data/Sentinel2/Tharsis_all_Sentinel2 /combined/20m"
+bands = {
+    "B4": os.path.join(project_root, data_subdir, "merged_B04_20m.jp2"),
+    "B6": os.path.join(project_root, data_subdir, "merged_B06_20m.jp2"),
+    "B7": os.path.join(project_root, data_subdir, "merged_B07_20m.jp2"),
+    "B8A": os.path.join(project_root, data_subdir, "merged_B8A_20m.jp2"),
+    "B11": os.path.join(project_root, data_subdir, "merged_B11_20m.jp2"),
+    "B12": os.path.join(project_root, data_subdir, "merged_B12_20m.jp2"),
+    "TCI": os.path.join(project_root, data_subdir, "merged_TCI_20m.jp2"),
+    "SCL": os.path.join(project_root, data_subdir, "merged_SCL_20m.jp2"),
+}
+
+# ROI and segmentation parameters
+bounds = (204498, 4170995, 227828, 4187076)
+n_classes = 6
+beta_init = 30.0
+n_iterations = 10 #using only a few steps for demonstration. in a real scenario 400 should be enough
+beta_jump_length = 0.1
+
+output_dir = os.path.join(project_root, "examples/Data/Segmentation_Output_Data")
+os.makedirs(output_dir, exist_ok=True)
 
 print(f"Segmentation configuration:")
 print(f"  Classes: {n_classes}")
@@ -73,39 +95,48 @@ print(f"  Beta (spatial smoothness): {beta_init}")
 print(f"  Iterations: {n_iterations}")
 
 # %%
-# Initialize Bayesian Segmenter
-# -----------------------------
+# Run Full Workflow
+# -----------------
+# This will load, crop, mask, and segment the data
 
-if DATA_AVAILABLE and BAYSEG_AVAILABLE:
-    print("\nInitializing BaySeg...")
-    start_time = time.time()
+if WORKFLOW_AVAILABLE and BAYSEG_AVAILABLE:
+    print("\nRunning Bayesian Segmentation workflow...")
 
-    seg = BaySeg(
-        data=layers,
-        n_labels=n_classes,
-        beta_init=beta_init
+    # We use run_workflow which handles data loading, cropping, soil masking, and running BaySeg
+    # It also saves the results and generates diagnostic plots.
+    run_workflow(
+        bands=bands,
+        bounds=bounds,
+        n_classes=n_classes,
+        beta_init=beta_init,
+        n_iterations=n_iterations,
+        beta_jump_length=beta_jump_length,
+        use_soil_mask=True,
+        save_npy=True,
+        plot_tci=True,
+        ref_band="B4",
+        output_prefix=os.path.join(output_dir, "Sentinel2_BaySeg"),
     )
 
-    print(f"✓ Segmenter initialized ({time.time() - start_time:.2f}s)")
+    # Load the results for further visualization in this script if desired
+    # though run_workflow already generates some plots and saves results.
+    # We construct the filename the same way run_workflow does.
+    result_filename = f"Sentinel2_BaySeg_labels_n{n_classes}_betajump{beta_jump_length}.npy"
+    result_path = os.path.join(output_dir, result_filename)
 
-# %%
-# Run Segmentation
-# ----------------
-# Perform Bayesian segmentation using MCMC
-
-if DATA_AVAILABLE and BAYSEG_AVAILABLE:
-    print(f"\nRunning segmentation ({n_iterations} iterations)...")
-    start_time = time.time()
-
-    labels = seg.fit(n=n_iterations, beta_jump_length=beta_jump_length)
-
-    elapsed = time.time() - start_time
-    print(f"✓ Segmentation complete ({elapsed:.2f}s)")
-    print(f"  Speed: {elapsed/n_iterations*1000:.1f} ms/iteration")
-
-    # Save results
-    np.save("bayseg_lithology_labels.npy", labels)
-    print("✓ Results saved to bayseg_lithology_labels.npy")
+    try:
+        labels = np.load(result_path)
+        DATA_AVAILABLE = True
+        print(f"✓ Loaded segmentation results from {result_path}")
+    except FileNotFoundError:
+        DATA_AVAILABLE = False
+        print(f"⚠ Segmentation results not found at {result_path}")
+else:
+    DATA_AVAILABLE = False
+    if not WORKFLOW_AVAILABLE:
+        print("⚠ Workflow not available.")
+    if not BAYSEG_AVAILABLE:
+        print("⚠ BaySeg not available.")
 
 # %%
 # Visualize Segmentation Results
@@ -133,16 +164,10 @@ if DATA_AVAILABLE and BAYSEG_AVAILABLE:
 # %%
 # Diagnostic Plots
 # ----------------
-# Show MCMC convergence diagnostics
-
-if DATA_AVAILABLE and BAYSEG_AVAILABLE:
-    # Plot log-likelihood evolution
-    seg.diagnostics_plot(transpose=False)
-
-    # Plot acceptance ratios for MCMC proposals
-    seg.plot_acc_ratios()
-
-    print("\n✓ Diagnostic plots generated")
+#
+# .. note::
+#    Diagnostic plots (log-likelihood evolution and acceptance ratios)
+#    are generated automatically by the ``run_workflow`` function.
 
 # %%
 # Class Distribution Analysis
