@@ -71,6 +71,26 @@ and Bayesian inversion techniques for geological and geophysical applications.
 
 ----
 
+.. _segmentation-examples:
+
+Satellite Image Segmentation
+============================
+
+Advanced workflows for lithological mapping and Bayesian classification of
+satellite imagery (EnMap, Sentinel-2).
+
+.. include:: examples_segmentation/index.rst
+   :start-after: .. thumbnail-parent-div-open
+   :end-before: .. thumbnail-parent-div-close
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+
+   examples_segmentation/index
+
+----
+
 API Reference
 =============
 
