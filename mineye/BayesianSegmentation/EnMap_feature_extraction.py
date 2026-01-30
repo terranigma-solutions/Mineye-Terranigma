@@ -12,8 +12,6 @@ except Exception:  # pragma: no cover
 from scipy.signal import savgol_filter
 from scipy.ndimage import gaussian_filter, median_filter, zoom, binary_erosion
 import xml.etree.ElementTree as ET
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 def _edge_buffer_mask(shape: tuple[int, int], edge_px: int = 0) -> np.ndarray:
@@ -1625,6 +1623,7 @@ def plot_feature_quicklooks(
         out_prefix: str = None,
         max_panels: int = 9,
         panels_per_page: int = 12,
+        show: bool = False,
 ):
     """Create quicklook plots of feature layers for QA.
 
@@ -1634,6 +1633,8 @@ def plot_feature_quicklooks(
     - If `MNF_01..MNF_03` exist, an RGB composite is saved.
     - Grouped quicklook pages for *all* `MNF_*`, `Depth_*`, and `Deriv_*` layers.
     - A small mixed overview (up to `max_panels` layers across all keys) for convenience.
+
+    If `show` is True, plt.show() is called for each plot.
     """
     if out_prefix is None:
         out_prefix = os.path.join("examples/Data/Segmentation_Output_Data", "EnMap_Segmentation")
@@ -1662,13 +1663,13 @@ def plot_feature_quicklooks(
                 pass
         return np.asarray(val)
 
-    def _plot_tiles(keys: List[str], out_path: str, title: str | None = None):
+    def _plot_tiles(keys: List[str], out_path: str, title: str | None = None, force_show: bool = False):
         if not keys:
             return
         n = len(keys)
         cols = min(3, n)
         rows = int(np.ceil(n / cols))
-        plt.figure(figsize=(4 * cols, 4 * rows))
+        fig = plt.figure(figsize=(4 * cols, 4 * rows))
         for i, k in enumerate(keys, 1):
             plt.subplot(rows, cols, i)
             arr = as_array(features[k])
@@ -1688,7 +1689,12 @@ def plot_feature_quicklooks(
             plt.suptitle(title)
         plt.tight_layout()
         plt.savefig(out_path, dpi=200)
-        plt.close()
+        
+        # Only keep the figure open if force_show is True (used for the overview)
+        if not force_show:
+            plt.close(fig)
+        elif show:
+            plt.show()
 
     def _plot_group_all(prefix: str, label: str):
         group_keys = sorted([k for k in features.keys() if k.startswith(prefix)])
@@ -1707,6 +1713,7 @@ def plot_feature_quicklooks(
                 chunk,
                 out_path=f"{out_prefix}_{label}_quicklooks{suffix}.png",
                 title=f"{label} quicklooks ({start + 1}–{end} / {len(group_keys)})",
+                force_show=False # Always close group plots
             )
 
     # 1) RGB composite from first three MNF components (if present)
@@ -1716,26 +1723,26 @@ def plot_feature_quicklooks(
         g = _percentile_scale(as_array(features["MNF_02"]))
         b = _percentile_scale(as_array(features["MNF_03"]))
         rgb = np.dstack([r, g, b])
-        plt.figure(figsize=(6, 6))
+        fig_rgb = plt.figure(figsize=(6, 6))
         plt.imshow(rgb)
         plt.title("RGB composite: MNF_01, MNF_02, MNF_03")
         plt.axis("off")
         plt.tight_layout()
         plt.savefig(f"{out_prefix}_MNF_RGB.png", dpi=200)
-        plt.close()
+        plt.close(fig_rgb) # Always close RGB composite
     elif len(mnf_keys) >= 3:
         # Fallback: use the first 3 MNF_* keys if naming differs.
         r = _percentile_scale(as_array(features[mnf_keys[0]]))
         g = _percentile_scale(as_array(features[mnf_keys[1]]))
         b = _percentile_scale(as_array(features[mnf_keys[2]]))
         rgb = np.dstack([r, g, b])
-        plt.figure(figsize=(6, 6))
+        fig_rgb = plt.figure(figsize=(6, 6))
         plt.imshow(rgb)
         plt.title(f"RGB composite: {mnf_keys[0]}, {mnf_keys[1]}, {mnf_keys[2]}")
         plt.axis("off")
         plt.tight_layout()
         plt.savefig(f"{out_prefix}_MNF_RGB.png", dpi=200)
-        plt.close()
+        plt.close(fig_rgb) # Always close RGB composite
 
     # 2) Grouped quicklooks for all layers of interest
     _plot_group_all("Depth_", "Depth")
@@ -1746,7 +1753,12 @@ def plot_feature_quicklooks(
     keys = sorted(list(features.keys()))
     sel = keys[: int(max_panels) if max_panels is not None else len(keys)]
     if sel:
-        _plot_tiles(sel, out_path=f"{out_prefix}_feature_quicklooks.png", title="Feature overview")
+        _plot_tiles(
+            sel, 
+            out_path=f"{out_prefix}_feature_quicklooks.png", 
+            title="Feature overview",
+            force_show=True # Keep this one open if show=True
+        )
 
 
 def plot_feature_histograms(
