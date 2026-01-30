@@ -22,11 +22,22 @@ import os
 import sys
 import warnings
 
+# Add project root to sys.path so we can import mineye without installing it
+sys.path.insert(0, os.path.abspath('../../'))
+
+# Add external dependencies paths
+sys.path.insert(0, os.path.abspath('/Users/simonvirgo/PycharmProjects/bayseg'))
+
 import dotenv
 import pyvista
 from sphinx_gallery.sorting import FileNameSortKey
 
 dotenv.load_dotenv()
+
+# Data Paths Configuration
+# These can be overridden by environment variables
+ENMAP_DATA_ROOT = os.getenv('ENMAP_DATA_ROOT', os.path.abspath('../../examples/Data/Segmentation_Input_Data/Enmap'))
+SEGMENTATION_OUTPUT_ROOT = os.getenv('SEGMENTATION_OUTPUT_ROOT', os.path.abspath('../../examples/Data/Segmentation_Output_Data'))
 
 # Try to import mineye for version info
 try:
@@ -152,11 +163,13 @@ sphinx_gallery_conf = {
         "examples_dirs"          : [
                 "../../examples/01_basic_examples",
                 "../../examples/02_probabilistic_modeling",
+                "../../examples/03_segmentation",
         ],
         # path where to save gallery generated examples
         "gallery_dirs"           : [
                 "examples_basic",
                 "examples_probabilistic",
+                "examples_segmentation",
         ],
 
         'ignore_pattern': r'__init__\.py',
