@@ -4,8 +4,9 @@
 SHELL        := /usr/bin/env bash
 
 # CONFIG
-VENV         := $(HOME)/.venv/2025
-PYTHON       := $(VENV)/bin/python
+# If VENV is not set, try to use the active virtual environment or just 'python'
+VENV         ?= $(shell which python | sed 's/\/bin\/python//')
+PYTHON       := $(shell if [ -x "$(VENV)/bin/python" ]; then echo "$(VENV)/bin/python"; else echo "python"; fi)
 SPHINXBUILD  := $(PYTHON) -m sphinx       # ← module form guarantees venv python
 SPHINXOPTS   :=
 SPHINXPROJ   := mineye-terranigma
@@ -15,21 +16,14 @@ BUILDDIR     := build
 # Sanity check: print which Python will be used (helpful in logs)
 .PHONY: which-python
 which-python:
-	@echo "Using Python: $$($(PYTHON) -c 'import sys; print(sys.executable)')"
+	@echo "Using Python: $(PYTHON)"
+	@$(PYTHON) --version
 
-# Optional venv check (won't block build; we force the venv via $(PYTHON) anyway)
+# Optional venv check
 .PHONY: check-venv
 check-venv:
 ifndef SKIP_VENV_CHECK
-	@cur="$${VIRTUAL_ENV:-}"; exp="$$(readlink -f $(VENV))"; \
-	if [[ "$$cur" != "$$exp" ]]; then \
-		echo ""; \
-		echo "ℹ️  Not in expected venv. That's okay — this Makefile will still use:"; \
-		echo "    $(VENV)/bin/python"; \
-		echo "Current: $$cur"; \
-		echo "Expected: $$exp"; \
-		echo ""; \
-	fi
+	@echo "ℹ️  Using Python from: $(PYTHON)"
 endif
 
 # Put it first so that "make" without argument is like "make help".
