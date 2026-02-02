@@ -71,18 +71,18 @@ The forward model f involves:
 
 
 """
-
+import os
 
 # %%
 # Import Libraries
 # ----------------
 
 import dotenv
+
 dotenv.load_dotenv()
 
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward, generate_gravity_uncertainty_plots
-
 
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 
@@ -117,7 +117,7 @@ from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_m
 # Define Model Extent and Resolution
 # -----------------------------------
 
-min_x = -709521
+min_x = -707_521
 max_x = -675558
 min_y = 4526832
 max_y = 4551949
@@ -368,8 +368,8 @@ model_priors = {
         ).to_event(1),
         prior_key_densities: dist.Normal(
             loc=(torch.tensor([
-                    2.9,  # plutonites
-                    2.3  # host
+                    2.9 - 2.67,  # plutonites
+                    2.3 - 2.67  # host
             ])),
             scale=torch.tensor(0.15),
         ).to_event(1)
@@ -718,7 +718,6 @@ print("    - Forward model: GemPy geological interpolation + gravity")
 print("    - Likelihood: Hierarchical per-station noise")
 print("    - Deterministics: gravity_response, mean_gravity, max_gravity")
 
-
 # %%
 # Step 9: Prior Predictive Checks
 # --------------------------------
@@ -915,7 +914,7 @@ print("  Warmup: 200 steps")
 print("  Sampling: 200 samples")
 print("  Chains: 1")
 
-RUN_SIMULATION = False
+RUN_SIMULATION = True
 if RUN_SIMULATION:
     data = gpp.run_nuts_inference(
         prob_model=prob_model,
@@ -937,16 +936,18 @@ if RUN_SIMULATION:
 
     print("✓ NUTS inference complete")
 
-# Combine Prior and Posterior
-# ----------------------------
-#
-# For comparison and diagnostics, we store both prior and posterior in the same
-# ArviZ InferenceData object. This allows us to visualize how our beliefs changed
-# after seeing the data.
+    # Combine Prior and Posterior
+    # ----------------------------
+    #
+    # For comparison and diagnostics, we store both prior and posterior in the same
+    # ArviZ InferenceData object. This allows us to visualize how our beliefs changed
+    # after seeing the data.
 
     data.extend(prior_inference_data)
     print("✓ Prior and posterior combined")
-    
+
+    data.to_netcdf(os.path.join(os.path.dirname(__file__), "New Grav"))
+
 else:
 
     from pathlib import Path
@@ -964,7 +965,7 @@ else:
 
     # Read the data file
     data = az.from_netcdf(str(data_path))
-    
+
 # %%
 # Analysis: Parameter Posterior Statistics
 # -----------------------------------------
@@ -1086,7 +1087,6 @@ plot_many_observed_vs_forward(
     many_forward_norm=data.posterior_predictive[r'gravity_response'].values[0, -20:],
     observed_norm=observed_gravity_ugal
 )
-
 
 # %%
 az.plot_density(

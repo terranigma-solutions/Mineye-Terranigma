@@ -40,7 +40,7 @@ class TestProbabilisticInversion:
             )
 
     def test_gravity_inversion(self, simple_geo_model, geophysical_dir, n_samples=50,
-                               arviz_data_filename="arviz_data_Nov10_I_hierarchical.nc"):
+                               arviz_data_filename="arviz_data_Feb2_I_hierarchical.nc"):
         """Test reading and computing a geological model."""
         print("Test gravity inversion...")
         # Use actual gravity measurement device locations
@@ -74,7 +74,7 @@ class TestProbabilisticInversion:
                 # warmup_steps=5,
                 num_samples=200,
                 warmup_steps=200,
-                num_chains=1
+                # num_chains=1
             ),
             plot_trace=True,
             run_posterior_predictive=True
@@ -109,8 +109,8 @@ class TestProbabilisticInversion:
                 ),
                 TestProbabilisticInversion.prior_key_density: dist.Normal(
                     loc=(torch.tensor([
-                            2.9,  # plutonites
-                            2.3  # host
+                            2.9 - 2.67,  # plutonites
+                            2.3 - 2.67 # host
                     ])),
                     scale=torch.tensor(0.15),
                 ).to_event(1)
@@ -132,12 +132,12 @@ class TestProbabilisticInversion:
         )
 
         # * 6) Set up Pyro model
-        prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
+        prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
             priors=model_priors,
             set_interp_input_fn=set_priors,
             likelihood_fn=likelihood_fn,
-            pre_forward_deterministics={},
-            post_forward_deterministics=post_forward_dets,
+            # pre_forward_deterministics={},
+            # post_forward_deterministics=post_forward_dets,
             obs_name="Gravity Measurement"
         )
         return geo_model, observed_gravity_ugal, prob_model
