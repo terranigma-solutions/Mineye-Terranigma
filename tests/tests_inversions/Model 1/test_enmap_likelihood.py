@@ -44,7 +44,7 @@ def test_simple_model_with_topography(simple_geo_model, topography_dir):
     gpv.plot_2d(model=simple_geo_model, section_names=['topography'], show_topography=True)
 
 
-def test_read_EnMap(base_dir, model_extent):
+def test_read_EnMap(base_dir, model_extent, simple_geo_model):
     """Test reading EnMap files and plotting them.
 
     This test reads the EnMap segmentation results (which are at the same
@@ -58,7 +58,7 @@ def test_read_EnMap(base_dir, model_extent):
 
     # Available EnMap files (segmentation results)
     enmap_files = {
-            'result_n4' : os.path.join(enmap_dir, 'EnMap_result_n4_betajump0.1.tif'),
+            'result_n4' : os.path.join(enmap_dir, 'EPSG3857_EnMap_result_n4_betajump0.1.tif'),
             'result_n6' : os.path.join(enmap_dir, 'EnMap_result_n6_betajump0.1.tif'),
             'result_n8' : os.path.join(enmap_dir, 'EnMap_result_n8_betajump0.1.tif'),
             'entropy_n4': os.path.join(enmap_dir, 'EnMap_entropy_n4_betajump0.1.tif'),
@@ -125,6 +125,10 @@ def test_read_EnMap(base_dir, model_extent):
         axes[0].set_xlabel('X (m)', fontsize=10)
         axes[0].set_ylabel('Y (m)', fontsize=10)
         axes[0].grid(True, alpha=0.3)
+        axes[0].scatter(
+            simple_geo_model.surface_points_copy.xyz[:, 0],
+            simple_geo_model.surface_points_copy.xyz[:, 1], c='red', s=10,
+            zorder=5, label='Model Surface Points', edgecolors='black', linewidth=0.5)
 
         # Plot 2: Histogram
         valid_data = data[~np.isnan(data)]
