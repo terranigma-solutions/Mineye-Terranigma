@@ -400,3 +400,49 @@ def plot_gravity_comparison(xy_ravel, observed_norm, forward_norm, residuals_nor
 
     return correlation
 
+
+def plot_model_and_gravity_sensors(simple_geo_model, xy_ravel, grav):
+    import pyvista as pv
+    p3d = gpv.plot_3d(
+        simple_geo_model,
+        ve=5,
+        image=False,
+        show=False,
+        show_boundaries=True,
+        show_lith=False,
+        show_octree=False,
+        kwargs_pyvista_bounds={
+                'show_xlabels': False,
+                'show_ylabels': False,
+                'show_zlabels': False
+        }
+    )
+
+    # Create a PolyData object from the detector coordinates
+    detectors_poly = pv.PolyData(xy_ravel)
+    detectors_poly.point_data['gravity'] = grav
+
+    # Define the inverted pyramid geometry (Cone with 4 faces)
+    # direction=(0, 0, -1) points the pyramid downwards (inverted)
+    # resolution=4 creates a square base (pyramid)
+    # center=(0, 0, 600) shifts the pyramid up so its tip is at the data point (offset = height/2)
+    # Adjust radius and height based on your scene scale (e.g., 600m radius, 1200m height)
+    pyramid_source = pv.Cone(
+        center=(0, 0, 0),
+        radius=600,
+        height=100,
+        direction=(0, 0, -1),
+        resolution=4
+    )
+
+    # Glyph the points with the pyramid source
+    # scale=False ensures all markers are the same size
+    glyphs = detectors_poly.glyph(geom=pyramid_source, scale=False, orient=False)
+
+    p3d.p.add_mesh(
+        glyphs,
+        scalars='gravity',
+        cmap='viridis_r',
+        name='gravity_observations'
+    )
+    p3d.p.show()
