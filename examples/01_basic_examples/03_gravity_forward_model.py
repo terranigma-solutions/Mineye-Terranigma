@@ -46,9 +46,6 @@ The Tharsis plutonite intrusion (density ~2.9 g/cm³) intruded into sedimentary 
 5. Compute forward gravity response
 6. Compare with observations and analyze residuals
 """
-import dotenv
-
-from mineye.GeoModel.helper_plotter import plot_model_and_gravity_sensors
 
 # %%
 # Import Libraries
@@ -70,8 +67,10 @@ from mineye.GeoModel.helper_plotter import plot_model_and_gravity_sensors
 # * ``align_forward_to_observed``: Aligns modeled gravity to observed data statistics
 # * ``normalize``: Data normalization and preprocessing functions
 
+import dotenv
 dotenv.load_dotenv()
 
+from mineye.GeoModel.helper_plotter import plot_model_and_gravity_sensors
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
@@ -94,7 +93,7 @@ from mineye.config import paths
 # -----------------------------------
 # The model covers the Tharsis mining district
 
-min_x = -709521
+min_x = -707_521  # * Cropping the corrupted area of the geotiff 
 max_x = -675558
 min_y = 4526832
 max_y = 4551949
@@ -198,7 +197,7 @@ print(f"Gravity range: {observed_gravity.min():.2f} to {observed_gravity.max():.
 xy_ravel = np.column_stack([
         np.array(gravity_data.geometry.x.values),
         np.array(gravity_data.geometry.y.values),
-        np.full(len(gravity_data), 0)  # Set Z to surface elevation
+        np.full(len(gravity_data), 505)  # Set Z to surface elevation
 ])
 
 print(f"Using {len(xy_ravel)} actual measurement points")
@@ -227,7 +226,7 @@ gp.set_centered_grid(
     grid=simple_geo_model.grid,
     centers=xy_ravel,
     resolution=np.array([10, 10, 15]),
-    radius=np.array([5000, 5000, 5000])
+    radius=np.array([2000, 5000, 2000])
 )
 
 # %%
@@ -285,8 +284,8 @@ print(f"Gravity gradient tensor shape: {gravity_gradient.shape}")
 #    Density uncertainties significantly impact modeling results. Typical uncertainties
 #    are ±0.05-0.10 g/cm³, which should be considered in probabilistic inversions.
 
-density_plutonites = 2.9  # g/cm³
-density_sedimentary_host = 2.3  # g/cm³
+density_plutonites = 2.9 - 2.67  # g/cm³
+density_sedimentary_host = 2.3 - 2.67 # g/cm³
 
 simple_geo_model.geophysics_input = gp.data.GeophysicsInput(
     tz=gravity_gradient,
