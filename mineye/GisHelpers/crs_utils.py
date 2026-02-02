@@ -35,7 +35,7 @@ from typing import Iterable, Tuple, Union
 
 import rasterio
 from rasterio.crs import CRS
-from rasterio.warp import transform_bounds
+from rasterio.warp import transform_bounds, calculate_default_transform, reproject, Resampling
 
 Bounds = Tuple[float, float, float, float]
 CRSType = Union[str, int, CRS]
@@ -152,3 +152,49 @@ def convert_bounds_to_dataset(
     if not hasattr(dataset, "crs") or dataset.crs is None:
         raise ValueError("Dataset has no CRS; cannot transform bounds.")
     return convert_bounds(bounds, src_crs=src_crs, dst_crs=dataset.crs, densify_pts=densify_pts, allow_invalid=allow_invalid)
+
+
+def reproject_geotiff(
+    src_path: str,
+    dst_path: str,
+    dst_crs: CRSType,
+    resampling: Resampling = Resampling.nearest,
+) -> None:
+    """Reproject a GeoTIFF file to a new coordinate reference system.
+
+    Parameters
+    ----------
+    src_path : str
+        Path to the source GeoTIFF file.
+    dst_path : str
+        Path where the reprojected GeoTIFF will be saved.
+    dst_crs : str | int | rasterio.crs.CRS
+        Destination CRS.
+    resampling : rasterio.warp.Resampling, default Resampling.nearest
+        Resampling method to use during reprojection.
+    """
+    dst_crs_obj = _crs_from_any(dst_crs)
+
+    with rasterio.open(src_path) as src:
+        transform, width, height = calculate_default_transform(
+            src.crs, dst_crs_obj, src.width, src.height, *src.bounds
+        )
+        kwargs = src.meta.copy()
+        kwargs.update({
+            'crs': dst_crs_obj,
+            'transform': transform,
+            'width': width,
+            'height': height
+        })
+
+        with rasterio.open(dst_path, 'w', **kwargs) as dst:
+            for i in range(1, src.count + 1):
+                reproject(
+                    source=rasterio.band(src, i),
+                    destination=rasterio.band(dst, i),
+                    src_transform=src.transform,
+                    src_crs=src.crs,
+                    dst_transform=transform,
+                    dst_crs=dst_crs_obj,
+                    resampling=resampling
+                )
