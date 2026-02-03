@@ -28,7 +28,7 @@ class TestProbabilisticInversion:
         geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
 
         # * 7) Run predictive
-        gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
+        gravity_observations_tensor = torch.tensor(observed_gravity_ugal, requires_grad=False)
         compute_prior_predictive = True
         if compute_prior_predictive:
             prior_inference_data: az.InferenceData = gpp.run_predictive(
@@ -47,7 +47,7 @@ class TestProbabilisticInversion:
         geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
 
         # * 7) Run predictive
-        gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
+        gravity_observations_tensor = torch.tensor(observed_gravity_ugal, requires_grad=False)
         compute_prior_predictive = True
         if compute_prior_predictive:
             prior_inference_data: az.InferenceData = gpp.run_predictive(
@@ -70,7 +70,7 @@ class TestProbabilisticInversion:
                 target_accept_prob=0.65,
                 max_tree_depth=5,
                 init_strategy='median',
-                # num_samples=20,
+                # num_samples=10,
                 # warmup_steps=5,
                 num_samples=200,
                 warmup_steps=200,
@@ -148,22 +148,22 @@ class TestProbabilisticInversion:
         check_mcmc_quality(data, verbose=True, plot=True)
 
     def test_run_predictive_analysis(self, simple_geo_model, geophysical_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
         # Prepare data
         observed_norm = observed_gravity_ugal
-        forward_norm = data.prior[r'gravity_response'].mean(axis=1)
+        forward_norm = data.prior[r'$\mu_{gravity}$'].mean(axis=1)
         if PRIOR := True:
-            many_forward_norm = data.prior[r'gravity_response'].values[0, -20:]
+            many_forward_norm = data.prior[r'$\mu_{gravity}$'].values[0, -20:]
         else:
-            many_forward_norm = data.posterior_predictive[r'gravity_response'].values[0, -40:-20]
+            many_forward_norm = data.posterior_predictive[r'$\mu_{gravity}$'].values[0, -40:-20]
 
         plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm)
 
     def test_run_kde_sections(self, simple_geo_model, geophysical_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
@@ -171,7 +171,7 @@ class TestProbabilisticInversion:
         gempy_viz(geo_model, data, n_samples=100)
 
     def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
 
         posterior_sigmas = data.posterior_predictive["sigma_stations"].values  # shape: (chains, samples, 20)
 
@@ -198,7 +198,7 @@ class TestProbabilisticInversion:
 
     def test_run_analysis(self, simple_geo_model, geophysical_dir):
 
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
         data.posterior
 
         az.plot_posterior(data, var_names=["dips", "density"])
@@ -223,21 +223,22 @@ class TestProbabilisticInversion:
         )
 
         plt.show()
-        plot_geophysics_comparison(forward_norm=data.prior[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
+        response = r'$\mu_{gravity}$' # r'gravity_response'
+        plot_geophysics_comparison(forward_norm=data.prior[response].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
-        plot_geophysics_comparison(forward_norm=data.posterior_predictive[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
+        plot_geophysics_comparison(forward_norm=data.posterior_predictive[response].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
         # * 9) Analysis inference
-        if hasattr(data, 'prior') and r'gravity_response' in data.prior:
+        if hasattr(data, 'prior') and response in data.prior:
             gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-                gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+                gravity_samples_norm=data.prior[response].values[0, :],  # (n_samples, n_devices)
                 observed_gravity_ugal=observed_gravity_ugal,
                 xy_ravel=xy_ravel
             )
 
-        if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
+        if hasattr(data, 'posterior') and response in data.prior:
             gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-                gravity_samples_norm=data.posterior_predictive[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+                gravity_samples_norm=data.posterior_predictive[response].values[0, :],  # (n_samples, n_devices)
                 observed_gravity_ugal=observed_gravity_ugal,
                 xy_ravel=xy_ravel
             )
