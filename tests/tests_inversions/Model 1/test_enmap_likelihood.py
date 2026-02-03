@@ -4,6 +4,7 @@ import time
 import numpy as np
 import pytest
 import rasterio
+from rasterio.windows import from_bounds
 from matplotlib import pyplot as plt
 
 import gempy as gp
@@ -120,7 +121,6 @@ def _extract_points_from_raster(raster_path, extent, step=10, z_value=None):
     """
     Private method to extract points from a raster within a given extent.
     """
-    from rasterio.windows import from_bounds
     
     with rasterio.open(raster_path) as src:
         left, right, bottom, top = extent[0], extent[1], extent[2], extent[3]
@@ -172,6 +172,154 @@ def _extract_points_from_raster(raster_path, extent, step=10, z_value=None):
         xyz = np.column_stack((xs, ys, zs))
         
         return xyz, labels_valid, data, (left, right, bottom, top)
+
+
+def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step_inner=20, kernel_size=5, z_value=None):
+    """
+    Extract points using a spatial kernel to identify boundaries and reduce points in homogeneous areas.
+    """
+    from skimage.segmentation import find_boundaries
+    from scipy import ndimage
+
+    with rasterio.open(raster_path) as src:
+        left, right, bottom, top = extent[0], extent[1], extent[2], extent[3]
+        window = from_bounds(left, bottom, right, top, src.transform)
+        
+        # Read the data within the window at full resolution
+        data = src.read(1, window=window)
+        transform = src.window_transform(window)
+        
+        # Clean data (handle NaNs and label mapping as in previous step)
+        # We need to fill NaNs for boundary detection, but we'll mask them out later
+        data_clean = data.copy()
+        mask_nan = np.isnan(data)
+        data_clean[mask_nan] = 255 # Temporary label for NaNs (uint8 safe)
+        
+        # Map labels (label 3 to 0, label 1 to be ignored)
+        # Note: We do this on the full resolution data to find boundaries correctly
+        data_mapped = data_clean.copy()
+        data_mapped[data_mapped == 3] = 0
+        
+        # Identify boundaries using a spatial kernel (find_boundaries uses a neighborhood check)
+        boundaries = find_boundaries(data_mapped, mode='thick')
+        
+        # Create a sampling mask
+        # 1. Sample boundary points at high frequency
+        boundary_mask = np.zeros_like(boundaries, dtype=bool)
+        boundary_mask[::step_boundary, ::step_boundary] = True
+        boundary_mask &= boundaries
+        
+        # 2. Sample inner points at low frequency
+        inner_mask = np.zeros_like(boundaries, dtype=bool)
+        inner_mask[::step_inner, ::step_inner] = True
+        inner_mask &= ~boundaries
+        
+        # Combine masks
+        sampling_mask = boundary_mask | inner_mask
+        
+        # Mask out NaNs and ignored labels (label 1)
+        sampling_mask &= ~mask_nan
+        sampling_mask &= (data_mapped != 1)
+        
+        # Get indices
+        ii, jj = np.where(sampling_mask)
+        labels_valid = data_mapped[ii, jj]
+        
+        # Get xy coordinates
+        xs, ys = rasterio.transform.xy(transform, ii.tolist(), jj.tolist())
+        xs = np.array(xs)
+        ys = np.array(ys)
+        
+        if z_value is None:
+            z_value = extent[5]
+        zs = np.full_like(xs, z_value)
+        
+        xyz = np.column_stack((xs, ys, zs))
+        
+        return xyz, labels_valid, data, (left, right, bottom, top)
+
+
+def test_spatial_correlation_reduction(base_dir, model_extent):
+    """
+    Test point reduction using spatial correlation (boundary detection).
+    """
+    enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
+
+    if not os.path.exists(enmap_path):
+        pytest.skip(f"EnMap file not found at {enmap_path}")
+
+    # 1. Standard extraction (for comparison)
+    step_standard = 10
+    xyz_std, labels_std, _, _ = _extract_points_from_raster(enmap_path, model_extent, step=step_standard)
+    
+    # 2. Spatially reduced extraction
+    # We want to keep boundaries dense but interior sparse
+    xyz_red, labels_red, data, bounds = _extract_points_spatially_reduced(
+        enmap_path, model_extent, step_boundary=50, step_inner=50
+    )
+    
+    print(f"\n📊 Reduction Comparison:")
+    print(f"   Standard (step={step_standard}): {len(xyz_std)} points")
+    print(f"   Spatially Reduced: {len(xyz_red)} points")
+    print(f"   Reduction factor: {len(xyz_std)/len(xyz_red):.2f}x")
+    
+    # 3. Visualization
+    fig, axes = plt.subplots(1, 2, figsize=(18, 8), sharex=True, sharey=True)
+    
+    # Standard plot
+    axes[0].imshow(data, extent=bounds, cmap='tab10', interpolation='nearest', alpha=0.3)
+    axes[0].scatter(xyz_std[:, 0], xyz_std[:, 1], c=labels_std, cmap='tab10', s=1, alpha=0.8)
+    axes[0].set_title(f'Standard Regular Grid (n={len(xyz_std)})')
+    
+    # Reduced plot
+    axes[1].imshow(data, extent=bounds, cmap='tab10', interpolation='nearest', alpha=0.3)
+    axes[1].scatter(xyz_red[:, 0], xyz_red[:, 1], c=labels_red, cmap='tab10', s=1, alpha=0.8)
+    axes[1].set_title(f'Spatially Reduced (n={len(xyz_red)})\nDense at boundaries, sparse in interior')
+    
+    for ax in axes:
+        ax.set_xlabel('X (m)')
+        ax.set_ylabel('Y (m)')
+
+    plt.tight_layout()
+    plt.show()
+    
+    # Assertions
+    assert len(xyz_red) < len(xyz_std), "Reduced set should have fewer points than standard if steps are chosen correctly"
+    assert len(xyz_red) > 0, "Should have extracted some points"
+    assert 1 not in labels_red, "Label 1 should have been ignored"
+    assert 3 not in labels_red, "Label 3 should have been combined with 0"
+    
+    # Check that we have a mix of boundary and inner points
+    # (This is a bit heuristic but helps ensure the logic is working)
+    with rasterio.open(enmap_path) as src:
+        window = from_bounds(model_extent[0], model_extent[2], model_extent[1], model_extent[3], src.transform)
+        data = src.read(1, window=window)
+        data_mapped = data.copy()
+        data_mapped[data_mapped == 3] = 0
+        from skimage.segmentation import find_boundaries
+        boundaries = find_boundaries(data_mapped, mode='thick')
+        
+        # Transform xyz back to pixel coordinates to check if they are on boundaries
+        inv_transform = ~src.window_transform(window)
+        cols, rows = inv_transform * (xyz_red[:, 0], xyz_red[:, 1])
+        cols = np.round(cols).astype(int)
+        rows = np.round(rows).astype(int)
+        
+        on_boundary = boundaries[rows, cols]
+        n_boundary = np.sum(on_boundary)
+        n_inner = len(xyz_red) - n_boundary
+        
+        print(f"   Points on boundaries: {n_boundary}")
+        print(f"   Points in interior: {n_inner}")
+        
+        assert n_boundary > 0, "Should have some points on boundaries"
+        assert n_inner > 0, "Should have some points in interior"
+    
+    # Save reduced set
+    np.save(os.path.join(base_dir, 'reduced_xyz.npy'), xyz_red)
+    np.save(os.path.join(base_dir, 'reduced_labels.npy'), labels_red)
+    
+    print(f"✓ Spatially reduced points saved to reduced_*.npy")
 
 
 def test_extract_reference_points(base_dir, model_extent, simple_geo_model):
