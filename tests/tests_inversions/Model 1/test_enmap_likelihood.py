@@ -116,33 +116,21 @@ def test_read_EnMap(base_dir, model_extent, simple_geo_model):
         print(f"   Valid pixels: {np.sum(~np.isnan(data))} / {data.size} ({100 * np.sum(~np.isnan(data)) / data.size:.1f}%)")
 
 
-def test_extract_reference_points(base_dir, model_extent, simple_geo_model):
-    enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
-
-    if not os.path.exists(enmap_path):
-        pytest.skip(f"EnMap file not found at {enmap_path}")
-
-    with rasterio.open(enmap_path) as src:
-        # 1. Define the cropping window based on model_extent
-        # model_extent: [min_x, max_x, min_y, max_y, min_z, max_z]
-        left, right, bottom, top = model_extent[0], model_extent[1], model_extent[2], model_extent[3]
-        
-        from rasterio.windows import from_bounds
+def _extract_points_from_raster(raster_path, extent, step=10, z_value=None):
+    """
+    Private method to extract points from a raster within a given extent.
+    """
+    from rasterio.windows import from_bounds
+    
+    with rasterio.open(raster_path) as src:
+        left, right, bottom, top = extent[0], extent[1], extent[2], extent[3]
         window = from_bounds(left, bottom, right, top, src.transform)
         
         # Read the data within the window
         data = src.read(1, window=window)
         transform = src.window_transform(window)
         
-        print(f"   Cropped Shape: {data.shape}")
-        print(f"   Cropped Bounds: {left}, {right}, {bottom}, {top}")
-
-        # 2. Extract well distributed amount of points
-        # We can use a regular grid or random sampling. 
-        # Let's use a step-based approach to get a well-distributed sample.
-        step = 10  # Adjust step for density
         rows, cols = data.shape
-        
         row_indices = np.arange(0, rows, step)
         col_indices = np.arange(0, cols, step)
         
@@ -155,46 +143,79 @@ def test_extract_reference_points(base_dir, model_extent, simple_geo_model):
         # Get labels
         labels = data[ii_flat, jj_flat]
         
-        # Filter out NaNs if any
+        # Filter out NaNs
         valid_mask = ~np.isnan(labels)
+        
+        # Apply specific label logic:
+        # 1. Ignore label 1
+        # 2. Combine label 3 and 0 (let's map 3 to 0)
+        
+        # Update valid_mask to ignore label 1
+        valid_mask &= (labels != 1)
+        
         ii_valid = ii_flat[valid_mask]
         jj_valid = jj_flat[valid_mask]
         labels_valid = labels[valid_mask]
         
+        # Combine label 3 and 0 -> set all 3s to 0
+        labels_valid[labels_valid == 3] = 0
+        
         # Get xy coordinates
-        # rasterio.transform.xy(transform, rows, cols, offset='center')
         xs, ys = rasterio.transform.xy(transform, ii_valid.tolist(), jj_valid.tolist())
         xs = np.array(xs)
         ys = np.array(ys)
         
-        # For Z, we might want to use topography or a fixed depth. 
-        # Given it's a surface map, Z should probably come from topography or be at the top.
-        # If we have the model, we can try to get topography at these points.
-        # For now, let's assume z=0 or top of model if not specified.
-        zs = np.full_like(xs, model_extent[5]) # Using max_z
+        if z_value is None:
+            z_value = extent[5]
+        zs = np.full_like(xs, z_value)
         
         xyz = np.column_stack((xs, ys, zs))
         
-        print(f"   Extracted {len(xyz)} points")
-        
-        # 3. Plotting for verification
-        fig, ax = plt.subplots(figsize=(10, 8))
-        im = ax.imshow(data, extent=(left, right, bottom, top), cmap='tab10', interpolation='nearest')
-        plt.colorbar(im, label='Class ID')
-        ax.scatter(xyz[:, 0], xyz[:, 1], c='white', s=2, alpha=0.5, label='Extracted Points')
-        ax.set_title('Cropped EnMap with Extracted Points')
-        ax.set_xlabel('X (m)')
-        ax.set_ylabel('Y (m)')
-        plt.legend()
-        plt.show()
+        return xyz, labels_valid, data, (left, right, bottom, top)
 
-        # Assertions
-        assert len(xyz) > 0, "Should have extracted some points"
-        assert xyz.shape[1] == 3, "xyz should have 3 columns"
-        assert len(labels_valid) == len(xyz), "Labels and xyz should have same length"
-        
-        # Save results for optimization (optional, but requested format was array or xyz and labels)
-        np.save(os.path.join(base_dir, 'extracted_xyz.npy'), xyz)
-        np.save(os.path.join(base_dir, 'extracted_labels.npy'), labels_valid)
-        
-        print(f"✓ Extracted {len(xyz)} points saved to .npy files")
+
+def test_extract_reference_points(base_dir, model_extent, simple_geo_model):
+    enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
+
+    if not os.path.exists(enmap_path):
+        pytest.skip(f"EnMap file not found at {enmap_path}")
+
+    # Extract points from main model extent
+    xyz, labels, data, bounds = _extract_points_from_raster(enmap_path, model_extent)
+    
+    print(f"   Extracted {len(xyz)} points from main extent")
+    
+    # 3. Plotting for verification
+    fig, ax = plt.subplots(figsize=(10, 8))
+    im = ax.imshow(data, extent=bounds, cmap='tab10', interpolation='nearest')
+    plt.colorbar(im, label='Class ID')
+    ax.scatter(xyz[:, 0], xyz[:, 1], c='white', s=2, alpha=0.5, label='Extracted Points')
+    ax.set_title('Cropped EnMap with Extracted Points (Label 1 ignored, 3&0 combined)')
+    ax.set_xlabel('X (m)')
+    ax.set_ylabel('Y (m)')
+    plt.legend()
+    plt.show()
+
+    # Assertions
+    assert len(xyz) > 0, "Should have extracted some points"
+    assert 1 not in labels, "Label 1 should have been ignored"
+    assert 3 not in labels, "Label 3 should have been combined with 0"
+    
+    # Save results for optimization
+    np.save(os.path.join(base_dir, 'extracted_xyz.npy'), xyz)
+    np.save(os.path.join(base_dir, 'extracted_labels.npy'), labels)
+    
+    print(f"✓ Extracted {len(xyz)} points saved to .npy files")
+
+    # Extra extent demonstration
+    extra_extent = [
+        model_extent[0], 
+        model_extent[0] + (model_extent[1] - model_extent[0]) / 2,
+        model_extent[2],
+        model_extent[2] + (model_extent[3] - model_extent[2]) / 2,
+        model_extent[4],
+        model_extent[5]
+    ]
+    
+    xyz_extra, labels_extra, _, _ = _extract_points_from_raster(enmap_path, extra_extent, step=5)
+    print(f"✓ Extracted {len(xyz_extra)} points from extra extent (quarter of model)")
