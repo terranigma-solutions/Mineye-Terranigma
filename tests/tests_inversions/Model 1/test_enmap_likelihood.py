@@ -239,6 +239,87 @@ def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step
         return xyz, labels_valid, data, (left, right, bottom, top)
 
 
+def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_value=None):
+    """
+    Extract points from the center of geological bodies using distance transform.
+    Prioritizes points furthest from boundaries and ensures they are spatially separated.
+    """
+    from skimage.segmentation import find_boundaries
+    from skimage.feature import peak_local_max
+    from scipy import ndimage
+
+    with rasterio.open(raster_path) as src:
+        left, right, bottom, top = extent[0], extent[1], extent[2], extent[3]
+        window = from_bounds(left, bottom, right, top, src.transform)
+        
+        # Read the data within the window at full resolution
+        data = src.read(1, window=window)
+        transform = src.window_transform(window)
+        
+        # Clean data (handle NaNs and label mapping)
+        data_mapped = data.copy()
+        mask_nan = np.isnan(data)
+        data_mapped[data_mapped == 3] = 0
+        
+        # 1. Identify boundaries
+        # We need to fill NaNs for boundary detection
+        data_temp = data_mapped.copy()
+        data_temp[mask_nan] = 255
+        boundaries = find_boundaries(data_temp, mode='thick')
+        
+        # 2. Distance transform: distance to nearest boundary or NaN
+        # We want to be far from boundaries AND far from NaN areas (which are outside the domain)
+        dist_mask = ~boundaries & ~mask_nan
+        dist_transform = ndimage.distance_transform_edt(dist_mask)
+        
+        # 3. Extract peaks for each label
+        unique_labels = np.unique(data_mapped)
+        unique_labels = unique_labels[~np.isnan(unique_labels)]
+        unique_labels = unique_labels[unique_labels != 1]
+        
+        all_ii = []
+        all_jj = []
+        all_labels = []
+        
+        for label_val in unique_labels:
+            mask = (data_mapped == label_val)
+            
+            # Use peak_local_max to find central points
+            # This ensures points are at least `min_distance` apart (no correlation)
+            # and they are at local maxima of distance from boundaries.
+            peaks = peak_local_max(
+                dist_transform, 
+                min_distance=min_distance, 
+                labels=mask,
+                exclude_border=False
+            )
+            
+            if len(peaks) > 0:
+                all_ii.extend(peaks[:, 0])
+                all_jj.extend(peaks[:, 1])
+                all_labels.extend([label_val] * len(peaks))
+        
+        ii = np.array(all_ii)
+        jj = np.array(all_jj)
+        labels_valid = np.array(all_labels)
+        
+        if len(ii) == 0:
+            return np.zeros((0, 3)), np.zeros(0), data, (left, right, bottom, top)
+
+        # Get xy coordinates
+        xs, ys = rasterio.transform.xy(transform, ii.tolist(), jj.tolist())
+        xs = np.array(xs)
+        ys = np.array(ys)
+        
+        if z_value is None:
+            z_value = extent[5]
+        zs = np.full_like(xs, z_value)
+        
+        xyz = np.column_stack((xs, ys, zs))
+        
+        return xyz, labels_valid, data, (left, right, bottom, top)
+
+
 def test_spatial_correlation_reduction(base_dir, model_extent):
     """
     Test point reduction using spatial correlation (boundary detection).
@@ -320,6 +401,61 @@ def test_spatial_correlation_reduction(base_dir, model_extent):
     np.save(os.path.join(base_dir, 'reduced_labels.npy'), labels_red)
     
     print(f"✓ Spatially reduced points saved to reduced_*.npy")
+
+
+def test_central_body_extraction(base_dir, model_extent):
+    """
+    Test extraction of points from the center of bodies to minimize spatial correlation.
+    """
+    enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
+
+    if not os.path.exists(enmap_path):
+        pytest.skip(f"EnMap file not found at {enmap_path}")
+
+    # 1. Spatially reduced extraction (previous approach for comparison)
+    xyz_red, labels_red, _, _ = _extract_points_spatially_reduced(
+        enmap_path, model_extent, step_boundary=50, step_inner=50
+    )
+    
+    # 2. Central extraction (new approach)
+    # min_distance ensures points are not correlated
+    xyz_central, labels_central, data, bounds = _extract_points_central_reduced(
+        enmap_path, model_extent, min_distance=25
+    )
+    
+    print(f"\n📊 Strategy Comparison:")
+    print(f"   Boundary-focused reduction: {len(xyz_red)} points")
+    print(f"   Central-focused reduction: {len(xyz_central)} points")
+    
+    # 3. Visualization
+    fig, axes = plt.subplots(1, 2, figsize=(18, 8), sharex=True, sharey=True)
+    
+    # Boundary-focused plot
+    axes[0].imshow(data, extent=bounds, cmap='tab10', interpolation='nearest', alpha=0.3)
+    axes[0].scatter(xyz_red[:, 0], xyz_red[:, 1], c=labels_red, cmap='tab10', s=10, edgecolors='black', linewidth=0.5)
+    axes[0].set_title(f'Boundary-Focused (n={len(xyz_red)})')
+    
+    # Central plot
+    axes[1].imshow(data, extent=bounds, cmap='tab10', interpolation='nearest', alpha=0.3)
+    axes[1].scatter(xyz_central[:, 0], xyz_central[:, 1], c=labels_central, cmap='tab10', s=10, edgecolors='black', linewidth=0.5)
+    axes[1].set_title(f'Central-Focused (n={len(xyz_central)})\nPoints at local maxima of distance transform')
+    
+    for ax in axes:
+        ax.set_xlabel('X (m)')
+        ax.set_ylabel('Y (m)')
+
+    plt.tight_layout()
+    plt.show()
+    
+    # Assertions
+    assert len(xyz_central) > 0, "Should extract at least some points"
+    assert not np.any(labels_central == 1), "Label 1 should be excluded"
+    assert not np.any(labels_central == 3), "Label 3 should be mapped to 0"
+    
+    # Final output
+    np.save(os.path.join(base_dir, 'central_xyz.npy'), xyz_central)
+    np.save(os.path.join(base_dir, 'central_labels.npy'), labels_central)
+    print(f"\n✅ Central points saved to 'central_xyz.npy' and 'central_labels.npy'")
 
 
 def test_extract_reference_points(base_dir, model_extent, simple_geo_model):
