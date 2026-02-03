@@ -9,39 +9,8 @@ from matplotlib import pyplot as plt
 import gempy as gp
 import gempy_viewer as gpv
 
-
-def test_simple_model_with_topography(simple_geo_model, topography_dir):
-    """Test reading and computing a geological model with topography."""
-    topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
-    gp.set_topography_from_file(
-        grid=simple_geo_model.grid,
-        filepath=topography_path,
-        crop_to_extent=[
-                simple_geo_model.grid.extent[0],
-                simple_geo_model.grid.extent[2],
-                simple_geo_model.grid.extent[1],
-                simple_geo_model.grid.extent[3]
-        ]
-    )
-
-    start_time = time.time()
-
-    simple_geo_model.interpolation_options.evaluation_options.number_octree_levels_surface = 3
-    gp.compute_model(simple_geo_model)
-    elapsed_time = time.time() - start_time
-    print(f"\n⏱️  Model computation time: {elapsed_time:.2f} seconds")
-
-    # Add assertions here to verify the model is computed correctly
-    assert simple_geo_model is not None
-
-    gpv.plot_3d(simple_geo_model, ve=5, image=True,
-                kwargs_pyvista_bounds={
-                        'show_xlabels': False,
-                        'show_ylabels': False,
-                        'show_zlabels': False
-                }
-                )
-    gpv.plot_2d(model=simple_geo_model, section_names=['topography'], show_topography=True)
+if rasterio is None:
+    pytest.skip("rasterio is required for reading EnMap files")
 
 
 def test_read_EnMap(base_dir, model_extent, simple_geo_model):
@@ -50,8 +19,6 @@ def test_read_EnMap(base_dir, model_extent, simple_geo_model):
     This test reads the EnMap segmentation results (which are at the same
     resolution as the GemPy model) and creates visualizations.
     """
-    if rasterio is None:
-        pytest.skip("rasterio is required for reading EnMap files")
 
     # Path to EnMap segmentation results
     enmap_dir = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap')
@@ -147,3 +114,87 @@ def test_read_EnMap(base_dir, model_extent, simple_geo_model):
 
         print(f"\n✓ Successfully read and plotted EnMap data")
         print(f"   Valid pixels: {np.sum(~np.isnan(data))} / {data.size} ({100 * np.sum(~np.isnan(data)) / data.size:.1f}%)")
+
+
+def test_extract_reference_points(base_dir, model_extent, simple_geo_model):
+    enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
+
+    if not os.path.exists(enmap_path):
+        pytest.skip(f"EnMap file not found at {enmap_path}")
+
+    with rasterio.open(enmap_path) as src:
+        # 1. Define the cropping window based on model_extent
+        # model_extent: [min_x, max_x, min_y, max_y, min_z, max_z]
+        left, right, bottom, top = model_extent[0], model_extent[1], model_extent[2], model_extent[3]
+        
+        from rasterio.windows import from_bounds
+        window = from_bounds(left, bottom, right, top, src.transform)
+        
+        # Read the data within the window
+        data = src.read(1, window=window)
+        transform = src.window_transform(window)
+        
+        print(f"   Cropped Shape: {data.shape}")
+        print(f"   Cropped Bounds: {left}, {right}, {bottom}, {top}")
+
+        # 2. Extract well distributed amount of points
+        # We can use a regular grid or random sampling. 
+        # Let's use a step-based approach to get a well-distributed sample.
+        step = 10  # Adjust step for density
+        rows, cols = data.shape
+        
+        row_indices = np.arange(0, rows, step)
+        col_indices = np.arange(0, cols, step)
+        
+        ii, jj = np.meshgrid(row_indices, col_indices, indexing='ij')
+        
+        # Flatten indices
+        ii_flat = ii.flatten()
+        jj_flat = jj.flatten()
+        
+        # Get labels
+        labels = data[ii_flat, jj_flat]
+        
+        # Filter out NaNs if any
+        valid_mask = ~np.isnan(labels)
+        ii_valid = ii_flat[valid_mask]
+        jj_valid = jj_flat[valid_mask]
+        labels_valid = labels[valid_mask]
+        
+        # Get xy coordinates
+        # rasterio.transform.xy(transform, rows, cols, offset='center')
+        xs, ys = rasterio.transform.xy(transform, ii_valid.tolist(), jj_valid.tolist())
+        xs = np.array(xs)
+        ys = np.array(ys)
+        
+        # For Z, we might want to use topography or a fixed depth. 
+        # Given it's a surface map, Z should probably come from topography or be at the top.
+        # If we have the model, we can try to get topography at these points.
+        # For now, let's assume z=0 or top of model if not specified.
+        zs = np.full_like(xs, model_extent[5]) # Using max_z
+        
+        xyz = np.column_stack((xs, ys, zs))
+        
+        print(f"   Extracted {len(xyz)} points")
+        
+        # 3. Plotting for verification
+        fig, ax = plt.subplots(figsize=(10, 8))
+        im = ax.imshow(data, extent=(left, right, bottom, top), cmap='tab10', interpolation='nearest')
+        plt.colorbar(im, label='Class ID')
+        ax.scatter(xyz[:, 0], xyz[:, 1], c='white', s=2, alpha=0.5, label='Extracted Points')
+        ax.set_title('Cropped EnMap with Extracted Points')
+        ax.set_xlabel('X (m)')
+        ax.set_ylabel('Y (m)')
+        plt.legend()
+        plt.show()
+
+        # Assertions
+        assert len(xyz) > 0, "Should have extracted some points"
+        assert xyz.shape[1] == 3, "xyz should have 3 columns"
+        assert len(labels_valid) == len(xyz), "Labels and xyz should have same length"
+        
+        # Save results for optimization (optional, but requested format was array or xyz and labels)
+        np.save(os.path.join(base_dir, 'extracted_xyz.npy'), xyz)
+        np.save(os.path.join(base_dir, 'extracted_labels.npy'), labels_valid)
+        
+        print(f"✓ Extracted {len(xyz)} points saved to .npy files")

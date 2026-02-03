@@ -21,15 +21,21 @@ def test_simple_model(simple_geo_model):
 
 def test_simple_model_with_topography(simple_geo_model, topography_dir):
     """Test reading and computing a geological model with topography."""
-    topography_path = os.path.join(topography_dir,  'topo_reduced_sf0.1.tif')
+    topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
     gp.set_topography_from_file(
         grid=simple_geo_model.grid,
         filepath=topography_path,
-        crop_to_extent=[-695558, simple_geo_model.grid.extent[2],
-                        simple_geo_model.grid.extent[1], simple_geo_model.grid.extent[3]]
+        crop_to_extent=[
+                simple_geo_model.grid.extent[0],
+                simple_geo_model.grid.extent[2],
+                simple_geo_model.grid.extent[1],
+                simple_geo_model.grid.extent[3]
+        ]
     )
 
     start_time = time.time()
+
+    simple_geo_model.interpolation_options.evaluation_options.number_octree_levels_surface = 3
     gp.compute_model(simple_geo_model)
     elapsed_time = time.time() - start_time
     print(f"\n⏱️  Model computation time: {elapsed_time:.2f} seconds")
@@ -37,4 +43,11 @@ def test_simple_model_with_topography(simple_geo_model, topography_dir):
     # Add assertions here to verify the model is computed correctly
     assert simple_geo_model is not None
 
-    gpv.plot_3d(simple_geo_model, ve=5, image=True)
+    gpv.plot_3d(simple_geo_model, ve=5, image=True,
+                kwargs_pyvista_bounds={
+                        'show_xlabels': False,
+                        'show_ylabels': False,
+                        'show_zlabels': False
+                }
+                )
+    gpv.plot_2d(model=simple_geo_model, section_names=['topography'], show_topography=True)
