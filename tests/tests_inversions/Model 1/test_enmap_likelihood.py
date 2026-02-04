@@ -24,7 +24,10 @@ def test_enmap_offset_gempy(simple_geo_model, topography_dir):
     simple_geo_model.interpolation_options.evaluation_options.number_octree_levels_surface = 3
     gp.compute_model(simple_geo_model)
     elapsed_time = time.time() - start_time
+
     print(f"\n⏱️  Model computation time: {elapsed_time:.2f} seconds")
+    
+    gpv.plot_3d(simple_geo_model, ve=5, image=True)
 
 
 def test_compare_enmap_gempy_labels(simple_geo_model, base_dir):
