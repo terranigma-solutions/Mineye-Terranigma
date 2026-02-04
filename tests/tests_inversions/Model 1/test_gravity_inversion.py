@@ -21,6 +21,7 @@ from mineye.GeoModel.model_one.visualization import (generate_gravity_uncertaint
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 # noinspection PyUnusedImports
 from tests import conftest
+from tests.tests_inversions.conftest import simple_geo_model, topography_dir
 
 
 class TestProbabilisticInversion:
@@ -252,7 +253,7 @@ class TestProbabilisticInversion:
         # * 9) Analysis Gempy Model
         gempy_viz(geo_model, data)
 
-    def test_probability_plots(self, simple_geo_model, geophysical_dir):
+    def test_probability_plots(self, simple_geo_model, geophysical_dir, topography_dir):
 
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
 
@@ -260,47 +261,82 @@ class TestProbabilisticInversion:
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
         # TODO: Make the probability plot
-        self._probability_fields_for(geo_model, data.prior)
+        self._probability_fields_for(geo_model, data.prior, topography_dir)
         self._probability_fields_for(geo_model, data.posterior)
 
     @staticmethod
-    def _probability_fields_for(geo_model, inference_data):
+    def _probability_fields_for(geo_model, inference_data, topography_dir):
         online_prob = compute_probability_density_fields(
             geo_model,
             inference_data,
-            n_samples=100
+            n_samples=20
         )
         import gempy_viewer as gpv
 
-        gpv.plot_2d(
-            geo_model,
-            override_regular_grid=online_prob.probability_field[0],
-            show_data=True,
-            ve=5,
-            kwargs_lithology={
-                    'cmap': 'viridis',
-                    'norm': None
-            }
+        if True:
+            gpv.plot_2d(
+                geo_model,
+                override_regular_grid=online_prob.probability_field[0],
+                show_data=True,
+                ve=5,
+                kwargs_lithology={
+                        'cmap': 'viridis',
+                        'norm': None
+                }
+            )
+
+            gpv.plot_2d(
+                geo_model,
+                override_regular_grid=online_prob.probability_field[1],
+                show_data=True,
+                ve=5,
+                kwargs_lithology={
+                        'cmap': 'viridis',
+                        'norm': None
+                }
+            )
+
+            gpv.plot_2d(
+                geo_model,
+                override_regular_grid=online_prob.entropy,
+                show_data=True,
+                ve=5,
+                kwargs_lithology={
+                        'cmap': 'magma',
+                        'norm': None
+                }
+            )
+
+        import gempy as gp
+        simple_geo_model = geo_model
+        topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
+        gp.set_topography_from_file(
+            grid=simple_geo_model.grid,
+            filepath=topography_path,
+            crop_to_extent=[
+                    simple_geo_model.grid.extent[0],
+                    simple_geo_model.grid.extent[2],
+                    simple_geo_model.grid.extent[1],
+                    simple_geo_model.grid.extent[3]
+            ]
         )
 
-        gpv.plot_2d(
-            geo_model,
-            override_regular_grid=online_prob.probability_field[1],
-            show_data=True,
-            ve=5,
-            kwargs_lithology={
-                    'cmap': 'viridis',
-                    'norm': None
-            }
-        )
+        gp.compute_model(geo_model)
 
-        gpv.plot_2d(
-            geo_model,
-            override_regular_grid=online_prob.entropy,
-            show_data=True,
-            ve=5,
-            kwargs_lithology={
-                    'cmap': 'magma',
-                    'norm': None
+        # * We inject the entropy field into the model
+        geo_model.solutions.raw_arrays.scalar_field_matrix[0] = online_prob.entropy
+        p3d = gpv.plot_3d(
+            model=geo_model,
+            active_scalar_field="sf_0",
+            show_scalar=True,
+            show_lith=False,
+            show_topography=True,
+            image=False,
+            ve=4,
+            threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
+            kwargs_pyvista_bounds={
+                    'show_xlabels': False,
+                    'show_ylabels': False,
+                    'show_zlabels': False,
             }
         )

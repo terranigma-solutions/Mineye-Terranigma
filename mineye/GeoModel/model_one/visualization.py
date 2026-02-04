@@ -108,7 +108,7 @@ def compute_probability_density_fields(geo_model: gp.data.GeoModel, inference_da
     from gempy.core.data.grid_modules import RegularGrid
     geo_model.grid.dense_grid = RegularGrid(
         geo_model.grid.extent,
-        np.array([50, 6, 50])
+        np.array([50, 50, 50])
     )
     gp.set_active_grid(
         grid=geo_model.grid,
