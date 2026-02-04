@@ -100,7 +100,7 @@ class TestEnMapInversion:
 
 
     def test_enmap_inversion(self, simple_geo_model, base_dir, n_samples=50,
-                             arviz_data_filename="arviz_data_enmap.nc"):
+                             arviz_data_filename="arviz_data_enmap_Feb04_2026.nc"):
         """Test EnMap inversion following the gravity inversion structure."""
         geo_model, labels_enmap_tensor, prob_model = self._create_probabilistic_model(base_dir, simple_geo_model)
 
@@ -109,7 +109,7 @@ class TestEnMapInversion:
         prior_inference_data = gpp.run_predictive(
             prob_model=prob_model,
             geo_model=geo_model,
-            y_obs_list=labels_enmap_tensor,
+            y_obs_list=None,
             n_samples=n_samples,
             plot_trace=True
         )
@@ -128,8 +128,10 @@ class TestEnMapInversion:
                 target_accept_prob=0.65,
                 max_tree_depth=5,
                 init_strategy='median',
-                num_samples=20,
-                warmup_steps=20,
+                # num_samples=20,
+                # warmup_steps=20,
+                num_samples=200,
+                warmup_steps=200,
             ),
             plot_trace=True,
             run_posterior_predictive=True
