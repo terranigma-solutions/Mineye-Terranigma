@@ -116,6 +116,7 @@ def generate_multigravity_likelihood_per_station_stable(norm_params):
     """
     Per-station noise with strict bounds for VI stability.
     """
+
     def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
         simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
         pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
@@ -143,6 +144,7 @@ def generate_multigravity_likelihood_per_station_stable(norm_params):
         return dist.Normal(simulated_geophysics, sigma_clamped).to_event(1)
 
     return likelihood_fn
+
 
 def generate_multigravity_likelihood(covariance_matrix, norm_params):
     return partial(multigravity_likelihood, covariance_matrix=covariance_matrix, norm_params=norm_params)
@@ -240,3 +242,98 @@ def gaussian_kernel(locations, length_scale, variance, nugget=None):
     K = K + torch.eye(n_stations, dtype=torch.float64, device=K.device) * nugget
 
     return K
+
+
+def _get_ordinal_probs(scalar_field, boundaries, temperature=0.1):
+    """
+    Computes class probabilities based on ordered boundaries.
+
+    Args:
+        scalar_field: Tensor of shape (n_points,)
+        boundaries: Tensor of shape (n_interfaces,) sorted ascending.
+                    e.g. [1.0, 2.0] for 3 units: (-inf, 1), [1, 2), [2, inf)
+        temperature: Controls sharpness. Lower = sharper boundaries.
+    """
+    # 1. Expand dimensions for broadcasting
+    # scalar: (n_points, 1)
+    # bounds: (1, n_boundaries)
+    s = scalar_field.unsqueeze(1)
+    b = boundaries.unsqueeze(0)
+
+    # 2. Compute Cumulative Probabilities (Sigmoid)
+    # This gives P(scalar > boundary). 
+    # The sigmoid acts as a smooth step function at the boundary.
+    # If scalar >> boundary, result -> 1.
+    # If scalar << boundary, result -> 0.
+    cdf = torch.sigmoid((s - b) / temperature)
+
+    # 3. Add 0 and 1 pads to define the edges of the universe
+    # effectively adding boundaries at -infinity and +infinity
+    n_points = scalar_field.shape[0]
+    zeros = torch.zeros((n_points, 1), device=scalar_field.device, dtype=torch.float64)
+    ones = torch.ones((n_points, 1), device=scalar_field.device, dtype=torch.float64)
+
+    # Stack: [0, P(>b1), P(>b2), ... , 1]
+    # Note: We usually define P(scalar < boundary), but GemPy scalar field 
+    # often increases with depth. Adjust sign based on your polarity.
+    # Let's assume scalar field INCREASES with depth (standard).
+    # Then Unit 0 is scalar < b1.
+
+    # We want P(scalar < boundary), which is 1 - sigmoid(s - b)
+    # Or simply sigmoid(b - s)
+    p_below = torch.sigmoid((b - s) / temperature)
+
+    # Pad to create the full probability mass
+    # [P(below -inf)=0, P(below b1), P(below b2), ..., P(below +inf)=1]
+    p_bounded = torch.cat([zeros, p_below, ones], dim=1)
+
+    # 4. Discrete Probabilities (The Difference)
+    # P(Unit i) = P(below b_{i+1}) - P(below b_i)
+    # This automatically sums to 1.
+    probs = p_bounded[:, 1:] - p_bounded[:, :-1]
+
+    # Numerical stability safety (prevent negative 0 or tiny negatives)
+    probs = torch.clamp(probs, min=1e-6)
+    probs = probs / probs.sum(dim=1, keepdim=True)
+
+    return probs
+
+
+def enmap_likelihood_fn(solutions: gp.data.Solutions):
+    #TODO
+    output_center: "gempy_engine.core.data.interp_output.InterpOutput" = solutions.octrees_output[0].last_output_center
+    scalar_field_at_custom_grid = output_center.exported_fields.scalar_field[output_center.grid.custom_grid_slice]
+    if not isinstance(scalar_field_at_custom_grid, torch.Tensor):
+        scalar_field_at_custom_grid = torch.tensor(scalar_field_at_custom_grid, dtype=torch.float64)
+
+    # DEFINE YOUR BOUNDARIES HERE
+    # These should match the isovalues of your interfaces.
+    # If your model is normalized, they might be roughly integers or fixed floats.
+    # Example: If Unit 0 is < 1.0, Unit 1 is 1.0 to 2.0, Unit 2 is > 2.0
+    # boundaries = torch.tensor([1.0, 2.0], dtype=torch.float64)
+    boundaries = torch.tensor(solutions.scalar_field_at_surface_points, dtype=torch.float64)
+
+    # Calculate probabilities
+    probs = _get_ordinal_probs(scalar_field_at_custom_grid, boundaries, temperature=0.1)
+
+    # 2. Save the class probabilities (The "Confidence")
+    # This will be shape (n_points, n_classes)
+    pyro.deterministic("probs_pred", probs.detach())
+    
+    # 3. (Optional) Save the boundaries if they change per iteration
+    pyro.deterministic("boundaries_pred", boundaries)
+
+    # Use Categorical directly with probabilities (no need for logits)
+    return dist.Categorical(probs=probs).to_event(1)
+
+
+# 4. Define EnMap Likelihood
+def enmap_likelihood_fn__(solutions):
+    labels_gempy = solutions.raw_arrays.custom
+
+    if not isinstance(labels_gempy, torch.Tensor):
+        labels_gempy = torch.tensor(labels_gempy, dtype=torch.float64)
+    else:
+        labels_gempy = labels_gempy.to(torch.float64)
+
+    return dist.Normal(loc=labels_gempy, scale=0.1).to_event(1)

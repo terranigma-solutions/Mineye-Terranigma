@@ -19,6 +19,8 @@ from mineye.GeoModel.model_one.visualization import (gempy_viz,
                                                      plot_many_observed_vs_forward,
                                                      compute_probability_density_fields)
 
+from mineye.GeoModel.model_one.probabilistic_model_likelihoods import enmap_likelihood_fn
+
 
 def set_priors_enmap(samples, geo_model):
     """A version of set_priors that only modifies orientations for EnMap."""
@@ -38,10 +40,64 @@ class TestEnMapInversion:
         prior_data = gpp.run_predictive(
             prob_model=prob_model,
             geo_model=geo_model,
-            y_obs_list=labels_enmap_tensor,
+            # y_obs_list=labels_enmap_tensor,
+            y_obs_list=None,
             n_samples=n_samples,
             plot_trace=True
         )
+        # Extract predicted labels (shape: n_samples x n_points)
+        # Check the exact key name in your prior_data dict (usually 'obs' or the name you gave it)
+        pred_labels = prior_data.prior['EnMap Labels'][0]
+        obs_labels = labels_enmap_tensor  # Your ground truth
+
+        plt.figure(figsize=(10, 5))
+        # Flatten pred_labels since it's (samples, labels) - we want all predictions in one histogram
+        plt.hist([pred_labels.values.flatten(), obs_labels.numpy()],
+                 label=['Prior Predicted', 'Observed Ground Truth'],
+                 bins=np.arange(4) - 0.5, density=True, rwidth=0.8)
+        plt.xticks([0, 1])
+        plt.xlabel("Rock Type Label")
+        plt.ylabel("Density")
+        plt.title("Are my priors exploring all rock types?")
+        plt.legend()
+        plt.show()
+
+        def plot_probability_heatmap(data, group='prior'):
+            import seaborn as sns
+            # Get the data array from ArviZ InferenceData
+            # Standard Shape: (chain, draw, n_points, n_classes)
+            # Example: (1, 50, 57, 3)
+            probs_da = data[group]['probs_pred']
+
+            # 1. Average over 'chain' and 'draw' dimensions to get mean per point
+            # Result Shape: (n_points, n_classes)
+            mean_probs = probs_da.mean(dim=["chain", "draw"]).values
+
+            # 2. Transpose for the Heatmap
+            # We want Y-axis = Classes, X-axis = Points
+            # Result Shape: (n_classes, n_points)
+            heatmap_data = mean_probs.T
+
+            # 3. Plot
+            plt.figure(figsize=(14, 4))
+            sns.heatmap(heatmap_data, cmap="Blues", vmin=0, vmax=1,
+                        annot=False, # Set True if you want numbers inside cells
+                        cbar_kws={'label': 'Probability'})
+
+            plt.title(f"Average Class Probabilities per Point ({group.capitalize()})")
+            plt.xlabel("Point Index (0 to 56)")
+            plt.ylabel("Rock Unit (Class)")
+
+            # Fix Y-axis labels to be integers (0, 1, 2)
+            plt.yticks(ticks=np.arange(heatmap_data.shape[0]) + 0.5,
+                       labels=np.arange(heatmap_data.shape[0]),
+                       rotation=0)
+
+            # plt.tight_layout()
+            plt.show()
+
+        plot_probability_heatmap(prior_data, 'prior')
+
 
     def test_enmap_inversion(self, simple_geo_model, base_dir, n_samples=50,
                              arviz_data_filename="arviz_data_enmap.nc"):
@@ -82,7 +138,8 @@ class TestEnMapInversion:
         data.extend(prior_inference_data)
         data.to_netcdf(os.path.join(os.path.dirname(__file__), arviz_data_filename))
 
-    def _create_probabilistic_model(self, base_dir, simple_geo_model):
+    @staticmethod
+    def _create_probabilistic_model(base_dir, simple_geo_model):
         # 1. Load EnMap extracted points and labels
         xyz_path = os.path.join(base_dir, 'central_xyz.npy')
         labels_path = os.path.join(base_dir, 'central_labels.npy')
@@ -92,32 +149,28 @@ class TestEnMapInversion:
 
         xyz_enmap = np.load(xyz_path)
         labels_enmap = np.load(labels_path)
+        labels_enmap[labels_enmap == 2] = 1 # * Normalize the labels
 
         print(f"\nLoaded {len(xyz_enmap)} points from EnMap extraction.")
 
         # 2. Set custom grid in GemPy model
+        simple_geo_model.interpolation_options.mesh_extraction = False
+        simple_geo_model.interpolation_options.evaluation_options.number_octree_levels = 1
         gp.set_custom_grid(simple_geo_model.grid, xyz_enmap)
+        gp.set_active_grid(
+            grid=simple_geo_model.grid,
+            grid_type=[simple_geo_model.grid.GridTypes.CUSTOM],
+            reset=True
+        )
 
         # 3. Define Priors
         model_priors = {
-            'dips': dist.Normal(
-                loc=(torch.ones(simple_geo_model.orientations_copy.xyz.shape[0]) * 10),
-                scale=torch.tensor(10, dtype=torch.float64),
-                validate_args=True
-            )
+                'dips': dist.Normal(
+                    loc=(torch.ones(simple_geo_model.orientations_copy.xyz.shape[0]) * 10),
+                    scale=torch.tensor(10, dtype=torch.float64),
+                    validate_args=True
+                )
         }
-
-        # 4. Define EnMap Likelihood
-        def enmap_likelihood_fn(solutions):
-            labels_gempy = solutions.raw_arrays.custom
-
-            if not isinstance(labels_gempy, torch.Tensor):
-                labels_gempy = torch.tensor(labels_gempy, dtype=torch.float64)
-            else:
-                labels_gempy = labels_gempy.to(torch.float64)
-
-            return dist.Normal(loc=labels_gempy, scale=0.1).to_event(1)
-
         # 5. Set up Pyro model
         prob_model = gpp.make_gempy_pyro_model(
             priors=model_priors,
@@ -196,8 +249,8 @@ class TestEnMapInversion:
             show_data=True,
             ve=5,
             kwargs_lithology={
-                'cmap': 'viridis',
-                'norm': None
+                    'cmap': 'viridis',
+                    'norm': None
             }
         )
 
@@ -207,8 +260,8 @@ class TestEnMapInversion:
             show_data=True,
             ve=5,
             kwargs_lithology={
-                'cmap': 'magma',
-                'norm': None
+                    'cmap': 'magma',
+                    'norm': None
             }
         )
 
@@ -219,10 +272,10 @@ class TestEnMapInversion:
                 grid=geo_model.grid,
                 filepath=topography_path,
                 crop_to_extent=[
-                    geo_model.grid.extent[0],
-                    geo_model.grid.extent[2],
-                    geo_model.grid.extent[1],
-                    geo_model.grid.extent[3]
+                        geo_model.grid.extent[0],
+                        geo_model.grid.extent[2],
+                        geo_model.grid.extent[1],
+                        geo_model.grid.extent[3]
                 ]
             )
 
@@ -240,9 +293,8 @@ class TestEnMapInversion:
                 ve=4,
                 threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
                 kwargs_pyvista_bounds={
-                    'show_xlabels': False,
-                    'show_ylabels': False,
-                    'show_zlabels': False,
+                        'show_xlabels': False,
+                        'show_ylabels': False,
+                        'show_zlabels': False,
                 }
             )
-
