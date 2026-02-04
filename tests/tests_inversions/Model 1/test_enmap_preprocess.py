@@ -113,7 +113,7 @@ def test_read_EnMap(base_dir, model_extent, simple_geo_model):
         print(f"   Valid pixels: {np.sum(~np.isnan(data))} / {data.size} ({100 * np.sum(~np.isnan(data)) / data.size:.1f}%)")
 
 
-def _extract_points_from_raster(raster_path, extent, step=10, z_value=None):
+def _extract_points_from_raster(raster_path, extent, step=10, z_value=None, topo_path=None):
     """
     Private method to extract points from a raster within a given extent.
     """
@@ -161,16 +161,21 @@ def _extract_points_from_raster(raster_path, extent, step=10, z_value=None):
         xs = np.array(xs)
         ys = np.array(ys)
         
-        if z_value is None:
-            z_value = extent[5]
-        zs = np.full_like(xs, z_value)
+        if topo_path:
+            with rasterio.open(topo_path) as topo_src:
+                coords = zip(xs, ys)
+                zs = np.array([val[0] for val in topo_src.sample(coords)])
+        else:
+            if z_value is None:
+                z_value = extent[5]
+            zs = np.full_like(xs, z_value)
         
         xyz = np.column_stack((xs, ys, zs))
         
         return xyz, labels_valid, data, (left, right, bottom, top)
 
 
-def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step_inner=20, kernel_size=5, z_value=None):
+def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step_inner=20, kernel_size=5, z_value=None, topo_path=None):
     """
     Extract points using a spatial kernel to identify boundaries and reduce points in homogeneous areas.
     """
@@ -225,16 +230,21 @@ def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step
         xs = np.array(xs)
         ys = np.array(ys)
         
-        if z_value is None:
-            z_value = extent[5]
-        zs = np.full_like(xs, z_value)
+        if topo_path:
+            with rasterio.open(topo_path) as topo_src:
+                coords = zip(xs, ys)
+                zs = np.array([val[0] for val in topo_src.sample(coords)])
+        else:
+            if z_value is None:
+                z_value = extent[5]
+            zs = np.full_like(xs, z_value)
         
         xyz = np.column_stack((xs, ys, zs))
         
         return xyz, labels_valid, data, (left, right, bottom, top)
 
 
-def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_value=None):
+def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_value=None, topo_path=None):
     """
     Extract points from the center of geological bodies using distance transform.
     Prioritizes points furthest from boundaries and ensures they are spatially separated.
@@ -306,32 +316,38 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_valu
         xs = np.array(xs)
         ys = np.array(ys)
         
-        if z_value is None:
-            z_value = extent[5]
-        zs = np.full_like(xs, z_value)
+        if topo_path:
+            with rasterio.open(topo_path) as topo_src:
+                coords = zip(xs, ys)
+                zs = np.array([val[0] for val in topo_src.sample(coords)])
+        else:
+            if z_value is None:
+                z_value = extent[5]
+            zs = np.full_like(xs, z_value)
         
         xyz = np.column_stack((xs, ys, zs))
         
         return xyz, labels_valid, data, (left, right, bottom, top)
 
 
-def test_spatial_correlation_reduction(base_dir, model_extent):
+def test_spatial_correlation_reduction(base_dir, model_extent, topography_dir):
     """
     Test point reduction using spatial correlation (boundary detection).
     """
     enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
+    topo_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
 
     if not os.path.exists(enmap_path):
         pytest.skip(f"EnMap file not found at {enmap_path}")
 
     # 1. Standard extraction (for comparison)
     step_standard = 10
-    xyz_std, labels_std, _, _ = _extract_points_from_raster(enmap_path, model_extent, step=step_standard)
+    xyz_std, labels_std, _, _ = _extract_points_from_raster(enmap_path, model_extent, step=step_standard, topo_path=topo_path)
     
     # 2. Spatially reduced extraction
     # We want to keep boundaries dense but interior sparse
     xyz_red, labels_red, data, bounds = _extract_points_spatially_reduced(
-        enmap_path, model_extent, step_boundary=50, step_inner=50
+        enmap_path, model_extent, step_boundary=50, step_inner=50, topo_path=topo_path
     )
     
     print(f"\n📊 Reduction Comparison:")
@@ -398,24 +414,25 @@ def test_spatial_correlation_reduction(base_dir, model_extent):
     print(f"✓ Spatially reduced points saved to reduced_*.npy")
 
 
-def test_central_body_extraction(base_dir, model_extent):
+def test_central_body_extraction(base_dir, model_extent, topography_dir):
     """
     Test extraction of points from the center of bodies to minimize spatial correlation.
     """
     enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
+    topo_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
 
     if not os.path.exists(enmap_path):
         pytest.skip(f"EnMap file not found at {enmap_path}")
 
     # 1. Spatially reduced extraction (previous approach for comparison)
     xyz_red, labels_red, _, _ = _extract_points_spatially_reduced(
-        enmap_path, model_extent, step_boundary=50, step_inner=50
+        enmap_path, model_extent, step_boundary=50, step_inner=50, topo_path=topo_path
     )
     
     # 2. Central extraction (new approach)
     # min_distance ensures points are not correlated
     xyz_central, labels_central, data, bounds = _extract_points_central_reduced(
-        enmap_path, model_extent, min_distance=25
+        enmap_path, model_extent, min_distance=25, topo_path=topo_path
     )
     
     print(f"\n📊 Strategy Comparison:")
@@ -453,14 +470,15 @@ def test_central_body_extraction(base_dir, model_extent):
     print(f"\n✅ Central points saved to 'central_xyz.npy' and 'central_labels.npy'")
 
 
-def test_extract_reference_points(base_dir, model_extent, simple_geo_model):
+def test_extract_reference_points(base_dir, model_extent, simple_geo_model, topography_dir):
     enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
+    topo_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
 
     if not os.path.exists(enmap_path):
         pytest.skip(f"EnMap file not found at {enmap_path}")
 
     # Extract points from main model extent
-    xyz, labels, data, bounds = _extract_points_from_raster(enmap_path, model_extent)
+    xyz, labels, data, bounds = _extract_points_from_raster(enmap_path, model_extent, topo_path=topo_path)
     
     print(f"   Extracted {len(xyz)} points from main extent")
     
@@ -496,5 +514,5 @@ def test_extract_reference_points(base_dir, model_extent, simple_geo_model):
         model_extent[5]
     ]
     
-    xyz_extra, labels_extra, _, _ = _extract_points_from_raster(enmap_path, extra_extent, step=5)
+    xyz_extra, labels_extra, _, _ = _extract_points_from_raster(enmap_path, extra_extent, step=5, topo_path=topo_path)
     print(f"✓ Extracted {len(xyz_extra)} points from extra extent (quarter of model)")
