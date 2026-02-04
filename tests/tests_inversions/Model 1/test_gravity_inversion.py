@@ -14,7 +14,7 @@ from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.probabilistic_model import normalize, set_priors
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_hierarchical_per_station
-from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots, gempy_viz, plot_many_observed_vs_forward
+from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots, gempy_viz, plot_many_observed_vs_forward, probability_density_plot_prior
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 # noinspection PyUnusedImports
 from tests import conftest
@@ -149,6 +149,9 @@ class TestProbabilisticInversion:
 
     def test_run_predictive_analysis(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
+        az.plot_trace(data.prior)
+        plt.show()
+        
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
@@ -168,7 +171,7 @@ class TestProbabilisticInversion:
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
-        gempy_viz(geo_model, data, n_samples=100)
+        gempy_viz(geo_model, data, n_samples=100, ve=3)
 
     def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
@@ -245,3 +248,15 @@ class TestProbabilisticInversion:
 
         # * 9) Analysis Gempy Model
         gempy_viz(geo_model, data)
+    
+    
+    def test_probability_plots(self, simple_geo_model, geophysical_dir):
+
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
+
+        gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
+        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
+        
+        # TODO: Make the probability plot
+        probability_density_plot_prior(geo_model, data, n_samples=100)
+        

@@ -77,15 +77,15 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
         legend=False,
         show_lith=False,
         show_data=False,
-        show=False
+        show=False,
+        ve=ve
     )
     plot_gempy(
         geo_model=geo_model,
         n_samples=n_samples,
         samples=(prior_inference_data.prior[r'dips'].values[0, :]),
         update_model_fn=_update_model_for_plotting,
-        gempy_plot=p2d,
-        # contour_colors=[default_blue],
+        gempy_plot=p2d
         # ve=ve,
         # kde_kwargs={
         #         'gridsize'         : 300,
@@ -106,8 +106,7 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
             samples=(prior_inference_data.posterior[r'dips'].values[0, :]),
             update_model_fn=_update_model_for_plotting,
             gempy_plot=p2d,
-            # contour_colors=[default_red],
-            # ve=ve,
+            contour_colors=[default_red],
             # kde_kwargs={
             #         'gridsize'         : 300,
             #         'bw'               : 0.1,
@@ -122,6 +121,47 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
 
     return p2d
 
+
+def probability_density_plot_prior(geo_model: gp.data.GeoModel, inference_data: arviz.InferenceData,
+                             n_samples=50, ve=5):
+    from gempy.core.data.grid_modules import RegularGrid
+    geo_model.grid.dense_grid = RegularGrid(
+        geo_model.grid.extent,
+        np.array([50, 6, 50])
+    )
+    gp.set_active_grid(
+        grid=geo_model.grid,
+        grid_type=[geo_model.grid.GridTypes.DENSE],
+        reset=True
+    )
+
+    geo_model.geophysics_input = None
+
+    gp.compute_model(gempy_model=geo_model)
+    all_lith = geo_model.solutions.raw_arrays.lith_block
+
+    for i in np.linspace(0, inference_data.prior.draw.size -1 , n_samples, dtype=int):
+        ori = inference_data.prior[r'dips'].values[0, :][i]
+        print("sum check ori", ori.sum())
+        _update_model_for_plotting(geo_model, ori, i)
+        print(geo_model.orientations_copy.grads)
+        gp.compute_model(gempy_model=geo_model)
+        lith = geo_model.solutions.raw_arrays.lith_block
+        print("sum check", lith.sum())
+        all_lith = np.vstack((all_lith, lith))
+
+    from gempy_probability.modules.fields import fields
+    foo = fields.probability(all_lith)
+    gpv.plot_2d(
+        geo_model,
+        override_regular_grid=foo[0],
+        show_data=True,
+        ve=ve,
+        kwargs_lithology={
+                'cmap': 'viridis',
+                'norm': None
+        }
+    )
 
 def gempy_viz_pro(geo_model: gp.data.GeoModel, prior_inference_data: arviz.InferenceData):
     p2d = gempy_viz(geo_model, prior_inference_data, n_samples=10)
