@@ -14,7 +14,10 @@ from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.probabilistic_model import normalize, set_priors
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_hierarchical_per_station
-from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots, gempy_viz, plot_many_observed_vs_forward, probability_density_plot_prior
+from mineye.GeoModel.model_one.visualization import (generate_gravity_uncertainty_plots,
+                                                     gempy_viz,
+                                                     plot_many_observed_vs_forward,
+                                                     compute_probability_density_fields)
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 # noinspection PyUnusedImports
 from tests import conftest
@@ -110,7 +113,7 @@ class TestProbabilisticInversion:
                 TestProbabilisticInversion.prior_key_density: dist.Normal(
                     loc=(torch.tensor([
                             2.9 - 2.67,  # plutonites
-                            2.3 - 2.67 # host
+                            2.3 - 2.67  # host
                     ])),
                     scale=torch.tensor(0.15),
                 ).to_event(1)
@@ -151,7 +154,7 @@ class TestProbabilisticInversion:
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
         az.plot_trace(data.prior)
         plt.show()
-        
+
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
@@ -226,7 +229,7 @@ class TestProbabilisticInversion:
         )
 
         plt.show()
-        response = r'$\mu_{gravity}$' # r'gravity_response'
+        response = r'$\mu_{gravity}$'  # r'gravity_response'
         plot_geophysics_comparison(forward_norm=data.prior[response].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
         plot_geophysics_comparison(forward_norm=data.posterior_predictive[response].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
@@ -248,15 +251,56 @@ class TestProbabilisticInversion:
 
         # * 9) Analysis Gempy Model
         gempy_viz(geo_model, data)
-    
-    
+
     def test_probability_plots(self, simple_geo_model, geophysical_dir):
 
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
-        
+
         # TODO: Make the probability plot
-        probability_density_plot_prior(geo_model, data, n_samples=100)
-        
+        self._probability_fields_for(geo_model, data.prior)
+        self._probability_fields_for(geo_model, data.posterior)
+
+    @staticmethod
+    def _probability_fields_for(geo_model, inference_data):
+        online_prob = compute_probability_density_fields(
+            geo_model,
+            inference_data,
+            n_samples=100
+        )
+        import gempy_viewer as gpv
+
+        gpv.plot_2d(
+            geo_model,
+            override_regular_grid=online_prob.probability_field[0],
+            show_data=True,
+            ve=5,
+            kwargs_lithology={
+                    'cmap': 'viridis',
+                    'norm': None
+            }
+        )
+
+        gpv.plot_2d(
+            geo_model,
+            override_regular_grid=online_prob.probability_field[1],
+            show_data=True,
+            ve=5,
+            kwargs_lithology={
+                    'cmap': 'viridis',
+                    'norm': None
+            }
+        )
+
+        gpv.plot_2d(
+            geo_model,
+            override_regular_grid=online_prob.entropy,
+            show_data=True,
+            ve=5,
+            kwargs_lithology={
+                    'cmap': 'magma',
+                    'norm': None
+            }
+        )

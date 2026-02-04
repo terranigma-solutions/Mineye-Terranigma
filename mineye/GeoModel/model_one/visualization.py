@@ -2,12 +2,14 @@ from typing import Any
 
 import arviz
 import numpy as np
+import xarray
 from matplotlib import pyplot as plt
 
 import gempy as gp
 import gempy_viewer as gpv
 from gempy_probability.modules.plot.plot_gempy import plot_gempy
 from gempy_probability.modules.plot.plot_posterior import default_blue, default_red
+from gempy_probability.modules.fields import fields
 
 
 def generate_gravity_uncertainty_plots(gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, Any]:
@@ -122,8 +124,8 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
     return p2d
 
 
-def probability_density_plot_prior(geo_model: gp.data.GeoModel, inference_data: arviz.InferenceData,
-                             n_samples=50, ve=5):
+def compute_probability_density_fields(geo_model: gp.data.GeoModel, inference_data: xarray.Dataset, 
+                                       n_samples=50) -> fields.OnlineProbability:
     from gempy.core.data.grid_modules import RegularGrid
     geo_model.grid.dense_grid = RegularGrid(
         geo_model.grid.extent,
@@ -138,23 +140,24 @@ def probability_density_plot_prior(geo_model: gp.data.GeoModel, inference_data: 
     geo_model.geophysics_input = None
 
     gp.compute_model(gempy_model=geo_model)
-    all_lith = geo_model.solutions.raw_arrays.lith_block
+    lith = geo_model.solutions.raw_arrays.lith_block
 
-    for i in np.linspace(0, inference_data.prior.draw.size -1 , n_samples, dtype=int):
-        ori = inference_data.prior[r'dips'].values[0, :][i]
-        print("sum check ori", ori.sum())
+    unique_liths = np.unique(lith)
+    online_prob = fields.OnlineProbability(lith.shape[0], unique_liths)
+    
+    for i in np.linspace(0, inference_data.draw.size -1 , n_samples, dtype=int):
+        ori = inference_data[r'dips'].values[0, :][i]
         _update_model_for_plotting(geo_model, ori, i)
-        print(geo_model.orientations_copy.grads)
         gp.compute_model(gempy_model=geo_model)
         lith = geo_model.solutions.raw_arrays.lith_block
-        print("sum check", lith.sum())
-        all_lith = np.vstack((all_lith, lith))
+        online_prob.update(lith)
+            
+    return online_prob
 
-    from gempy_probability.modules.fields import fields
-    foo = fields.probability(all_lith)
     gpv.plot_2d(
         geo_model,
-        override_regular_grid=foo[0],
+        # override_regular_grid=foo[0],
+        override_regular_grid=online_prob.probability_field[0],
         show_data=True,
         ve=ve,
         kwargs_lithology={
