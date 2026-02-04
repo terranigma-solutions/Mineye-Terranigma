@@ -262,7 +262,7 @@ class TestProbabilisticInversion:
 
         # TODO: Make the probability plot
         self._probability_fields_for(geo_model, data.prior, topography_dir)
-        self._probability_fields_for(geo_model, data.posterior)
+        self._probability_fields_for(geo_model, data.posterior, topography_dir)
 
     @staticmethod
     def _probability_fields_for(geo_model, inference_data, topography_dir):
@@ -331,7 +331,7 @@ class TestProbabilisticInversion:
             show_scalar=True,
             show_lith=False,
             show_topography=True,
-            image=False,
+            image=True,
             ve=4,
             threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
             kwargs_pyvista_bounds={

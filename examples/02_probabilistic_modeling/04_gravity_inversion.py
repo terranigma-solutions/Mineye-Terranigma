@@ -401,13 +401,6 @@ print(f"  Std: 10°")
 # 2. Visualization: Plot how gravity predictions evolve during sampling
 # 3. Diagnostics: Check if normalized values are reasonable
 
-post_forward_dets = {
-        "gravity_response_raw": lambda samples, gm, sol: sol.gravity,
-        "gravity_response"    : lambda samples, gm, sol: align_forward_to_observed(-sol.gravity, norm_params),
-        "mean_gravity"        : lambda samples, gm, sol: torch.mean(align_forward_to_observed(-sol.gravity, norm_params)),
-        "max_gravity"         : lambda samples, gm, sol: torch.max(align_forward_to_observed(-sol.gravity, norm_params), 0),
-}
-
 # %%
 # Step 7: Define Likelihood Function
 # -----------------------------------
@@ -702,12 +695,10 @@ print(f"  Each station's noise will be inferred from data")
 # - gpp.run_vi_inference() for variational inference (faster approximation)
 
 # %%
-prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
+prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
     priors=model_priors,
     set_interp_input_fn=set_priors,
     likelihood_fn=likelihood_fn,
-    pre_forward_deterministics={},
-    post_forward_deterministics=post_forward_dets,
     obs_name="Gravity Measurement"
 )
 

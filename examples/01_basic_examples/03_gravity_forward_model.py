@@ -197,7 +197,7 @@ print(f"Gravity range: {observed_gravity.min():.2f} to {observed_gravity.max():.
 xy_ravel = np.column_stack([
         np.array(gravity_data.geometry.x.values),
         np.array(gravity_data.geometry.y.values),
-        np.full(len(gravity_data), 505)  # Set Z to surface elevation
+        np.full(len(gravity_data), 500)  # Set Z to surface elevation
 ])
 
 print(f"Using {len(xy_ravel)} actual measurement points")
@@ -336,7 +336,7 @@ gp.set_topography_from_file(
     ]
 )
 
-sol = gp.compute_model(simple_geo_model)
+sol = gp.compute_model(simple_geo_model, validate_serialization=False)
 
 print("✓ Forward gravity model computed successfully")
 
