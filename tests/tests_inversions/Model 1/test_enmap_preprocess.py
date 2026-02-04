@@ -244,10 +244,13 @@ def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step
         return xyz, labels_valid, data, (left, right, bottom, top)
 
 
-def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_value=None, topo_path=None):
+def _extract_points_central_reduced(raster_path, extent, min_distance=25, z_value=None, topo_path=None, balance_patches=True):
     """
     Extract points from the center of geological bodies using distance transform.
     Prioritizes points furthest from boundaries and ensures they are spatially separated.
+    
+    If balance_patches is True, it tries to limit the number of points from small patches
+    and potentially increase the number of points from large patches to avoid over-representation.
     """
     from skimage.segmentation import find_boundaries
     from skimage.feature import peak_local_max
@@ -285,20 +288,92 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_valu
         all_ii = []
         all_jj = []
         all_labels = []
+
+        # Area calculation for balancing
+        if balance_patches:
+            label_areas = {}
+            for label_val in unique_labels:
+                label_areas[label_val] = np.sum(data_mapped == label_val)
+            
+            max_area = max(label_areas.values()) if label_areas else 1
+            min_area = min(label_areas.values()) if label_areas else 1
+            
+            print(f"\n   Area balancing enabled:")
+            print(f"   Area range: {min_area} to {max_area} pixels")
         
         for label_val in unique_labels:
             mask = (data_mapped == label_val)
             
+            # Dynamic min_distance based on area? 
+            # Or just limit the number of points?
+            
+            current_min_dist = min_distance
+            if balance_patches:
+                # If area is small, we might want to increase min_distance to get fewer points
+                # or just use num_peaks in peak_local_max
+                area_ratio = label_areas[label_val] / max_area
+                # If area is only 1% of the max area, we probably don't want many points.
+                # However, we want at least one point if possible.
+                
+                # Heuristic: cap number of points proportional to area
+                # total_points_budget = (data_mapped.size / (min_distance**2))
+                # expected_points = total_points_budget * (label_areas[label_val] / data_mapped.size)
+                
+                # Another approach: adjust min_distance. 
+                # Larger area -> smaller min_distance (more dense)
+                # Smaller area -> larger min_distance (less dense)
+                # This is counter-intuitive if we want to AVOID over-representing small patches.
+                # Actually, small patches get over-represented because they might only fit ONE point,
+                # but that one point represents a tiny area, while a large patch has many points,
+                # but maybe fewer per unit area than the small patch.
+                
+                # Actually, the user says "By removing redundant points on big areas it seems that we are over representing small patches."
+                # This means the big areas are being thinned out TOO MUCH compared to small patches.
+                # So we should either:
+                # 1. Thin out small patches more.
+                # 2. Thin out big areas less.
+                
+                # Let's try to limit the number of peaks for small patches.
+                pass
+
             # Use peak_local_max to find central points
-            # This ensures points are at least `min_distance` apart (no correlation)
-            # and they are at local maxima of distance from boundaries.
             peaks = peak_local_max(
                 dist_transform, 
-                min_distance=min_distance, 
+                min_distance=current_min_dist, 
                 labels=mask,
                 exclude_border=False
             )
             
+            if balance_patches:
+                # Limit points for small patches
+                # Say we want point density to be somewhat uniform.
+                # area / num_peaks should be roughly constant.
+                
+                # We use the distance transform to estimate a "natural" number of peaks 
+                # given the min_distance. But for very small patches, even 1 peak might 
+                # be "over-representing" them relative to their area if we have thinned 
+                # out big areas significantly.
+                
+                target_density = 1 / (min_distance**2) # points per pixel
+                # Heuristic: Target number of points proportional to area.
+                # We allow slightly more points than the strict proportional density to ensure 
+                # small patches are still represented.
+                target_num_peaks = max(1, int(label_areas[label_val] * target_density * 1.5)) 
+                
+                # Further correction: if a patch is very small, we might want to skip it 
+                # or strictly limit it to 1 point if it's below a threshold.
+                min_patch_area = (min_distance ** 2) / 2
+                if label_areas[label_val] < min_patch_area:
+                     target_num_peaks = 0 # Too small to represent at this scale
+                     print(f"      Label {label_val}: Area={label_areas[label_val]} is too small. Skipping.")
+                
+                if len(peaks) > target_num_peaks:
+                     print(f"      Label {label_val}: Area={label_areas[label_val]}, Peaks={len(peaks)} -> Reduced to {target_num_peaks}")
+                     # Sort peaks by distance transform value (most central first)
+                     peak_vals = dist_transform[tuple(peaks.T)]
+                     idx = np.argsort(peak_vals)[::-1]
+                     peaks = peaks[idx[:target_num_peaks]]
+
             if len(peaks) > 0:
                 all_ii.extend(peaks[:, 0])
                 all_jj.extend(peaks[:, 1])
