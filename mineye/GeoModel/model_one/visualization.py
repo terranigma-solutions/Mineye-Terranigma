@@ -88,17 +88,6 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
         samples=(prior_inference_data.prior[r'dips'].values[0, :]),
         update_model_fn=_update_model_for_plotting,
         gempy_plot=p2d
-        # ve=ve,
-        # kde_kwargs={
-        #         'gridsize'         : 300,
-        #         'bw'               : 0.1,
-        #         'alpha'            : 1,
-        #         'cmap'             : 'Blues',
-        #         'lognorm'          : True,  # Use log normalization
-        #         'density_threshold': 0,  # Mask bottom 10%
-        #         'vmin_percentile'  : 0,  # Start color scale at 5th percentile
-        #         'vmax_percentile'  : 100  # End color scale at 95th percentile
-        # },
     )
 
     if hasattr(prior_inference_data, 'posterior') and True:
@@ -109,22 +98,12 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
             update_model_fn=_update_model_for_plotting,
             gempy_plot=p2d,
             contour_colors=[default_red],
-            # kde_kwargs={
-            #         'gridsize'         : 300,
-            #         'bw'               : 0.1,
-            #         'alpha'            : 1,
-            #         'cmap'             : 'Reds',
-            #         'lognorm'          : False,  # Use log normalization
-            #         'density_threshold': 40,  # Mask bottom 10%iaa
-            #         'vmin_percentile'  : 0,  # Start color scale at 5th percentile
-            #         'vmax_percentile'  : 100  # End color scale at 95th percentile
-            # }
         )
 
     return p2d
 
 
-def compute_probability_density_fields(geo_model: gp.data.GeoModel, inference_data: xarray.Dataset, 
+def compute_probability_density_fields(geo_model: gp.data.GeoModel, inference_data: xarray.Dataset,
                                        n_samples=50) -> fields.OnlineProbability:
     from gempy.core.data.grid_modules import RegularGrid
     geo_model.grid.dense_grid = RegularGrid(
@@ -142,29 +121,22 @@ def compute_probability_density_fields(geo_model: gp.data.GeoModel, inference_da
     gp.compute_model(gempy_model=geo_model)
     lith = geo_model.solutions.raw_arrays.lith_block
 
-    unique_liths = np.unique(lith)
-    online_prob = fields.OnlineProbability(lith.shape[0], unique_liths)
-    
-    for i in np.linspace(0, inference_data.draw.size -1 , n_samples, dtype=int):
-        ori = inference_data[r'dips'].values[0, :][i]
-        _update_model_for_plotting(geo_model, ori, i)
+    online_prob = fields.OnlineProbability(
+        n_cells=lith.shape[0],
+        unique_lithologies=(np.unique(lith))
+    )
+
+    for i in np.linspace(0, inference_data.draw.size - 1, n_samples, dtype=int):
+        _update_model_for_plotting(
+            geo_model=geo_model,
+            sample_value=(inference_data[r'dips'].values[0, :][i]),
+            sample_idx=i
+        )
         gp.compute_model(gempy_model=geo_model)
-        lith = geo_model.solutions.raw_arrays.lith_block
-        online_prob.update(lith)
-            
+        online_prob.update(geo_model.solutions.raw_arrays.lith_block)
+
     return online_prob
 
-    gpv.plot_2d(
-        geo_model,
-        # override_regular_grid=foo[0],
-        override_regular_grid=online_prob.probability_field[0],
-        show_data=True,
-        ve=ve,
-        kwargs_lithology={
-                'cmap': 'viridis',
-                'norm': None
-        }
-    )
 
 def gempy_viz_pro(geo_model: gp.data.GeoModel, prior_inference_data: arviz.InferenceData):
     p2d = gempy_viz(geo_model, prior_inference_data, n_samples=10)
