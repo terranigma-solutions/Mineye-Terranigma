@@ -113,7 +113,7 @@ def test_read_EnMap(base_dir, model_extent, simple_geo_model):
         print(f"   Valid pixels: {np.sum(~np.isnan(data))} / {data.size} ({100 * np.sum(~np.isnan(data)) / data.size:.1f}%)")
 
 
-def _extract_points_from_raster(raster_path, extent, step=10, z_value=None, topo_path=None):
+def _extract_points_from_raster(raster_path, extent, step=10, z_value=None, topo_path=None, margin=0.0):
     """
     Private method to extract points from a raster within a given extent.
     """
@@ -126,6 +126,14 @@ def _extract_points_from_raster(raster_path, extent, step=10, z_value=None, topo
         data = src.read(1, window=window)
         transform = src.window_transform(window)
         
+        # 0. Crop points near borders
+        rows, cols = data.shape
+        row_margin = int(rows * margin)
+        col_margin = int(cols * margin)
+        
+        crop_mask = np.zeros_like(data, dtype=bool)
+        crop_mask[row_margin:rows-row_margin, col_margin:cols-col_margin] = True
+        
         rows, cols = data.shape
         row_indices = np.arange(0, rows, step)
         col_indices = np.arange(0, cols, step)
@@ -135,6 +143,11 @@ def _extract_points_from_raster(raster_path, extent, step=10, z_value=None, topo
         # Flatten indices
         ii_flat = ii.flatten()
         jj_flat = jj.flatten()
+
+        # Filter by crop mask
+        in_crop = crop_mask[ii_flat, jj_flat]
+        ii_flat = ii_flat[in_crop]
+        jj_flat = jj_flat[in_crop]
         
         # Get labels
         labels = data[ii_flat, jj_flat]
@@ -175,7 +188,7 @@ def _extract_points_from_raster(raster_path, extent, step=10, z_value=None, topo
         return xyz, labels_valid, data, (left, right, bottom, top)
 
 
-def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step_inner=20, kernel_size=5, z_value=None, topo_path=None):
+def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step_inner=20, kernel_size=5, z_value=None, topo_path=None, margin=0.0):
     """
     Extract points using a spatial kernel to identify boundaries and reduce points in homogeneous areas.
     """
@@ -188,6 +201,14 @@ def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step
         # Read the data within the window at full resolution
         data = src.read(1, window=window)
         transform = src.window_transform(window)
+        
+        # 0. Crop points near borders
+        rows, cols = data.shape
+        row_margin = int(rows * margin)
+        col_margin = int(cols * margin)
+        
+        crop_mask = np.zeros_like(data, dtype=bool)
+        crop_mask[row_margin:rows-row_margin, col_margin:cols-col_margin] = True
         
         # Clean data (handle NaNs and label mapping as in previous step)
         # We need to fill NaNs for boundary detection, but we'll mask them out later
@@ -215,7 +236,7 @@ def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step
         inner_mask &= ~boundaries
         
         # Combine masks
-        sampling_mask = boundary_mask | inner_mask
+        sampling_mask = (boundary_mask | inner_mask) & crop_mask
         
         # Mask out NaNs and ignored labels (label 1)
         sampling_mask &= ~mask_nan
@@ -244,7 +265,7 @@ def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step
         return xyz, labels_valid, data, (left, right, bottom, top)
 
 
-def _extract_points_central_reduced(raster_path, extent, min_distance=25, z_value=None, topo_path=None, balance_patches=True):
+def _extract_points_central_reduced(raster_path, extent, min_distance=25, z_value=None, topo_path=None, balance_patches=True, margin=0.05):
     """
     Extract points from the center of geological bodies using distance transform.
     Prioritizes points furthest from boundaries and ensures they are spatially separated.
@@ -264,6 +285,14 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=25, z_valu
         data = src.read(1, window=window)
         transform = src.window_transform(window)
         
+        # 0. Crop points near borders
+        rows, cols = data.shape
+        row_margin = int(rows * margin)
+        col_margin = int(cols * margin)
+        
+        crop_mask = np.zeros_like(data, dtype=bool)
+        crop_mask[row_margin:rows-row_margin, col_margin:cols-col_margin] = True
+        
         # Clean data (handle NaNs and label mapping)
         data_mapped = data.copy()
         mask_nan = np.isnan(data)
@@ -277,7 +306,7 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=25, z_valu
         
         # 2. Distance transform: distance to nearest boundary or NaN
         # We want to be far from boundaries AND far from NaN areas (which are outside the domain)
-        dist_mask = ~boundaries & ~mask_nan
+        dist_mask = ~boundaries & ~mask_nan & crop_mask
         dist_transform = ndimage.distance_transform_edt(dist_mask)
         
         # 3. Extract peaks for each label
@@ -356,16 +385,18 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=25, z_valu
                 
                 target_density = 1 / (min_distance**2) # points per pixel
                 # Heuristic: Target number of points proportional to area.
-                # We allow slightly more points than the strict proportional density to ensure 
-                # small patches are still represented.
-                target_num_peaks = max(1, int(label_areas[label_val] * target_density * 1.5)) 
+                # We want a more uniform distribution.
+                # Actually, if we use target_density = 1 / (min_distance**2), 
+                # peak_local_max ALREADY tries to achieve this density.
+                # To actually thinning it out MORE than peak_local_max, we should use a stricter density.
+                target_num_peaks = max(1, int(label_areas[label_val] * target_density * 0.2)) 
                 
                 # Further correction: if a patch is very small, we might want to skip it 
                 # or strictly limit it to 1 point if it's below a threshold.
-                min_patch_area = (min_distance ** 2) / 2
+                min_patch_area = (min_distance ** 2)
                 if label_areas[label_val] < min_patch_area:
-                     target_num_peaks = 0 # Too small to represent at this scale
-                     print(f"      Label {label_val}: Area={label_areas[label_val]} is too small. Skipping.")
+                     # Even if it's small, we keep at most 1 point if it has any valid pixel
+                     target_num_peaks = 1 
                 
                 if len(peaks) > target_num_peaks:
                      print(f"      Label {label_val}: Area={label_areas[label_val]}, Peaks={len(peaks)} -> Reduced to {target_num_peaks}")
