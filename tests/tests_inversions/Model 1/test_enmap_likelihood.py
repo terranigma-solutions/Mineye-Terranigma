@@ -27,7 +27,7 @@ def test_enmap_offset_gempy(simple_geo_model, topography_dir):
 
     print(f"\n⏱️  Model computation time: {elapsed_time:.2f} seconds")
     
-    gpv.plot_3d(simple_geo_model, ve=5, image=True)
+    gpv.plot_3d(simple_geo_model, ve=5, image=False)
 
 
 def test_compare_enmap_gempy_labels(simple_geo_model, base_dir):

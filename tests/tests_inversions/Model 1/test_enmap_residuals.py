@@ -43,9 +43,12 @@ def test_enmap_gempy_residual_plots(simple_geo_model, base_dir):
     labels_gempy = simple_geo_model.solutions.raw_arrays.custom.astype(int)
 
     # 5. Apply mapping as specified by user
-    # EnMap 0 maps to GemPy 1
-    # EnMap 2 maps to GemPy 2
-    mapping = {0: 1, 2: 2}
+    # EnMap 0 maps to GemPy 2
+    # EnMap 2 maps to GemPy 1
+    mapping = {
+            0: 2,
+            2: 1
+    }
 
     mapped_enmap_labels = np.zeros_like(labels_enmap)
     for enmap_val, gempy_val in mapping.items():
