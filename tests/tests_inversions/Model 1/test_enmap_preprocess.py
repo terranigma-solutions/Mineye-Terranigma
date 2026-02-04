@@ -338,31 +338,9 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=25, z_valu
             
             current_min_dist = min_distance
             if balance_patches:
-                # If area is small, we might want to increase min_distance to get fewer points
-                # or just use num_peaks in peak_local_max
                 area_ratio = label_areas[label_val] / max_area
-                # If area is only 1% of the max area, we probably don't want many points.
-                # However, we want at least one point if possible.
-                
-                # Heuristic: cap number of points proportional to area
-                # total_points_budget = (data_mapped.size / (min_distance**2))
-                # expected_points = total_points_budget * (label_areas[label_val] / data_mapped.size)
-                
-                # Another approach: adjust min_distance. 
-                # Larger area -> smaller min_distance (more dense)
-                # Smaller area -> larger min_distance (less dense)
-                # This is counter-intuitive if we want to AVOID over-representing small patches.
-                # Actually, small patches get over-represented because they might only fit ONE point,
-                # but that one point represents a tiny area, while a large patch has many points,
-                # but maybe fewer per unit area than the small patch.
-                
-                # Actually, the user says "By removing redundant points on big areas it seems that we are over representing small patches."
-                # This means the big areas are being thinned out TOO MUCH compared to small patches.
-                # So we should either:
-                # 1. Thin out small patches more.
-                # 2. Thin out big areas less.
-                
-                # Let's try to limit the number of peaks for small patches.
+                # We use area_ratio to scale the density of points. 
+                # This increases points on large areas and reduces them on small areas.
                 pass
 
             # Use peak_local_max to find central points
@@ -374,29 +352,17 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=25, z_valu
             )
             
             if balance_patches:
-                # Limit points for small patches
-                # Say we want point density to be somewhat uniform.
-                # area / num_peaks should be roughly constant.
-                
-                # We use the distance transform to estimate a "natural" number of peaks 
-                # given the min_distance. But for very small patches, even 1 peak might 
-                # be "over-representing" them relative to their area if we have thinned 
-                # out big areas significantly.
-                
+                # Heuristic: Target number of points proportional to area, weighted by area_ratio.
                 target_density = 1 / (min_distance**2) # points per pixel
-                # Heuristic: Target number of points proportional to area.
-                # We want a more uniform distribution.
-                # Actually, if we use target_density = 1 / (min_distance**2), 
-                # peak_local_max ALREADY tries to achieve this density.
-                # To actually thinning it out MORE than peak_local_max, we should use a stricter density.
-                target_num_peaks = max(1, int(label_areas[label_val] * target_density * 0.2)) 
                 
-                # Further correction: if a patch is very small, we might want to skip it 
-                # or strictly limit it to 1 point if it's below a threshold.
-                min_patch_area = (min_distance ** 2)
-                if label_areas[label_val] < min_patch_area:
-                     # Even if it's small, we keep at most 1 point if it has any valid pixel
-                     target_num_peaks = 1 
+                # Using area_ratio (label_area / max_area) instead of a constant factor (0.2)
+                # increases points on large areas and reduces them on small areas.
+                target_num_peaks = int(label_areas[label_val] * target_density * area_ratio)
+                
+                # Further correction: for small patches, we no longer force 1 point.
+                # We only ensure at least one point if the label area is significant enough.
+                if target_num_peaks == 0 and label_areas[label_val] >= (min_distance ** 2):
+                    target_num_peaks = 1
                 
                 if len(peaks) > target_num_peaks:
                      print(f"      Label {label_val}: Area={label_areas[label_val]}, Peaks={len(peaks)} -> Reduced to {target_num_peaks}")
@@ -538,7 +504,11 @@ def test_central_body_extraction(base_dir, model_extent, topography_dir):
     # 2. Central extraction (new approach)
     # min_distance ensures points are not correlated
     xyz_central, labels_central, data, bounds = _extract_points_central_reduced(
-        enmap_path, model_extent, min_distance=25, topo_path=topo_path
+        enmap_path,
+        model_extent,
+        min_distance=50,
+        topo_path=topo_path,
+        balance_patches=True
     )
     
     print(f"\n📊 Strategy Comparison:")
