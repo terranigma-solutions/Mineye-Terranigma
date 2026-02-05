@@ -21,7 +21,7 @@ from mineye.GeoModel.model_one.visualization import (generate_gravity_uncertaint
                                                      gempy_viz,
                                                      plot_many_observed_vs_forward,
                                                      plot_joint_inversion_results,
-                                                     compute_probability_density_fields)
+                                                     compute_probability_density_fields, probability_fields_for, plot_probability_heatmap, plot_heat_map)
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 
@@ -87,7 +87,7 @@ class TestJointInversion:
         # likelihood_fn = generate_joint_likelihood(norm_params)
         gravity_dist = generate_multigravity_likelihood_hierarchical_per_station(norm_params)
         enmap_dist = enmap_likelihood_fn
-        
+
         prob_model = gpp.make_gempy_pyro_model(
             priors=model_priors,
             set_interp_input_fn=joint_set_priors,
@@ -134,14 +134,6 @@ class TestJointInversion:
         data.to_netcdf(save_path)
         print(f"Saved joint inversion results to {save_path}")
 
-        # 10. Visualization
-        plot_joint_inversion_results(
-            data=data,
-            observed_gravity=observed_gravity_ugal,
-            xy_gravity=xy_ravel,  # xy_ravel expects (n, 2)
-            geo_model=simple_geo_model
-        )
-        plt.show()
 
     def test_run_diagnostics(self):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_joint_Feb05_2026.nc"))
@@ -154,13 +146,6 @@ class TestJointInversion:
         plt.show()
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
-
-        # We need the gravity locations for plotting
-        gravity_xyz = np.zeros((len(gravity_data), 3))
-        gravity_xyz[:, 0] = gravity_data['X'].values
-        gravity_xyz[:, 1] = gravity_data['Y'].values
-        gravity_xyz[:, 2] = gravity_data['Z'].values
-        xy_ravel = gravity_xyz[:, :2]
 
         # Prepare data
         observed_norm = observed_gravity_ugal
@@ -176,24 +161,9 @@ class TestJointInversion:
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_joint_Feb05_2026.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
-        # Reconstruct the geomodel setup as in test_joint_inversion
-        gravity_xyz = np.zeros((len(gravity_data), 3))
-        gravity_xyz[:, 0] = gravity_data['X'].values
-        gravity_xyz[:, 1] = gravity_data['Y'].values
-        gravity_xyz[:, 2] = gravity_data['Z'].values
+        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
-        xyz_path = os.path.join(base_dir, 'central_xyz.npy')
-        xyz_enmap = np.load(xyz_path)
-        combined_custom_points = np.vstack([gravity_xyz, xyz_enmap])
-
-        gp.set_custom_grid(simple_geo_model.grid, combined_custom_points)
-        gp.set_active_grid(
-            grid=simple_geo_model.grid,
-            grid_type=[simple_geo_model.grid.GridTypes.CUSTOM],
-            reset=True
-        )
-
-        gempy_viz(simple_geo_model, data, n_samples=100, ve=3)
+        gempy_viz(geo_model, data, n_samples=20, ve=3)
 
     def test_run_analysis(self, simple_geo_model, geophysical_dir, base_dir):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_joint_Feb05_2026.nc"))
@@ -202,11 +172,7 @@ class TestJointInversion:
         plt.show()
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
-        gravity_xyz = np.zeros((len(gravity_data), 3))
-        gravity_xyz[:, 0] = gravity_data['X'].values
-        gravity_xyz[:, 1] = gravity_data['Y'].values
-        gravity_xyz[:, 2] = gravity_data['Z'].values
-        xy_ravel = gravity_xyz[:, :2]
+        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
         plt.rcParams['figure.dpi'] = 72  # Lower DPI for faster rendering
 
@@ -242,94 +208,45 @@ class TestJointInversion:
                 xy_ravel=xy_ravel
             )
 
+        if hasattr(data, 'posterior') and response in data.prior:
+            gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
+                gravity_samples_norm=data.posterior_predictive[response].values[0, :],  # (n_samples, n_devices)
+                observed_gravity_ugal=observed_gravity_ugal,
+                xy_ravel=xy_ravel
+            )
+
         # * 9) Analysis Gempy Model
         gempy_viz(simple_geo_model, data)
 
     def test_probability_plots(self, simple_geo_model, geophysical_dir, base_dir, topography_dir):
         data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_joint_Feb05_2026.nc"))
 
-        # Reconstruct the geomodel setup as in test_joint_inversion
-        gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
-        gravity_xyz = np.zeros((len(gravity_data), 3))
-        gravity_xyz[:, 0] = gravity_data['X'].values
-        gravity_xyz[:, 1] = gravity_data['Y'].values
-        gravity_xyz[:, 2] = gravity_data['Z'].values
-
-        xyz_path = os.path.join(base_dir, 'central_xyz.npy')
-        xyz_enmap = np.load(xyz_path)
-        combined_custom_points = np.vstack([gravity_xyz, xyz_enmap])
-
-        gp.set_custom_grid(simple_geo_model.grid, combined_custom_points)
-        gp.set_active_grid(
-            grid=simple_geo_model.grid,
-            grid_type=[simple_geo_model.grid.GridTypes.CUSTOM],
-            reset=True
-        )
-
-        self._probability_fields_for(simple_geo_model, data.prior, topography_dir)
-        self._probability_fields_for(simple_geo_model, data.posterior, topography_dir)
-
-    @staticmethod
-    def _probability_fields_for(geo_model, inference_data, topography_dir):
-        online_prob = compute_probability_density_fields(
-            geo_model,
-            inference_data,
-            n_samples=20
-        )
-        import gempy_viewer as gpv
-
-        gpv.plot_2d(
-            geo_model,
-            override_regular_grid=online_prob.probability_field[0],
-            show_data=True,
-            ve=5,
-            kwargs_lithology={'cmap': 'viridis', 'norm': None}
-        )
-
-        gpv.plot_2d(
-            geo_model,
-            override_regular_grid=online_prob.probability_field[1],
-            show_data=True,
-            ve=5,
-            kwargs_lithology={'cmap': 'viridis', 'norm': None}
-        )
-
-        gpv.plot_2d(
-            geo_model,
-            override_regular_grid=online_prob.entropy,
-            show_data=True,
-            ve=5,
-            kwargs_lithology={'cmap': 'magma', 'norm': None}
-        )
 
         topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
-        gp.set_topography_from_file(
-            grid=geo_model.grid,
-            filepath=topography_path,
-            crop_to_extent=[
-                    geo_model.grid.extent[0],
-                    geo_model.grid.extent[2],
-                    geo_model.grid.extent[1],
-                    geo_model.grid.extent[3]
-            ]
+
+        probability_fields_for(simple_geo_model, data.prior, topography_path)
+        probability_fields_for(simple_geo_model, data.posterior, topography_path)
+
+
+    def test_check_trace(self):
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_joint_Feb05_2026.nc"))
+        az.plot_trace(data.posterior)
+        plt.show()
+
+        plot_probability_heatmap(data, 'prior')
+        plot_probability_heatmap(data, 'posterior_predictive')
+
+        plot_heat_map(
+            group='posterior_predictive',
+            heatmap_data=(data.posterior_predictive['probs_pred'].isel(chain=0, draw=-1).values.T)
         )
 
-        gp.compute_model(geo_model)
+        plot_heat_map(
+            group='posterior_predictive',
+            heatmap_data=(data.posterior_predictive['probs_pred'].isel(chain=0, draw=-10).values.T)
+        )
 
-        # * We inject the entropy field into the model
-        geo_model.solutions.raw_arrays.scalar_field_matrix[0] = online_prob.entropy
-        gpv.plot_3d(
-            model=geo_model,
-            active_scalar_field="sf_0",
-            show_scalar=True,
-            show_lith=False,
-            show_topography=True,
-            image=True,
-            ve=4,
-            threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
-            kwargs_pyvista_bounds={
-                    'show_xlabels': False,
-                    'show_ylabels': False,
-                    'show_zlabels': False,
-            }
+        plot_heat_map(
+            group='posterior_predictive',
+            heatmap_data=(data.posterior_predictive['probs_pred'].isel(chain=0, draw=-20).values.T)
         )
