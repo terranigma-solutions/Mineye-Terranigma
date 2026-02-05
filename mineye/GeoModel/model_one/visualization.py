@@ -265,7 +265,8 @@ def plot_heat_map(group, heatmap_data):
     plt.show()
 
 
-def probability_fields_for(geo_model, inference_data, topography_dir):
+
+def probability_fields_for(geo_model, inference_data, topography_path):
     online_prob = compute_probability_density_fields(
         geo_model,
         inference_data,
@@ -310,7 +311,6 @@ def probability_fields_for(geo_model, inference_data, topography_dir):
     import gempy as gp
     import os
     simple_geo_model = geo_model
-    topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
     gp.set_topography_from_file(
         grid=simple_geo_model.grid,
         filepath=topography_path,

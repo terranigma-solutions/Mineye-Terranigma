@@ -260,6 +260,7 @@ class TestProbabilisticInversion:
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
-        # TODO: Make the probability plot
-        probability_fields_for(geo_model, data.prior, topography_dir)
-        probability_fields_for(geo_model, data.posterior, topography_dir)
+
+        topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
+        probability_fields_for(geo_model, data.prior, topography_path)
+        probability_fields_for(geo_model, data.posterior, topography_path)

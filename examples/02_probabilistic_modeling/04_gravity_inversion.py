@@ -82,6 +82,7 @@ import dotenv
 dotenv.load_dotenv()
 
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
+from mineye.GeoModel.model_one.visualization import probability_fields_for
 from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward, generate_gravity_uncertainty_plots
 
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
@@ -1177,16 +1178,26 @@ if "sigma_stations" in data.posterior_predictive:
 # * **Information Entropy**: Quantifies the total uncertainty. High entropy means
 #   high uncertainty about which unit is present.
 
-from mineye.GeoModel.model_one.visualization import probability_fields_for
-
-
+# Resetting the model
+geo_model = gp.create_geomodel(
+    project_name='gravity_inversion',
+    extent=extent,
+    refinement=refinement,
+    resolution=resolution,
+    importer_helper=gp.data.ImporterHelper(
+        path_to_orientations=mod_or_path,
+        path_to_surface_points=mod_pts_path,
+    )
+)
 
 # Prior Probability Fields
 print("\nComputing prior probability fields...")
+
+topography_path = paths.get_topography_path()
 probability_fields_for(
     geo_model=geo_model,
     inference_data=data.prior,
-    topography_dir=geophysical_dir
+    topography_path=topography_path
 )
 
 # Posterior Probability Fields
@@ -1195,7 +1206,7 @@ if hasattr(data, 'posterior'):
     probability_fields_for(
         geo_model=geo_model,
         inference_data=data.posterior,
-        topography_dir=geophysical_dir
+        topography_path=topography_path
     )
 
 # %%
