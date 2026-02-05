@@ -17,7 +17,7 @@ from tests.tests_inversions.conftest import simple_geo_model, topography_dir, ba
 from mineye.GeoModel.model_one.probabilistic_model import _modify_orientations
 from mineye.GeoModel.model_one.visualization import (gempy_viz,
                                                      plot_many_observed_vs_forward,
-                                                     compute_probability_density_fields)
+                                                     compute_probability_density_fields, plot_probability_heatmap, plot_heat_map)
 
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import enmap_likelihood_fn
 
@@ -62,42 +62,7 @@ class TestEnMapInversion:
         plt.legend()
         plt.show()
 
-        def plot_probability_heatmap(data, group='prior'):
-            import seaborn as sns
-            # Get the data array from ArviZ InferenceData
-            # Standard Shape: (chain, draw, n_points, n_classes)
-            # Example: (1, 50, 57, 3)
-            probs_da = data[group]['probs_pred']
-
-            # 1. Average over 'chain' and 'draw' dimensions to get mean per point
-            # Result Shape: (n_points, n_classes)
-            mean_probs = probs_da.mean(dim=["chain", "draw"]).values
-
-            # 2. Transpose for the Heatmap
-            # We want Y-axis = Classes, X-axis = Points
-            # Result Shape: (n_classes, n_points)
-            heatmap_data = mean_probs.T
-
-            # 3. Plot
-            plt.figure(figsize=(14, 4))
-            sns.heatmap(heatmap_data, cmap="Blues", vmin=0, vmax=1,
-                        annot=False, # Set True if you want numbers inside cells
-                        cbar_kws={'label': 'Probability'})
-
-            plt.title(f"Average Class Probabilities per Point ({group.capitalize()})")
-            plt.xlabel("Point Index (0 to 56)")
-            plt.ylabel("Rock Unit (Class)")
-
-            # Fix Y-axis labels to be integers (0, 1, 2)
-            plt.yticks(ticks=np.arange(heatmap_data.shape[0]) + 0.5,
-                       labels=np.arange(heatmap_data.shape[0]),
-                       rotation=0)
-
-            # plt.tight_layout()
-            plt.show()
-
         plot_probability_heatmap(prior_data, 'prior')
-
 
     def test_enmap_inversion(self, simple_geo_model, base_dir, n_samples=50,
                              arviz_data_filename="arviz_data_enmap_Feb04_2026.nc"):
@@ -110,7 +75,7 @@ class TestEnMapInversion:
             prob_model=prob_model,
             geo_model=geo_model,
             y_obs_list=None,
-            n_samples=n_samples,
+            n_samples=300,
             plot_trace=True
         )
 
@@ -130,8 +95,8 @@ class TestEnMapInversion:
                 init_strategy='median',
                 # num_samples=20,
                 # warmup_steps=20,
-                num_samples=200,
-                warmup_steps=200,
+                num_samples=200 * 5,
+                warmup_steps=200 * 5,
             ),
             plot_trace=True,
             run_posterior_predictive=True
@@ -151,7 +116,7 @@ class TestEnMapInversion:
 
         xyz_enmap = np.load(xyz_path)
         labels_enmap = np.load(labels_path)
-        labels_enmap[labels_enmap == 2] = 1 # * Normalize the labels
+        labels_enmap[labels_enmap == 2] = 1  # * Normalize the labels
 
         print(f"\nLoaded {len(xyz_enmap)} points from EnMap extraction.")
 
@@ -187,7 +152,8 @@ class TestEnMapInversion:
         return simple_geo_model, labels_enmap_tensor, prob_model
 
     def test_run_predictive_analysis(self, simple_geo_model, base_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_enmap.nc"))
+        # TODO: I do not think this makes any sense here
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_enmap_Feb04_2026.nc"))
         az.plot_trace(data.prior)
         plt.show()
 
@@ -205,11 +171,35 @@ class TestEnMapInversion:
         plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm)
 
     def test_run_kde_sections(self, simple_geo_model, base_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_enmap.nc"))
-        gempy_viz(simple_geo_model, data, n_samples=100, ve=3)
+        # * The prior of this should look exactly the same as the gravity
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_enmap_Feb04_2026.nc"))
+        gempy_viz(simple_geo_model, data, n_samples=50, ve=3)
+
+    def test_check_trace(self):
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_enmap_Feb04_2026.nc"))
+        az.plot_trace(data.posterior)
+        plt.show()
+
+        plot_probability_heatmap(data, 'prior')
+        plot_probability_heatmap(data, 'posterior_predictive')
+
+        plot_heat_map(
+            group='posterior_predictive',
+            heatmap_data=(data.posterior_predictive['probs_pred'].isel(chain=0, draw=-1).values.T)
+        )
+
+        plot_heat_map(
+            group='posterior_predictive',
+            heatmap_data=(data.posterior_predictive['probs_pred'].isel(chain=0, draw=-10).values.T)
+        )
+
+        plot_heat_map(
+            group='posterior_predictive',
+            heatmap_data=(data.posterior_predictive['probs_pred'].isel(chain=0, draw=-20).values.T)
+        )
 
     def test_run_analysis(self, simple_geo_model, base_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_enmap.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_enmap_Feb04_2026.nc"))
 
         az.plot_posterior(data, var_names=["dips"])
         plt.show()
@@ -231,7 +221,7 @@ class TestEnMapInversion:
         gempy_viz(simple_geo_model, data)
 
     def test_probability_plots(self, simple_geo_model, base_dir, topography_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_enmap.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_enmap_Feb04_2026.nc"))
 
         self._probability_fields_for(simple_geo_model, data.prior, topography_dir)
         self._probability_fields_for(simple_geo_model, data.posterior)
@@ -241,7 +231,7 @@ class TestEnMapInversion:
         online_prob = compute_probability_density_fields(
             geo_model,
             inference_data,
-            n_samples=20
+            n_samples=100
         )
         import gempy_viewer as gpv
 
@@ -266,6 +256,8 @@ class TestEnMapInversion:
                     'norm': None
             }
         )
+
+        return
 
         if topography_dir:
             import gempy as gp

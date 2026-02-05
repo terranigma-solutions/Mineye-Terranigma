@@ -196,3 +196,41 @@ def _update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float,
         geo_model=geo_model,
         dip=sample_value,
     )
+
+def plot_probability_heatmap(data, group='prior'):
+    # Get the data array from ArviZ InferenceData
+    # Standard Shape: (chain, draw, n_points, n_classes)
+    # Example: (1, 50, 57, 3)
+    probs_da = data[group]['probs_pred']
+
+    # 1. Average over 'chain' and 'draw' dimensions to get mean per point
+    # Result Shape: (n_points, n_classes)
+    mean_probs = probs_da.mean(dim=["chain", "draw"]).values
+
+    # 2. Transpose for the Heatmap
+    # We want Y-axis = Classes, X-axis = Points
+    # Result Shape: (n_classes, n_points)
+    heatmap_data = mean_probs.T
+
+    plot_heat_map(group, heatmap_data)
+
+
+def plot_heat_map(group, heatmap_data):
+    import seaborn as sns
+    # 3. Plot
+    plt.figure(figsize=(14, 4))
+    sns.heatmap(heatmap_data, cmap="Blues", vmin=0, vmax=1,
+                annot=False,  # Set True if you want numbers inside cells
+                cbar_kws={'label': 'Probability'})
+
+    plt.title(f"Average Class Probabilities per Point ({group.capitalize()})")
+    plt.xlabel("Point Index (0 to 56)")
+    plt.ylabel("Rock Unit (Class)")
+
+    # Fix Y-axis labels to be integers (0, 1, 2)
+    plt.yticks(ticks=np.arange(heatmap_data.shape[0]) + 0.5,
+               labels=np.arange(heatmap_data.shape[0]),
+               rotation=0)
+
+    # plt.tight_layout()
+    plt.show()
