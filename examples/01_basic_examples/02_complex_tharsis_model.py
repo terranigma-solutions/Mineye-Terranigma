@@ -30,6 +30,25 @@ This example demonstrates a **two-model workflow**:
 3. Finally, the models are merged by overwriting the sedimentary lithologies where
    the plutonite exists
 
+**Why two models instead of one?**
+
+Standard implicit modeling (using a single scalar field) can sometimes struggle with
+**erosive contacts** and complex topological relationships. By using two separate
+models, we gain several advantages:
+
+* **Implicit vs. Explicit Topology**: Instead of relying on the interpolator to correctly
+  handle the cutting relationship (implicit), we explicitly define it during the merge
+  step. This ensures the plutonite always "wins" and cuts cleanly through the host rock.
+
+* **Independent Constraints**: The sedimentary layers are constrained by their own
+  orientations and surface points, while the plutonite is constrained by its unique
+  geometry. This prevents data from one domain from "bleeding" into and distorting
+  the other.
+
+* **Topological Robustness**: It ensures that no "floating" stratigraphic layers appear
+  inside the intrusive body, which can happen in single-model workflows if the
+  interpolated surfaces cross in unphysical ways.
+
 This approach allows each geological domain to be modeled with appropriate constraints
 while still producing a unified 3D model.
 
@@ -67,23 +86,19 @@ np.random.seed(1234)
 # * **Green** for Mid Devonian: Intermediate color for older sediments
 # * **Orange** for Famennian: Distinct color for basement rocks
 
-FORMATION_COLORS = {
-    'Tournaisian Plutonites': '#e74c3c',        # Red - plutonite
-    'Visean Shales': '#3498db',                 # Blue
-    'Mid Devonian Siliciclastics': '#2ecc71',   # Green
-    'Famennian Siliciclastics': '#f39c12',      # Orange - basement
-    'basement': '#8B4513',                      # Brown - default basement
-}
-
 # %%
 # Import Paths and Helper Modules
 # -------------------------------
 #
 # The ``paths`` module provides centralized access to data file locations.
 # The ``helper_plotter`` module contains custom visualization functions.
+# The ``example_parameters`` module contains shared configuration like color schemes.
 
 from mineye.config import paths
+from mineye.config.example_parameters import TharsisModelConfig
 from mineye.GeoModel import helper_plotter
+
+FORMATION_COLORS = TharsisModelConfig.TharsisDataProcessingConfig.FORMATION_COLORS
 
 # %%
 # Define Model Extent and Resolution
@@ -302,6 +317,46 @@ helper_plotter.plot_combined_model(
     topography_points=topography_points,
     title='Combined Geological Model - Tharsis Region'
 )
+
+# %%
+# **3D Cut-Away View**
+#
+# To better visualize the internal relationship where the plutonite cuts the sedimentary
+# layers, we can create a "cut-away" view. This removes a portion of the model to
+# reveal the internal 3D structure.
+
+import pyvista as pv
+
+# Create a PyVista structured grid from the regular grid
+x = np.linspace(extent[0], extent[1], resolution[0])
+y = np.linspace(extent[2], extent[3], resolution[1])
+z = np.linspace(extent[4], extent[5], resolution[2])
+grid = pv.RectilinearGrid(x, y, z)
+
+# Add lithology data to the grid
+grid.cell_data['Lithology'] = lith_block_modified
+
+# Create a clip box to remove the front-right quadrant
+clip_box = [
+    (extent[0] + extent[1]) / 2, extent[1],  # X range
+    (extent[2] + extent[3]) / 2, extent[3],  # Y range
+    extent[4], extent[5]                     # Z range
+]
+clipped_grid = grid.clip_box(clip_box, invert=True)
+
+# Map colors to the lithology IDs
+color_list = [FORMATION_COLORS[FORMATION_ID_MAP[i]] for i in sorted(FORMATION_ID_MAP.keys())]
+cmap = pv.LookupTable()
+cmap.n_values = len(color_list)
+for i, color in enumerate(color_list):
+    cmap.set_table_value(i, color)
+
+# Plot the clipped model
+plotter = pv.Plotter(window_size=[1024, 768])
+plotter.add_mesh(clipped_grid, scalars='Lithology', cmap=cmap, show_scalar_bar=False)
+plotter.add_text("3D Cut-Away View: Plutonite Intrusion", font_size=12)
+plotter.view_isometric()
+plotter.show()
 
 # %%
 # Summary and Next Steps
