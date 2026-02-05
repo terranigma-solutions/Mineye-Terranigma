@@ -16,6 +16,7 @@ from mineye.GeoModel.model_one.probabilistic_model import normalize
 from mineye.GeoModel.model_one.joint_probabilistic_model import joint_set_priors, generate_joint_likelihood
 
 from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
+from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_hierarchical_per_station, enmap_likelihood_fn
 from mineye.GeoModel.model_one.visualization import (generate_gravity_uncertainty_plots,
                                                      gempy_viz,
                                                      plot_many_observed_vs_forward,
@@ -83,15 +84,16 @@ class TestJointInversion:
         }
 
         # 6. Create Probabilistic Model
-        likelihood_fn = generate_joint_likelihood(norm_params)
-
+        # likelihood_fn = generate_joint_likelihood(norm_params)
+        gravity_dist = generate_multigravity_likelihood_hierarchical_per_station(norm_params)
+        enmap_dist = enmap_likelihood_fn
+        
         prob_model = gpp.make_gempy_pyro_model(
             priors=model_priors,
             set_interp_input_fn=joint_set_priors,
-            likelihood_fn=likelihood_fn,
+            likelihood_fn=[gravity_dist, enmap_dist],
             obs_name="Joint_Obs"
         )
-
         # 7. Prepare observed data
         gravity_obs_tensor = torch.tensor(observed_gravity_ugal, dtype=torch.float64)
         enmap_obs_tensor = torch.tensor(labels_enmap, dtype=torch.float64)
