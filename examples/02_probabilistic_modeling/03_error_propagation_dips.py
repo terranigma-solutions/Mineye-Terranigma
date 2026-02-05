@@ -98,7 +98,25 @@ print("✓ Switched to PyTorch backend")
 # %%
 # Define Prior Distribution for Dips
 # -----------------------------------
-# We'll add uncertainty to all orientation dip angles
+#
+# **Prior Predictive Sampling vs. Posterior Sampling**
+#
+# * **Prior Predictive Sampling**: Generating data from the model using parameters drawn
+#   from the prior distribution. It answers: "What kind of models/data do our initial
+#   beliefs produce?" It's a way to check if the model and priors are reasonable before
+#   considering observations.
+#
+# * **Posterior Sampling**: Generating parameters that are consistent with both our
+#   initial beliefs (priors) AND the observed data. It answers: "What parameters are
+#   most likely given the data we've seen?"
+#
+# In this example, we focus on **Prior Predictive Sampling** to see how uncertainty
+# in orientation dip angles propagates to the final structural geometry.
+#
+# We'll add uncertainty to all orientation dip angles.
+
+from mineye.config.example_parameters import TharsisModelConfig
+FORMATION_COLORS = TharsisModelConfig.TharsisDataProcessingConfig.FORMATION_COLORS
 
 n_orientations = geo_model.orientations_copy.xyz.shape[0]
 print(f"Number of orientations: {n_orientations}")
@@ -179,8 +197,11 @@ plot_gempy(
     n_samples=20,
     samples=(prior_inference_data.prior[r'dips'].values[0, :]),
     update_model_fn=update_model_for_plotting,
-    gempy_plot=p2d
+    gempy_plot=p2d,
+    contour_colors=[FORMATION_COLORS['Tournaisian Plutonites']]
 )
+
+# sphinx_gallery_thumbnail_number = 1
 
 print("✓ Visualization complete")
 
