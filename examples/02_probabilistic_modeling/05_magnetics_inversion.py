@@ -183,7 +183,7 @@ def setup_magnetic_geomodel(magnetic_data, simple_geo_model):
     xy_ravel = np.column_stack([
             np.array(magnetic_data.geometry.x.values),
             np.array(magnetic_data.geometry.y.values),
-            np.full(len(magnetic_data), 0)  # Surface elevation
+            np.full(len(magnetic_data), 500)  # Surface elevation
     ])
 
     # Setup centered grid for magnetics
@@ -191,7 +191,7 @@ def setup_magnetic_geomodel(magnetic_data, simple_geo_model):
         grid=simple_geo_model.grid,
         centers=xy_ravel,
         resolution=np.array([10, 10, 15]),
-        radius=np.array([5000, 5000, 5000])
+        radius=np.array([2000, 5000, 2000])
     )
 
     # Calculate magnetic gradient tensor
@@ -381,7 +381,7 @@ print(f"  Global mean noise prior: ~50.0 nT")
 # Step 9: Create Probabilistic Model
 # -----------------------------------
 
-prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
+prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
     priors=model_priors,
     set_interp_input_fn=set_magnetic_priors,
     likelihood_fn=likelihood_fn,
@@ -494,7 +494,8 @@ gempy_viz(
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_magnetics_np, norm_params)),
     many_forward_norm=prior_inference_data.prior[r'$\mu_{magnetics}$'].values[0, -10:],
-    observed_norm=observed_magnetics_nt
+    observed_norm=observed_magnetics_nt,
+    unit_label='nT'
 )
 
 # %%
@@ -647,7 +648,8 @@ print(f"  RMS: {np.sqrt((residuals ** 2).mean()):.2f} nT (fit quality)")
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_magnetics_np, norm_params)),
     many_forward_norm=data.posterior_predictive[r'$\mu_{magnetics}$'].values[0, -20:],
-    observed_norm=observed_magnetics_nt
+    observed_norm=observed_magnetics_nt,
+    unit_label='nT'
 )
 
 # %%

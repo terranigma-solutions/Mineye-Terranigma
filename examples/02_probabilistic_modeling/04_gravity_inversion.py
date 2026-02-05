@@ -838,7 +838,8 @@ gempy_viz(
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
     many_forward_norm=prior_inference_data.prior[r'$\mu_{gravity}$'].values[0, -10:],
-    observed_norm=observed_gravity_ugal
+    observed_norm=observed_gravity_ugal,
+    unit_label='μGal'
 )
 
 # %%
@@ -1088,7 +1089,8 @@ print(f"  Max absolute: {np.abs(residuals).max():.2f} µGal")
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
     many_forward_norm=data.posterior_predictive[r'$\mu_{gravity}$'].values[0, -20:],
-    observed_norm=observed_gravity_ugal
+    observed_norm=observed_gravity_ugal,
+    unit_label='μGal'
 )
 
 # %%

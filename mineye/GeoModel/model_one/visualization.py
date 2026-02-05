@@ -143,7 +143,7 @@ def gempy_viz_pro(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Infer
     p2d.axes[0].set_title("Uncertainty: representative realizations")
 
 
-def plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm):
+def plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm, unit_label=r'$\mu$Gal'):
     # Create figure
     fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -164,7 +164,6 @@ def plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm
         ax.plot(sorted_observed, sorted_fw, alpha=0.3, linewidth=1)
 
     # Set up plot attributes
-    unit_label = r'$\mu$Gal'
     ax.set_xlabel(f'Observed ({unit_label})')
     ax.set_ylabel(f'Forward Model ({unit_label})')
     ax.set_title('Observed vs Forward Model Correlation')
