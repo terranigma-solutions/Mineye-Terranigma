@@ -201,7 +201,6 @@ plot_gempy(
     samples=(prior_inference_data.prior[r'$\mu_{top}$'].values[0, :]),
     update_model_fn=update_model_for_plotting,
     gempy_plot=p2d,
-    ve=5
 )
 
 print("✓ Visualization complete")
