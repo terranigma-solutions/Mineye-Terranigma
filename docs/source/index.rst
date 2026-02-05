@@ -71,6 +71,26 @@ and Bayesian inversion techniques for geological and geophysical applications.
 
 ----
 
+.. _segmentation-examples:
+
+Hyperspectral Segmentation
+==========================
+
+Workflows for lithological segmentation of EnMap hyperspectral data using Bayesian inference.
+These examples cover feature extraction, preprocessing, and model comparison.
+
+.. include:: examples_segmentation/index.rst
+   :start-after: .. thumbnail-parent-div-open
+   :end-before: .. thumbnail-parent-div-close
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+
+   examples_segmentation/index
+
+----
+
 API Reference
 =============
 
@@ -86,24 +106,23 @@ Detailed documentation of the Mineye-Terranigma Python API.
 Key Features
 ============
 
-Bayesian Inference with Pyro
-----------------------------
+.. list-table::
+   :widths: 50 50
+   :header-rows: 0
 
-The project uses PyTorch and Pyro for probabilistic programming, enabling:
+   * - **Bayesian Inference with Pyro**
+     - **Geological Modeling with GemPy**
+   * - The project uses PyTorch and Pyro for probabilistic programming, enabling:
 
-* **Variational Inference (VI)**: Fast approximate posterior estimation
-* **Hamiltonian Monte Carlo (HMC/NUTS)**: Accurate sampling for complex posteriors
-* **GPU Acceleration**: Scalable inference for large-scale inversions
+       * **Variational Inference (VI)**: Fast approximate posterior estimation
+       * **Hamiltonian Monte Carlo (HMC/NUTS)**: Accurate sampling for complex posteriors
+       * **GPU Acceleration**: Scalable inference for large-scale inversions
+     - Building on the GemPy framework, the project supports:
 
-Geological Modeling with GemPy
-------------------------------
-
-Building on the GemPy framework, the project supports:
-
-* **Implicit Surface Modeling**: Continuous 3D geological surfaces from sparse data
-* **Structural Complexity**: Faults, unconformities, and erosive contacts
-* **Forward Modeling**: Gravity and magnetic field computations
-* **Uncertainty Quantification**: Probabilistic geological interpretations
+       * **Implicit Surface Modeling**: Continuous 3D geological surfaces from sparse data
+       * **Structural Complexity**: Faults, unconformities, and erosive contacts
+       * **Forward Modeling**: Gravity and magnetic field computations
+       * **Uncertainty Quantification**: Probabilistic geological interpretations
 
 ----
 
