@@ -308,6 +308,7 @@ def probability_fields_for(geo_model, inference_data, topography_dir):
         )
 
     import gempy as gp
+    import os
     simple_geo_model = geo_model
     topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
     gp.set_topography_from_file(
@@ -331,7 +332,7 @@ def probability_fields_for(geo_model, inference_data, topography_dir):
         show_scalar=True,
         show_lith=False,
         show_topography=True,
-        image=True,
+        image=False,
         ve=4,
         threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
         kwargs_pyvista_bounds={
@@ -340,4 +341,5 @@ def probability_fields_for(geo_model, inference_data, topography_dir):
                 'show_zlabels': False,
         }
     )
+    return online_prob
 

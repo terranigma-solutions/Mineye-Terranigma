@@ -836,7 +836,7 @@ gempy_viz(
 
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
-    many_forward_norm=prior_inference_data.prior[r'$\mu_{gravity}$'].values[0, -10:],
+    many_forward_norm=prior_inference_data.prior[r'gravity_response'].values[0, -10:],
     observed_norm=observed_gravity_ugal
 )
 
@@ -1177,42 +1177,26 @@ if "sigma_stations" in data.posterior_predictive:
 # * **Information Entropy**: Quantifies the total uncertainty. High entropy means
 #   high uncertainty about which unit is present.
 
-from mineye.GeoModel.model_one.visualization import compute_probability_density_fields
+from mineye.GeoModel.model_one.visualization import probability_fields_for
 
-# We need to ensure the grid is active for probability computation
-gp.set_active_grid(
-    grid=geo_model.grid,
-    grid_type=[geo_model.grid.GridTypes.REGULAR],
-    reset=True
-)
 
-online_prob = compute_probability_density_fields(
+
+# Prior Probability Fields
+print("\nComputing prior probability fields...")
+probability_fields_for(
     geo_model=geo_model,
-    inference_data=data.posterior,
-    n_samples=50
+    inference_data=data.prior,
+    topography_dir=geophysical_dir
 )
 
-# Plot probability of the first unit (Tournaisian Plutonites)
-gpv.plot_2d(
-    geo_model,
-    override_regular_grid=online_prob.probability_field[0],
-    show_data=True,
-    ve=5,
-    kwargs_lithology={'cmap': 'viridis', 'norm': None}
-)
-plt.title("Probability Density Field: Tournaisian Plutonites")
-plt.show()
-
-# Plot Information Entropy
-gpv.plot_2d(
-    geo_model,
-    override_regular_grid=online_prob.entropy,
-    show_data=True,
-    ve=5,
-    kwargs_lithology={'cmap': 'magma', 'norm': None}
-)
-plt.title("Information Entropy (Structural Uncertainty)")
-plt.show()
+# Posterior Probability Fields
+if hasattr(data, 'posterior'):
+    print("\nComputing posterior probability fields...")
+    probability_fields_for(
+        geo_model=geo_model,
+        inference_data=data.posterior,
+        topography_dir=geophysical_dir
+    )
 
 # %%
 # **3D Entropy Visualization**
@@ -1220,24 +1204,8 @@ plt.show()
 # We can also visualize uncertainty in 3D by injecting the entropy field back
 # into the GemPy solutions object.
 
-# Inject entropy into the scalar field matrix for 3D visualization
-geo_model.solutions.raw_arrays.scalar_field_matrix[0] = online_prob.entropy
-
-gpv.plot_3d(
-    model=geo_model,
-    active_scalar_field="sf_0",
-    show_scalar=True,
-    show_lith=False,
-    show_topography=True,
-    image=False,
-    ve=5,
-    threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
-    kwargs_pyvista_bounds={
-        'show_xlabels': False,
-        'show_ylabels': False,
-        'show_zlabels': False,
-    }
-)
+# Note: The 3D visualization is already handled inside probability_fields_for()
+# by injecting the entropy field and calling gpv.plot_3d.
 
 # %%
 # Summary: The Complete Bayesian Gravity Inversion Workflow
