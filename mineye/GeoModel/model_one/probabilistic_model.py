@@ -40,6 +40,25 @@ def set_priors(
     return interpolation_input
 
 
+def set_magnetic_priors(
+        samples: dict[str, Distribution],
+        geo_model: gp.data.GeoModel,
+) -> InterpolationInput:
+    """Set priors for magnetic inversion - modifies susceptibilities and orientations."""
+    interpolation_input = _modify_orientations(
+        samples=samples,
+        geo_model=geo_model,
+        key=r"dips"
+    )
+
+    if "susceptibility" in samples:
+        susceptibilities = samples["susceptibility"]
+        if geo_model.geophysics_input and geo_model.geophysics_input.magnetics_input:
+            geo_model.geophysics_input.magnetics_input.susceptibilities = susceptibilities
+
+    return interpolation_input
+
+
 def _modify_densities(
         samples: dict[str, Distribution],
         geo_model: gp.data.GeoModel,

@@ -112,6 +112,48 @@ def generate_multigravity_likelihood_hierarchical_per_station(norm_params):
     return likelihood_fn
 
 
+def generate_multimagnetic_likelihood_hierarchical_per_station(norm_params):
+    """
+    Per-station hierarchical likelihood for magnetic data.
+    """
+
+    def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
+        simulated_magnetics = align_forward_to_observed(solutions.magnetics, norm_params)
+        pyro.deterministic(r'$\mu_{magnetics}$', simulated_magnetics.detach())
+        n_stations = simulated_magnetics.shape[0]
+
+        # Global hyperprior on typical noise level
+        mu_log_sigma = pyro.sample(
+            "mu_log_sigma",
+            dist.Normal(
+                torch.tensor(np.log(50.0), dtype=torch.float64),  # ~50 nT typical
+                torch.tensor(0.5, dtype=torch.float64)
+            )
+        )
+
+        # Variability between stations
+        tau_log_sigma = pyro.sample(
+            "tau_log_sigma",
+            dist.HalfNormal(torch.tensor(0.5, dtype=torch.float64))
+        )
+
+        # Per-station noise
+        log_sigma_stations = pyro.sample(
+            "log_sigma_stations",
+            dist.Normal(
+                mu_log_sigma.expand([n_stations]),
+                tau_log_sigma
+            ).to_event(1)
+        )
+
+        sigma_stations = torch.exp(log_sigma_stations)
+        pyro.deterministic("sigma_stations", sigma_stations)
+
+        return dist.Normal(simulated_magnetics, sigma_stations).to_event(1)
+
+    return likelihood_fn
+
+
 def generate_multigravity_likelihood_per_station_stable(norm_params):
     """
     Per-station noise with strict bounds for VI stability.

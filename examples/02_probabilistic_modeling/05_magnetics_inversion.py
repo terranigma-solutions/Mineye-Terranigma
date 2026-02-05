@@ -78,7 +78,9 @@ np.random.seed(1234)
 from mineye.config import paths
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.model_setup import setup_geomodel
-from mineye.GeoModel.model_one.probabilistic_model import normalize, _modify_orientations
+from mineye.GeoModel.model_one.probabilistic_model import normalize, set_magnetic_priors
+from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multimagnetic_likelihood_hierarchical_per_station
+from mineye.GeoModel.model_one.visualization import probability_fields_for
 import geopandas as gpd
 
 # %%
@@ -143,7 +145,7 @@ gp.map_stack_to_surfaces(
 # with magnetite) create positive anomalies; non-magnetic rocks (e.g.,
 # sediments) create negative anomalies or lows.
 #
-# **Units**: nanoTesla (nT), where 1 nT = 10{y Tesla. Earth's field is ~47,000 nT
+# **Units**: nanoTesla (nT), where 1 nT = 10⁻⁹ Tesla. Earth's field is ~47,000 nT
 # at this location; anomalies from geology are typically 10-1000 nT.
 
 def read_magnetics(geophysical_dir):
@@ -342,7 +344,7 @@ print(f"  Host rock: 0.001 � 0.01 SI")
 
 post_forward_dets = {
         "magnetic_response_raw": lambda samples, gm, sol: sol.magnetics,
-        "magnetic_response"    : lambda samples, gm, sol: align_forward_to_observed(
+        r'$\mu_{magnetics}$'    : lambda samples, gm, sol: align_forward_to_observed(
             sol.magnetics, norm_params
         ),
         "mean_magnetics"       : lambda samples, gm, sol: torch.mean(
@@ -361,47 +363,6 @@ post_forward_dets = {
 # We use a hierarchical likelihood with per-station noise, analogous to the
 # gravity example but with typical magnetic noise levels (~50 nT).
 
-def generate_multimagnetic_likelihood_hierarchical_per_station(norm_params):
-    """Per-station hierarchical likelihood for magnetic data."""
-
-    def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
-        simulated_magnetics = align_forward_to_observed(solutions.magnetics, norm_params)
-        import pyro
-        pyro.deterministic(r'$\mu_{magnetics}$', simulated_magnetics)
-        n_stations = simulated_magnetics.shape[0]
-
-        # Global hyperprior on typical noise level
-        mu_log_sigma = pyro.sample(
-            "mu_log_sigma",
-            dist.Normal(
-                torch.tensor(np.log(50.0), dtype=torch.float64),  # ~50 nT typical
-                torch.tensor(0.5, dtype=torch.float64)
-            )
-        )
-
-        # Variability between stations
-        tau_log_sigma = pyro.sample(
-            "tau_log_sigma",
-            dist.HalfNormal(torch.tensor(0.5, dtype=torch.float64))
-        )
-
-        # Per-station noise
-        log_sigma_stations = pyro.sample(
-            "log_sigma_stations",
-            dist.Normal(
-                mu_log_sigma.expand([n_stations]),
-                tau_log_sigma
-            ).to_event(1)
-        )
-
-        sigma_stations = torch.exp(log_sigma_stations)
-        pyro.deterministic("sigma_stations", sigma_stations)
-
-        return dist.Normal(simulated_magnetics, sigma_stations).to_event(1)
-
-    return likelihood_fn
-
-
 likelihood_fn = generate_multimagnetic_likelihood_hierarchical_per_station(
     norm_params=norm_params
 )
@@ -415,24 +376,6 @@ print(f"  Global mean noise prior: ~50.0 nT")
 # -----------------------------------------
 #
 # This function updates GemPy model parameters from Pyro samples.
-
-def set_magnetic_priors(samples: dict, geo_model: gp.data.GeoModel):
-    """Set priors for magnetic inversion - modifies susceptibilities and orientations."""
-    # Modify orientations (dips)
-    interpolation_input = _modify_orientations(
-        samples=samples,
-        geo_model=geo_model,
-        key=r"dips"
-    )
-
-    # Modify susceptibilities
-    if prior_key_susceptibility in samples:
-        susceptibilities = samples[prior_key_susceptibility]
-        if geo_model.geophysics_input and geo_model.geophysics_input.magnetics_input:
-            geo_model.geophysics_input.magnetics_input.susceptibilities = susceptibilities
-
-    return interpolation_input
-
 
 # %%
 # Step 9: Create Probabilistic Model
@@ -452,6 +395,107 @@ print("  Model components:")
 print("    - Priors: dips (orientations), susceptibilities")
 print("    - Forward model: GemPy geological interpolation + TMI")
 print("    - Likelihood: Hierarchical per-station noise")
+
+# %%
+# Step 11: Prior Predictive Checks
+# --------------------------------
+#
+# **Why Prior Predictive Checks?**
+#
+# Before running inference, we sample from the prior to answer critical questions:
+#
+# 1. **Range check**: Do prior predictions cover the observed values?
+#    If not, the prior may be too restrictive or the model inadequate.
+#
+# 2. **Model adequacy**: Can *any* parameter combination explain the data?
+#    If prior predictions are far from observations, we may need:
+#
+#    - More model complexity (additional parameters)
+#    - Different physics (e.g., include magnetics, seismic)
+#    - Revised priors (incorrect geological assumptions)
+#
+# 3. **Prior sensitivity**: How much do predictions vary under the prior?
+#    High variability indicates the prior is uninformative; low variability
+#    suggests the prior is too restrictive.
+#
+# **Expected behavior**:
+#
+# In this test case, we simulate 20 observations per iteration. Some forward models
+# explain certain stations well but fail at others, suggesting:
+#
+# - The model may be oversimplified
+# - Some stations could be outliers
+# - Additional data types might not help without increasing model complexity
+#
+# Prior predictive sampling generates data *as if* we hadn't seen the observations yet.
+
+print("\nRunning prior predictive sampling (100 samples)...")
+prior_inference_data: az.InferenceData = gpp.run_predictive(
+    prob_model=prob_model,
+    geo_model=geo_model,
+    y_obs_list=torch.tensor(observed_magnetics_nt),
+    n_samples=100,
+    plot_trace=True
+)
+
+print("✓ Prior predictive sampling complete")
+
+# %%
+# Visualize Prior Geological Models
+# ----------------------------------
+#
+# **Understanding gempy_viz**
+#
+# This function creates a 2D cross-section visualization showing:
+#
+# 1. **The geological model**: Interpolated lithological boundaries
+# 2. **Prior uncertainty via KDE (Kernel Density Estimation)**:
+#
+#    - Background colored contours show probability density of boundary locations
+#    - Darker/more saturated colors = higher probability
+#    - Shows where the geological boundary is likely to be given our prior beliefs
+#
+# 3. **Representative realizations**: Individual model samples overlaid as contours
+#
+# **Why visualize the prior?**
+#
+# - Verify that prior predictions span a geologically reasonable range
+# - Check if the model can produce diverse enough structures
+# - Identify if priors are too restrictive (narrow KDE) or too vague (very wide KDE)
+#
+# **KDE interpretation**:
+#
+# - **Narrow, focused density**: Strong prior belief about structure location
+# - **Wide, diffuse density**: High uncertainty in structure location
+# - **Multiple modes**: Prior suggests multiple possible configurations
+
+gempy_viz(
+    geo_model=geo_model,
+    prior_inference_data=prior_inference_data,
+    n_samples=20
+)
+
+# %%
+# Compare Multiple Prior Predictions to Observations
+# ---------------------------------------------------
+#
+# **Understanding plot_many_observed_vs_forward**
+#
+# This diagnostic plot shows how well different prior samples fit the data.
+# It helps answer: "Can ANY model from our prior explain the observations?"
+#
+# **Plot Structure**:
+#
+# - **X-axis**: Observed magnetics (sorted by value for clarity)
+# - **Y-axis**: Forward-modeled magnetics from different prior samples
+# - **Each colored line**: One realization from the prior distribution
+# - **Red dashed line**: Perfect 1:1 agreement
+
+plot_many_observed_vs_forward(
+    forward_norm=(align_forward_to_observed(baseline_fw_magnetics_np, norm_params)),
+    many_forward_norm=prior_inference_data.prior[r'$\mu_{magnetics}$'].values[0, -10:],
+    observed_norm=observed_magnetics_nt
+)
 
 # %%
 # Step 10: Load Pre-computed Results
@@ -492,7 +536,6 @@ if RUN_SIMULATION:
             init_strategy='median',
             num_samples=200,
             warmup_steps=200,
-            num_chains=1
         ),
         plot_trace=True,
         run_posterior_predictive=True
@@ -512,9 +555,7 @@ else:
     if not data_path.exists():
         raise FileNotFoundError(
             f"Data file not found at {data_path}. "
-            f"Please run the simulation first with RUN_SIMULATION=True, or "
-            f"copy the file 'arviz_data_magnetic_Nov_17_I_hierarchical.nc' "
-            f"from tests/tests_inversions/Model 1/ to {current_dir} and rename to arviz_data_05.nc"
+            f"Please run the simulation first with RUN_SIMULATION=True"
         )
 
     # Read the data file
@@ -569,12 +610,43 @@ print(f"  Mean: {residuals.mean():.2f} nT (bias)")
 print(f"  RMS: {np.sqrt((residuals ** 2).mean()):.2f} nT (fit quality)")
 
 # %%
-# Visualization: Posterior vs Prior Comparison
-# ---------------------------------------------
+# Posterior Predictive: Model Fit Analysis
+# -----------------------------------------
+#
+# **Understanding Posterior Convergence**
+#
+# In the plot_many_observed_vs_forward visualization, we observe that no single model
+# can perfectly explain all observations simultaneously. This reveals an important aspect
+# of Bayesian inference: the posterior distribution identifies models that best balance
+# the fit across all measurement stations.
+#
+# **What the inference is doing**:
+#
+# The MCMC sampler finds parameter combinations that bring the maximum number of
+# observations close to their measured values. Rather than perfectly fitting a subset
+# of stations, the posterior concentrates on models that provide reasonable explanations
+# across the entire dataset. This "compromise" solution is mathematically optimal under
+# our likelihood model.
+#
+# **Geometric constraints from data**:
+#
+# Even with this distributed fit, the magnetic data significantly constrains the possible
+# geological configurations. As visualized in gempy_viz, the posterior distribution shows
+# much tighter bounds on structural geometry than the prior. The inference has successfully
+# ruled out large regions of parameter space that are inconsistent with observations.
+#
+# **Implications**:
+#
+# - Stations that remain poorly fit may indicate localized geological complexity not
+#   captured by our current model structure
+# - The spread in posterior predictions quantifies irreducible uncertainty given model
+#   assumptions
+# - Future model refinements (additional layers, spatially-varying susceptibilities) could
+#   improve station-by-station fit while maintaining these geometric constraints
 
 plot_many_observed_vs_forward(
-    forward_norm=align_forward_to_observed(baseline_fw_magnetics_np, norm_params),
-    many_forward_norm=data.posterior_predictive[r'magnetic_response'].values[0, -20:],
+    forward_norm=(align_forward_to_observed(baseline_fw_magnetics_np, norm_params)),
+    many_forward_norm=data.posterior_predictive[r'$\mu_{magnetics}$'].values[0, -20:],
     observed_norm=observed_magnetics_nt
 )
 
@@ -605,7 +677,7 @@ gempy_viz(
 # Spatial Comparison: Prior Predictions
 
 plot_geophysics_comparison(
-    forward_norm=data.prior[r'magnetic_response'].mean(axis=1),
+    forward_norm=data.prior[r'$\mu_{magnetics}$'].mean(axis=1),
     normalization_method='align_to_reference',
     observed_ugal=observed_magnetics_nt,
     xy_ravel=xy_ravel
@@ -615,7 +687,7 @@ plot_geophysics_comparison(
 # Spatial Comparison: Posterior Predictions
 
 plot_geophysics_comparison(
-    forward_norm=data.posterior_predictive[r'magnetic_response'].mean(axis=1),
+    forward_norm=data.posterior_predictive[r'$\mu_{magnetics}$'].mean(axis=1),
     normalization_method='align_to_reference',
     observed_ugal=observed_magnetics_nt,
     xy_ravel=xy_ravel
@@ -625,7 +697,7 @@ plot_geophysics_comparison(
 # Uncertainty Quantification: Prior
 
 gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-    gravity_samples_norm=data.prior[r'magnetic_response'].values[0, :],
+    gravity_samples_norm=data.prior[r'$\mu_{magnetics}$'].values[0, :],
     observed_gravity_ugal=observed_magnetics_nt,
     xy_ravel=xy_ravel
 )
@@ -633,9 +705,9 @@ gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
 # %%
 # Uncertainty Quantification: Posterior
 
-if hasattr(data, 'posterior_predictive') and r'magnetic_response' in data.posterior_predictive:
+if hasattr(data, 'posterior_predictive') and r'$\mu_{magnetics}$' in data.posterior_predictive:
     gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-        gravity_samples_norm=data.posterior_predictive[r'magnetic_response'].values[0, :],
+        gravity_samples_norm=data.posterior_predictive[r'$\mu_{magnetics}$'].values[0, :],
         observed_gravity_ugal=observed_magnetics_nt,
         xy_ravel=xy_ravel
     )
@@ -675,42 +747,35 @@ if "sigma_stations" in data.posterior_predictive:
 # To visualize the spatial uncertainty of the geological structure, we compute
 # probability density fields and information entropy.
 
-from mineye.GeoModel.model_one.visualization import compute_probability_density_fields
 
-# We need to ensure the grid is active for probability computation
-gp.set_active_grid(
-    grid=geo_model.grid,
-    grid_type=[geo_model.grid.GridTypes.REGULAR],
-    reset=True
+# Resetting the model
+geo_model = gp.create_geomodel(
+    project_name='gravity_inversion',
+    extent=extent,
+    refinement=refinement,
+    resolution=resolution,
+    importer_helper=gp.data.ImporterHelper(
+        path_to_orientations=mod_or_path,
+        path_to_surface_points=mod_pts_path,
+    )
 )
-
-online_prob = compute_probability_density_fields(
+# Prior Probability Fields
+print("\nComputing prior probability fields...")
+topography_path = paths.get_topography_path()
+probability_fields_for(
     geo_model=geo_model,
-    inference_data=data.posterior,
-    n_samples=50
+    inference_data=data.prior,
+    topography_path=topography_path
 )
 
-# Plot probability of the first unit (Tournaisian Plutonites)
-gpv.plot_2d(
-    geo_model,
-    override_regular_grid=online_prob.probability_field[0],
-    show_data=True,
-    ve=5,
-    kwargs_lithology={'cmap': 'viridis', 'norm': None}
-)
-plt.title("Probability Density Field: Tournaisian Plutonites")
-plt.show()
-
-# Plot Information Entropy
-gpv.plot_2d(
-    geo_model,
-    override_regular_grid=online_prob.entropy,
-    show_data=True,
-    ve=5,
-    kwargs_lithology={'cmap': 'magma', 'norm': None}
-)
-plt.title("Information Entropy (Structural Uncertainty)")
-plt.show()
+# Posterior Probability Fields
+if hasattr(data, 'posterior'):
+    print("\nComputing posterior probability fields...")
+    probability_fields_for(
+        geo_model=geo_model,
+        inference_data=data.posterior,
+        topography_path=topography_path
+    )
 
 # %%
 # **3D Entropy Visualization**
@@ -718,24 +783,8 @@ plt.show()
 # We can also visualize uncertainty in 3D by injecting the entropy field back
 # into the GemPy solutions object.
 
-# Inject entropy into the scalar field matrix for 3D visualization
-geo_model.solutions.raw_arrays.scalar_field_matrix[0] = online_prob.entropy
-
-gpv.plot_3d(
-    model=geo_model,
-    active_scalar_field="sf_0",
-    show_scalar=True,
-    show_lith=False,
-    show_topography=True,
-    image=False,
-    ve=5,
-    threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
-    kwargs_pyvista_bounds={
-        'show_xlabels': False,
-        'show_ylabels': False,
-        'show_zlabels': False,
-    }
-)
+# Note: The 3D visualization is already handled inside probability_fields_for()
+# by injecting the entropy field and calling gpv.plot_3d.
 
 # %%
 # Summary
