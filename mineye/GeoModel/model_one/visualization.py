@@ -140,13 +140,7 @@ def compute_probability_density_fields(geo_model: gp.data.GeoModel, inference_da
 
 def gempy_viz_pro(geo_model: gp.data.GeoModel, prior_inference_data: arviz.InferenceData):
     p2d = gempy_viz(geo_model, prior_inference_data, n_samples=10)
-
-    if len(x_all):
-        x_all = np.concatenate(x_all);
-        z_all = np.concatenate(z_all)
-        _draw_kde(ax, x_all, z_all, gridsize=400, bw=0.03, alpha=0.5, cmap="Blues", zorder=35, lognorm=True)
-
-    p2d.axes[0].set_title("Uncertainty: KDE background + representative realizations")
+    p2d.axes[0].set_title("Uncertainty: representative realizations")
 
 
 def plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm):
@@ -197,11 +191,14 @@ def _update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float,
         dip=sample_value,
     )
 
-def plot_probability_heatmap(data, group='prior'):
+def plot_probability_heatmap(data, group='prior', slice_idx=None):
     # Get the data array from ArviZ InferenceData
     # Standard Shape: (chain, draw, n_points, n_classes)
     # Example: (1, 50, 57, 3)
     probs_da = data[group]['probs_pred']
+    
+    if slice_idx is not None:
+        probs_da = probs_da.isel(Joint_Obs_1_dim_0=slice_idx)
 
     # 1. Average over 'chain' and 'draw' dimensions to get mean per point
     # Result Shape: (n_points, n_classes)
@@ -213,6 +210,38 @@ def plot_probability_heatmap(data, group='prior'):
     heatmap_data = mean_probs.T
 
     plot_heat_map(group, heatmap_data)
+
+
+def plot_joint_inversion_results(data: arviz.InferenceData, 
+                                 observed_gravity: np.ndarray, 
+                                 xy_gravity: np.ndarray,
+                                 observed_enmap: np.ndarray,
+                                 geo_model: gp.data.GeoModel = None,
+                                 n_gravity_points: int = 0):
+    """
+    Comprehensive visualization for joint inversion results.
+    """
+    # 1. Gravity Visualization
+    if 'Joint_Obs_0' in data.posterior_predictive:
+        gravity_samples = data.posterior_predictive['Joint_Obs_0'].values[0] # (n_samples, n_gravity_points)
+        generate_gravity_uncertainty_plots(gravity_samples, observed_gravity, xy_gravity)
+        
+        # Observed vs Forward Correlation
+        forward_mean = gravity_samples.mean(axis=0)
+        plot_many_observed_vs_forward(forward_mean, gravity_samples[:20], observed_gravity)
+
+    # 2. EnMap Visualization
+    if 'probs_pred' in data.posterior_predictive:
+        # We need to be careful with indexing if multiple likelihoods were used.
+        # In the joint model, we used slice_idx in enmap_likelihood_fn, 
+        # but 'probs_pred' in pyro.deterministic might contain only the sliced part 
+        # or the whole thing depending on how it was called.
+        # Based on joint_probabilistic_model.py, it's called with a slice.
+        plot_probability_heatmap(data, group='posterior_predictive')
+
+    # 3. Geological Model Visualization
+    if geo_model is not None:
+        gempy_viz(geo_model, data)
 
 
 def plot_heat_map(group, heatmap_data):
