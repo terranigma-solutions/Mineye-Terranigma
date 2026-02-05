@@ -153,25 +153,62 @@ labels_gempy = simple_geo_model.solutions.raw_arrays.custom.astype(int)
 # Label Mapping and Accuracy
 # --------------------------
 # EnMap and GemPy use different ID systems. We must map them to compare results.
-# In this specific case:
-# - EnMap 0 -> GemPy 2 (Host Rock)
-# - EnMap 2 -> GemPy 1 (Plutonite)
+#
+# **Automated Best Mapping**
+#
+# Since the class IDs from unsupervised segmentation don't necessarily match GemPy's
+# lithology IDs, we use an automated "best mapping" logic that finds the permutation
+# of IDs that maximizes the agreement between the two datasets.
 
-mapping = {
-    0: 2,
-    2: 1
-}
+from itertools import permutations
 
-mapped_enmap_labels = np.zeros_like(labels_enmap)
-for enmap_val, gempy_val in mapping.items():
-    mapped_enmap_labels[labels_enmap == enmap_val] = gempy_val
+def find_best_mapping(observed_labels, predicted_labels):
+    obs_unique = np.unique(observed_labels)
+    pred_unique = np.unique(predicted_labels)
+    
+    best_acc = -1
+    best_map = {}
+    
+    # Try all permutations of mapping observed labels to predicted labels
+    for p in permutations(pred_unique, len(obs_unique)):
+        mapping = dict(zip(obs_unique, p))
+        mapped = np.vectorize(mapping.get)(observed_labels)
+        acc = np.mean(mapped == predicted_labels)
+        if acc > best_acc:
+            best_acc = acc
+            best_map = mapping
+            
+    return best_map, best_acc
+
+best_mapping, best_accuracy = find_best_mapping(labels_enmap, labels_gempy)
+
+mapped_enmap_labels = np.vectorize(best_mapping.get)(labels_enmap)
 
 # Calculate residuals (where labels don't match)
 residuals = (mapped_enmap_labels != labels_gempy)
-accuracy = 1.0 - (np.sum(residuals) / len(labels_enmap))
 
-print(f"Mapping used: {mapping}")
-print(f"Accuracy: {accuracy:.2%}")
+print(f"Best automated mapping found: {best_mapping}")
+print(f"Overall Accuracy: {best_accuracy:.2%}")
+
+# %%
+# **Performance Metrics: Confusion Matrix**
+#
+# A confusion matrix provides a detailed breakdown of which geological units are
+# being misclassified.
+
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+
+cm = confusion_matrix(mapped_enmap_labels, labels_gempy)
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.xlabel('GemPy (Predicted)')
+plt.ylabel('EnMap (Observed)')
+plt.title('Confusion Matrix: EnMap vs. GemPy')
+plt.show()
+
+print("\nClassification Report:")
+print(classification_report(mapped_enmap_labels, labels_gempy))
 
 # %%
 # Visualization
@@ -192,7 +229,7 @@ plt.colorbar(sc1, ax=axes[1])
 
 # Plot Residuals
 sc2 = axes[2].scatter(x, y, c=residuals, cmap='Reds', s=20, edgecolors='k', linewidth=0.5)
-axes[2].set_title(f'Residuals (Mismatches)\nAccuracy: {accuracy:.2%}')
+axes[2].set_title(f'Residuals (Mismatches)\nAccuracy: {best_accuracy:.2%}')
 plt.colorbar(sc2, ax=axes[2], label='1 = Mismatch')
 
 for ax in axes:
