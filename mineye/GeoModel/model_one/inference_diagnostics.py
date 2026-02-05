@@ -181,13 +181,15 @@ def check_likelihood_balance(prob_model, geo_model, y_obs_list):
         # Assuming you added gravity argument to your model
     )
 
+    trace.compute_log_prob()
+
     # 2. Extract Log Probs for Observation Nodes
     # You need to know the exact "name" you gave the sample site in your model.
     # e.g., dist.Normal(...).to_event(1), name="Gravity Data"
 
     # -- EnMap Likelihood --
     try:
-        enmap_node = trace.nodes["probs_pred"]  # Replace with your exact string name
+        enmap_node = trace.nodes["Joint_Obs_1"]  # Replace with your exact string name
         enmap_lp = enmap_node["log_prob_sum"]
         print(f"EnMap Log-Likelihood:   {enmap_lp:.2f}")
     except KeyError:
@@ -195,7 +197,7 @@ def check_likelihood_balance(prob_model, geo_model, y_obs_list):
 
     # -- Gravity Likelihood --
     try:
-        gravity_node = trace.nodes[r'$\mu_{gravity}$']  # Replace with your exact string name
+        gravity_node = trace.nodes["Joint_Obs_0"]  # Replace with your exact string name
         gravity_lp = gravity_node["log_prob_sum"]
         print(f"Gravity Log-Likelihood: {gravity_lp:.2f}")
     except KeyError:
