@@ -35,42 +35,42 @@ Visuals: In plot_gempy, ensure the colors of the sampled lines match the geologi
 ◦
 Didactic: Add a diagram or text explaining "Prior Predictive Sampling" vs. "Posterior Sampling".
 •
-[ ] 04_gravity_inversion.py
+[ ] 04_gravity_inversion.py & 05_magnetics_inversion.py
 ◦
-Structure: This file is very long (~1200 lines). Consider breaking it into sub-sections or using more # %% separators to make the generated gallery page more digestible.
+Advanced Visuals: Port the "Probability Density Fields" and "Information Entropy" plots from test_gravity_inversion.py. Show entropy in 3D by injecting it into the scalar field.
 ◦
-Fix: Check line 922 NUTSConfig(...) for the "unexpected argument" error (likely a version mismatch in gempy_probability).
+Diagnostics: Implement the outlier detection logic for stations (Sigma analysis) to show which measurements are "problematic".
 ◦
-Interactive: Add a note about the RUN_SIMULATION flag and how users can download pre-computed .nc files to save time.
-•
-[ ] 05_magnetics_inversion.py
+Structure: Break 04_gravity_inversion.py into sub-sections using more # %% separators to make the gallery page readable.
 ◦
-Fix: Correct the expected type Tensor, got ndarray error in the likelihood function (line 367).
+Fixes: Correct NUTSConfig arguments and Tensor/ndarray type mismatches in the likelihood functions.
 ◦
-Visuals: Add a plot showing the IGRF field vector (inclination/declination) to help users visualize the magnetic source of the TMI signal.
-◦
-Didactic: Explicitly contrast Susceptibility (Magnetic) vs. Density (Gravity) in a small table.
+Interactive: Add instructions for downloading pre-computed .nc files.
 📁 03_segmentation (Remote Sensing Integration)
 •
 [ ] 01_enmap_lith_segmentation.py
 ◦
-Standardize: Replace the 'hacky' project root detection (lines 63-80) with a standard call to paths.get_base_dir().
+Standardize: Replace the 'hacky' project root detection with paths.get_base_dir().
 ◦
-Didactic: Add more visual "Quicklooks" of the MNF bands and explain why MNF is preferred over raw bands for geology.
-◦
-Robustness: Add a check for the existence of the specific EnMap folder and provide a download link or instruction if missing.
+Didactic: Add visual "Quicklooks" of MNF bands and explain their importance.
 •
 [ ] 02_enmap_data_extraction.py
 ◦
-Visuals: Add a side-by-side comparison of the raw GeoTIFF vs. the sampled points on top of a topography map.
+Advanced Sampling: Incorporate the "Boundary-Focused" and "Spatially Reduced" sampling strategies from test_enmap_preprocess.py.
 ◦
-Didactic: Explain the "Distance Transform" concept visually (show the distance map as a subplot).
+Visuals: Show a side-by-side comparison of raw GeoTIFF vs. sampled points on topography.
+◦
+Didactic: Explain "Distance Transform" visually with a dedicated subplot.
 •
 [ ] 03_enmap_gempy_comparison.py
 ◦
-Visuals: Create a "Confusion Matrix" or "Accuracy by Class" bar chart to provide a more quantitative summary than just a scatter plot.
+Label Mapping: Port the automated "Best Mapping" logic from test_enmap_likelihood.py to handle different class ID systems.
 ◦
-Integration: Add a concluding section on how this "Likelihood" is actually used in Example 04/05 to drive the inversion.
+Visuals: Standardize the 3-panel residual plot (EnMap vs GemPy vs Mismatch) seen in test_enmap_residuals.py.
+◦
+Metrics: Add a Confusion Matrix and accuracy-by-class reporting.
+◦
+Benchmarking: Add computation time reporting (e.g., "Model computation time: X seconds") inspired by test_structural_model.py.
 🌐 General Improvements (Across All Files)
 •
 [ ] Path Handling: Replace all occurrences of os.path.join(base_dir, 'examples', 'Data', ...) with direct calls to paths.get_data_dir() or similar.
