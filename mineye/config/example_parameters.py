@@ -4,7 +4,7 @@ class TharsisModelConfig:
     """Configuration parameters for the Tharsis geological model."""
 
     PROJECT_NAME = 'simple_model'
-    EXTENT = [-709521, -675558, 4526832, 4551949, -500, 505]
+    EXTENT = [-707521, -675558, 4526832, 4551949, -500, 505]
     RESOLUTION = [64, 64, 64]
     REFINEMENT = 4
     SURFACE_MAPPING = {

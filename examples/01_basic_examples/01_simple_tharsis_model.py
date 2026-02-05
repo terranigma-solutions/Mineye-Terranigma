@@ -63,7 +63,7 @@ from mineye.config import paths
 # The vertical extent captures both subsurface structures (down to 500m below sea level)
 # and topography (up to 505m above sea level).
 
-min_x = -709521
+min_x = -707_521  # * Cropping the corrupted area of the geotiff 
 max_x = -675558
 min_y = 4526832
 max_y = 4551949
@@ -176,7 +176,7 @@ gp.map_stack_to_surfaces(
 #
 # .. note::
 #    The ``crop_to_extent`` parameter adjusts the X extent to match the available DEM coverage.
-#    In this case, we shift the western boundary from -709521 to -695558 to align with the DEM.
+#    In this case, we shift the western boundary from -707521 to -695558 to align with the DEM.
 
 topography_path = paths.get_topography_path()
 gp.set_topography_from_file(

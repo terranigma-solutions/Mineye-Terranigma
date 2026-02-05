@@ -39,7 +39,7 @@ from mineye.config import paths
 # Define Model Extent and Resolution
 # -----------------------------------
 
-min_x = -709521
+min_x = -707521
 max_x = -675558
 min_y = 4526832
 max_y = 4551949

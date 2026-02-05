@@ -63,7 +63,7 @@ def model_paths(tmp_dir):
 @pytest.fixture(scope="session")
 def model_extent():
     """Model extent coordinates [min_x, max_x, min_y, max_y, min_z, max_z]."""
-    # min_x = -709521
+    # min_x = -707521
     min_x = -707_521  # * Cropping the corrupted area of the geotiff 
     max_x = -675558
     min_y = 4_526_832
