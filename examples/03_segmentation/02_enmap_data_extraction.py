@@ -67,6 +67,20 @@ if not os.path.exists(enmap_path):
 # Extraction Functions
 # --------------------
 # These functions implement different sampling strategies.
+#
+# **Distance Transform and Central Sampling**
+#
+# The "Distance Transform" computes the distance from each pixel to the nearest
+# boundary. For geological unit sampling, the local maxima of this transform
+# represent the points most distant from any contact (the "centers" of the units).
+#
+# .. math::
+#
+#     d(p) = \min_{q \in \text{Boundary}} \text{dist}(p, q)
+#
+# Sampling at these locations provides the most certain lithological constraints,
+# as points near boundaries are more likely to be affected by mixed pixels or
+# segmentation uncertainty.
 
 def extract_points_from_raster(raster_path, extent, step=10, topo_path=None):
     """Simple regular grid extraction."""
@@ -157,6 +171,12 @@ xyz_central, labels_central, _, _ = extract_points_central_reduced(enmap_path, e
 # %%
 # Visualize Strategies
 # --------------------
+#
+# **Comparison: Raw Raster vs. Sampled Points**
+#
+# We compare the original high-resolution segmentation results with our reduced
+# point sets. Note how the central-focused sampling maintains the structural
+# representation with a fraction of the data volume.
 
 fig, axes = plt.subplots(1, 2, figsize=(18, 8), sharex=True, sharey=True)
 
@@ -178,9 +198,10 @@ plt.tight_layout()
 plt.show()
 
 # %%
+# sphinx_gallery_thumbnail_number = 1
+#
 # Summary
 # -------
-#
 # The central-focused sampling significantly reduces the number of points while 
 # capturing the representative locations for each geological unit. These points
 # can now be used as `custom_grid` in GemPy to evaluate model likelihood 
