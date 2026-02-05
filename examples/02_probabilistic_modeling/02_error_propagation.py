@@ -191,7 +191,8 @@ p2d = gpv.plot_2d(
     legend=False,
     show_lith=False,
     show_data=False,
-    show=False
+    show=False,
+    ve=5
 )
 
 # Overlay sampled models

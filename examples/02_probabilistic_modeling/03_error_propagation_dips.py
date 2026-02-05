@@ -84,7 +84,7 @@ geo_model = gp.create_geomodel(
 gp.map_stack_to_surfaces(
     gempy_model=geo_model,
     mapping_object={
-        "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
+            "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
     }
 )
 
@@ -108,11 +108,11 @@ mean_orientations = torch.ones(n_orientations) * 10.0
 std_orientations = 10.0
 
 model_priors = {
-    r'dips': dist.Normal(
-        loc=mean_orientations,
-        scale=torch.tensor(std_orientations, dtype=torch.float64),
-        validate_args=True
-    )
+        r'dips': dist.Normal(
+            loc=mean_orientations,
+            scale=torch.tensor(std_orientations, dtype=torch.float64),
+            validate_args=True
+        )
 }
 
 print(f"\nPrior distribution:")
@@ -149,6 +149,7 @@ prior_inference_data: az.InferenceData = gpp.run_predictive(
 
 print("✓ Prior predictive sampling complete")
 
+
 # %%
 # Visualize Uncertainty
 # ---------------------
@@ -160,6 +161,7 @@ def update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float, 
         dip=sample_value,
     )
 
+
 # Create base plot
 p2d = gpv.plot_2d(
     model=geo_model,
@@ -167,7 +169,8 @@ p2d = gpv.plot_2d(
     legend=False,
     show_lith=False,
     show_data=False,
-    show=False
+    show=False,
+    ve=5
 )
 
 # Overlay sampled models
