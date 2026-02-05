@@ -35,6 +35,8 @@ class TestJointInversion:
 
         # 1. Setup Gravity Data
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
+        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
+        geo_model.interpolation_options.sigmoid_slope = 100
 
         # 2. Setup EnMap Data
         xyz_path = os.path.join(base_dir, 'central_xyz.npy')
@@ -46,34 +48,13 @@ class TestJointInversion:
         labels_enmap = np.load(labels_path)
         labels_enmap[labels_enmap == 2] = 1  # Normalize labels
 
-        # 3. Setup GeoModel with both grids (GemPy supports one active grid, so we might need to be careful)
-        # Usually, for joint inversion, we want both observations at their respective locations.
-        # In GemPy, we can use a CustomGrid for EnMap and the standard Grid for Gravity if it's on a grid,
-        # but here gravity is at specific station locations (which are also treated as a custom grid in GemPy usually).
-
-        # In test_gravity_inversion.py: geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
-        # setup_geomodel sets the custom grid to the gravity station locations.
-
-        # If we have two sets of custom locations, we should combine them into one custom grid.
-
-        # Combine EnMap points and Gravity points?
-        # Actually, EnMap likelihood needs the scalar field at xyz_enmap.
-        # Gravity likelihood needs the gravity at gravity_data locations.
-
-        # Let's combine all custom points:
-        gravity_xyz = np.zeros((len(gravity_data), 3))
-        gravity_xyz[:, 0] = gravity_data['X'].values
-        gravity_xyz[:, 1] = gravity_data['Y'].values
-        gravity_xyz[:, 2] = gravity_data['Z'].values
-
-        combined_custom_points = np.vstack([gravity_xyz, xyz_enmap])
-
-        # Now set the custom grid
-        gp.set_custom_grid(simple_geo_model.grid, combined_custom_points)
+        simple_geo_model.interpolation_options.mesh_extraction = False
+        simple_geo_model.interpolation_options.evaluation_options.number_octree_levels = 1
+        gp.set_custom_grid(simple_geo_model.grid, xyz_enmap)
         gp.set_active_grid(
             grid=simple_geo_model.grid,
             grid_type=[simple_geo_model.grid.GridTypes.CUSTOM],
-            reset=True
+            reset=False
         )
 
         # We need to tell the likelihood functions where their data is in the custom grid.
@@ -102,7 +83,7 @@ class TestJointInversion:
         }
 
         # 6. Create Probabilistic Model
-        likelihood_fn = generate_joint_likelihood(norm_params, n_gravity_points=len(gravity_xyz))
+        likelihood_fn = generate_joint_likelihood(norm_params)
 
         prob_model = gpp.make_gempy_pyro_model(
             priors=model_priors,
@@ -155,10 +136,8 @@ class TestJointInversion:
         plot_joint_inversion_results(
             data=data,
             observed_gravity=observed_gravity_ugal,
-            xy_gravity=gravity_xyz[:, :2],  # xy_ravel expects (n, 2)
-            observed_enmap=labels_enmap,
-            geo_model=simple_geo_model,
-            n_gravity_points=len(gravity_xyz)
+            xy_gravity=xy_ravel,  # xy_ravel expects (n, 2)
+            geo_model=simple_geo_model
         )
         plt.show()
 

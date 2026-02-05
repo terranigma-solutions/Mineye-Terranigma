@@ -230,9 +230,7 @@ plot_joint_inversion_results(
     data=data,
     observed_gravity=observed_gravity_ugal,
     xy_gravity=gravity_xyz[:, :2],
-    observed_enmap=labels_enmap,
-    geo_model=simple_geo_model,
-    n_gravity_points=len(gravity_xyz)
+    geo_model=simple_geo_model
 )
 
 # Show cross-sections with uncertainty

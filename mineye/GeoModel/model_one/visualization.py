@@ -211,12 +211,10 @@ def plot_probability_heatmap(data, group='prior', slice_idx=None):
     plot_heat_map(group, heatmap_data)
 
 
-def plot_joint_inversion_results(data: arviz.InferenceData, 
-                                 observed_gravity: np.ndarray, 
+def plot_joint_inversion_results(data: arviz.InferenceData,
+                                 observed_gravity: np.ndarray,
                                  xy_gravity: np.ndarray,
-                                 observed_enmap: np.ndarray,
-                                 geo_model: gp.data.GeoModel = None,
-                                 n_gravity_points: int = 0):
+                                 geo_model: gp.data.GeoModel = None):
     """
     Comprehensive visualization for joint inversion results.
     """

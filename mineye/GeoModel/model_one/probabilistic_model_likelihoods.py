@@ -341,12 +341,10 @@ def _get_ordinal_probs(scalar_field, boundaries, temperature=0.1):
     return probs
 
 
-def enmap_likelihood_fn(solutions: gp.data.Solutions, slice_idx: slice = None):
+def enmap_likelihood_fn(solutions: gp.data.Solutions):
     output_center: "gempy_engine.core.data.interp_output.InterpOutput" = solutions.octrees_output[0].last_output_center
     scalar_field_at_custom_grid = output_center.exported_fields.scalar_field[output_center.grid.custom_grid_slice]
     
-    if slice_idx is not None:
-        scalar_field_at_custom_grid = scalar_field_at_custom_grid[slice_idx]
 
     if not isinstance(scalar_field_at_custom_grid, torch.Tensor):
         scalar_field_at_custom_grid = torch.tensor(scalar_field_at_custom_grid, dtype=torch.float64)
