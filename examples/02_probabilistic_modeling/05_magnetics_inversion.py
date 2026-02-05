@@ -507,7 +507,7 @@ else:
 
     # Get the directory of the current file
     current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
-    data_path = current_dir / "arviz_data_05.nc"
+    data_path = current_dir / "arviz_data_magnetic_feb2026.nc"
 
     if not data_path.exists():
         raise FileNotFoundError(
