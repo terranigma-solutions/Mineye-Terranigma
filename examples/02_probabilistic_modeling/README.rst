@@ -4,7 +4,8 @@ Probabilistic Modeling Examples
 This gallery contains advanced examples of probabilistic geological modeling and Bayesian
 geophysical inversion using GemPy with Pyro probabilistic programming.
 
-**Gallery Overview**
+Gallery Overview
+----------------
 
 These examples demonstrate uncertainty quantification and probabilistic inference methods
 for geological and geophysical problems. They leverage PyTorch and Pyro to perform:
@@ -14,7 +15,8 @@ for geological and geophysical problems. They leverage PyTorch and Pyro to perfo
 * Joint inversion of multiple data types
 * Posterior sampling and credible interval estimation
 
-**Why Probabilistic Modeling?**
+Why Probabilistic Modeling?
+----------------------------
 
 Traditional deterministic geological models provide a single "best guess" interpretation.
 Probabilistic modeling offers several advantages:
@@ -25,14 +27,16 @@ Probabilistic modeling offers several advantages:
 * **Risk assessment**: Enables decision-making under uncertainty for resource exploration
 
 
-**Prerequisites**
+Prerequisites
+-------------
 
 * Completion of Basic Examples gallery
 * Understanding of probability and statistics
 * Familiarity with Bayesian inference concepts (helpful but not required)
-* Installed packages: gempy, gempy-probability, pyro-ppl, torch, arviz
+* Installed packages: ``gempy``, ``gempy-probability``, ``pyro-ppl``, ``torch``, ``arviz``
 
-**Example Descriptions**
+Example Descriptions
+--------------------
 
 * **02_error_propagation.py**: Propagate uncertainty in surface point locations through
   a geological model to understand how data uncertainty affects predictions
@@ -46,7 +50,8 @@ Probabilistic modeling offers several advantages:
 * **05_magnetics_inversion.py**: Magnetic data inversion demonstrating joint
   geophysical-geological inference
 
-**Inference Methods**
+Inference Methods
+-----------------
 
 These examples use two main inference approaches:
 
@@ -62,7 +67,8 @@ These examples use two main inference approaches:
    * Slower but more robust
    * Uses Hamiltonian Monte Carlo (HMC) and NUTS algorithms
 
-**Computational Requirements**
+Computational Requirements
+--------------------------
 
 Probabilistic modeling is computationally intensive:
 
@@ -70,7 +76,8 @@ Probabilistic modeling is computationally intensive:
 * GPU acceleration recommended for large inversions
 * Some examples save pre-computed results (``arviz_data_*.nc`` files)
 
-**Visualization and Diagnostics**
+Visualization and Diagnostics
+-----------------------------
 
 All examples use ArviZ for posterior analysis:
 
