@@ -263,4 +263,3 @@ class TestProbabilisticInversion:
         # TODO: Make the probability plot
         probability_fields_for(geo_model, data.prior, topography_dir)
         probability_fields_for(geo_model, data.posterior, topography_dir)
-

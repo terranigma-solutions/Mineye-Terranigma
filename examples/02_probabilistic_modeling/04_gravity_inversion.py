@@ -836,7 +836,7 @@ gempy_viz(
 
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
-    many_forward_norm=prior_inference_data.prior[r'gravity_response'].values[0, -10:],
+    many_forward_norm=prior_inference_data.prior[r'$\mu_{gravity}$'].values[0, -10:],
     observed_norm=observed_gravity_ugal
 )
 
@@ -906,7 +906,7 @@ print("  Warmup: 200 steps")
 print("  Sampling: 200 samples")
 print("  Chains: 1")
 
-RUN_SIMULATION = True
+RUN_SIMULATION = False
 if RUN_SIMULATION:
     data = gpp.run_nuts_inference(
         prob_model=prob_model,
@@ -946,7 +946,7 @@ else:
 
     # Get the directory of the current file using inspect
     current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
-    data_path = current_dir / "arviz_data_04.nc"
+    data_path = current_dir / "arviz_data_grav_feb2026.nc"
 
     if not data_path.exists():
         raise FileNotFoundError(
@@ -1086,7 +1086,7 @@ print(f"  Max absolute: {np.abs(residuals).max():.2f} µGal")
 
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
-    many_forward_norm=data.posterior_predictive[r'gravity_response'].values[0, -20:],
+    many_forward_norm=data.posterior_predictive[r'$\mu_{gravity}$'].values[0, -20:],
     observed_norm=observed_gravity_ugal
 )
 
@@ -1111,25 +1111,25 @@ gempy_viz(
 
 # %%
 
-plot_geophysics_comparison(forward_norm=data.prior[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
+plot_geophysics_comparison(forward_norm=data.prior[r'$\mu_{gravity}$'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
 # %%
 
-plot_geophysics_comparison(forward_norm=data.posterior_predictive[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
+plot_geophysics_comparison(forward_norm=data.posterior_predictive[r'$\mu_{gravity}$'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
 # %%
 
 gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-    gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+    gravity_samples_norm=data.prior[r'$\mu_{gravity}$'].values[0, :],  # (n_samples, n_devices)
     observed_gravity_ugal=observed_gravity_ugal,
     xy_ravel=xy_ravel
 )
 
 # %%
 
-if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
+if hasattr(data, 'posterior') and r'$\mu_{gravity}$' in data.prior:
     gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-        gravity_samples_norm=data.posterior_predictive[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+        gravity_samples_norm=data.posterior_predictive[r'$\mu_{gravity}$'].values[0, :],  # (n_samples, n_devices)
         observed_gravity_ugal=observed_gravity_ugal,
         xy_ravel=xy_ravel
     )
