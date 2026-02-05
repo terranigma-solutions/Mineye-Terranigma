@@ -1,35 +1,103 @@
 import os
-import torch
-import numpy as np
+
 import arviz as az
 import matplotlib.pyplot as plt
-import pyro
-from pyro import distributions as dist
+import numpy as np
 import pytest
+import torch
+from pyro import distributions as dist
 
 import gempy as gp
 import gempy_probability as gpp
 from gempy_probability.core.samplers_data import NUTSConfig
-
+from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
+from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality, check_likelihood_balance
+from mineye.GeoModel.model_one.joint_probabilistic_model import joint_set_priors
 from mineye.GeoModel.model_one.model_setup import setup_geomodel, read_gravity, baseline
 from mineye.GeoModel.model_one.probabilistic_model import normalize
-from mineye.GeoModel.model_one.joint_probabilistic_model import joint_set_priors, generate_joint_likelihood
-
-from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_hierarchical_per_station, enmap_likelihood_fn
 from mineye.GeoModel.model_one.visualization import (generate_gravity_uncertainty_plots,
                                                      gempy_viz,
                                                      plot_many_observed_vs_forward,
-                                                     plot_joint_inversion_results,
-                                                     compute_probability_density_fields, probability_fields_for, plot_probability_heatmap, plot_heat_map)
+                                                     probability_fields_for, plot_probability_heatmap, plot_heat_map)
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
-from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
-
 # noinspection PyUnusedImports
 from tests.tests_inversions.conftest import simple_geo_model, topography_dir, base_dir, geophysical_dir
 
 
 class TestJointInversion:
+    
+    def test_likelihood_balance(self, simple_geo_model, geophysical_dir, base_dir, n_samples=50):
+        gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
+        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
+        geo_model.interpolation_options.sigmoid_slope = 100
+
+        # 2. Setup EnMap Data
+        xyz_path = os.path.join(base_dir, 'central_xyz.npy')
+        labels_path = os.path.join(base_dir, 'central_labels.npy')
+        if not os.path.exists(xyz_path) or not os.path.exists(labels_path):
+            pytest.skip("EnMap extracted data not found. Run test_enmap_preprocess.py first.")
+
+        xyz_enmap = np.load(xyz_path)
+        labels_enmap = np.load(labels_path)
+        labels_enmap[labels_enmap == 2] = 1  # Normalize labels
+
+        simple_geo_model.interpolation_options.mesh_extraction = False
+        simple_geo_model.interpolation_options.evaluation_options.number_octree_levels = 1
+        gp.set_custom_grid(simple_geo_model.grid, xyz_enmap)
+        gp.set_active_grid(
+            grid=simple_geo_model.grid,
+            grid_type=[simple_geo_model.grid.GridTypes.CUSTOM],
+            reset=False
+        )
+
+        # We need to tell the likelihood functions where their data is in the custom grid.
+        # Gravity is first len(gravity_xyz) points.
+        # EnMap is the rest.
+
+        # 4. Normalization for Gravity
+        norm_params = normalize(
+            baseline_fw_gravity_np=(baseline(simple_geo_model)),
+            observed_gravity=observed_gravity_ugal,
+            method="align_to_reference",
+            extrapolation_buffer=0.3
+        )
+
+        # 5. Define Priors
+        model_priors = {
+                'dips'   : dist.Normal(
+                    loc=(torch.ones(simple_geo_model.orientations_copy.xyz.shape[0]) * 10),
+                    scale=torch.tensor(10, dtype=torch.float64),
+                    validate_args=True
+                ),
+                'density': dist.Normal(
+                    loc=(torch.tensor([2.9 - 2.67, 2.3 - 2.67])),
+                    scale=torch.tensor(0.15),
+                ).to_event(1)
+        }
+
+        # 6. Create Probabilistic Model
+        # likelihood_fn = generate_joint_likelihood(norm_params)
+        gravity_dist = generate_multigravity_likelihood_hierarchical_per_station(norm_params)
+        enmap_dist = enmap_likelihood_fn
+
+        prob_model = gpp.make_gempy_pyro_model(
+            priors=model_priors,
+            set_interp_input_fn=joint_set_priors,
+            likelihood_fn=[gravity_dist, enmap_dist],
+            obs_name="Joint_Obs"
+        )
+        # 7. Prepare observed data
+        gravity_obs_tensor = torch.tensor(observed_gravity_ugal, dtype=torch.float64)
+        enmap_obs_tensor = torch.tensor(labels_enmap, dtype=torch.float64)
+        check_likelihood_balance(
+            prob_model=prob_model,
+            geo_model=geo_model,
+            y_obs_list =  [gravity_obs_tensor, enmap_obs_tensor]
+        )
+
+
+    
     def test_joint_inversion(self, simple_geo_model, geophysical_dir, base_dir, n_samples=50,
                              arviz_data_filename="arviz_data_joint_Feb05_2026.nc"):
         """Test joint inversion of gravity and EnMap data."""
