@@ -87,6 +87,7 @@ from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observe
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 import gempy as gp
 import gempy_probability as gpp
@@ -919,7 +920,6 @@ if RUN_SIMULATION:
             init_strategy='median',
             num_samples=200,
             warmup_steps=200,
-            num_chains=1
         ),
         plot_trace=True,
         run_posterior_predictive=True
@@ -956,6 +956,17 @@ else:
 
     # Read the data file
     data = az.from_netcdf(str(data_path))
+
+# %%
+# **Interactive: Pre-computed Results**
+#
+# Running full MCMC chains can be computationally expensive. For convenience,
+# pre-computed `.nc` files (ArviZ InferenceData) are available for download.
+#
+# To use them:
+# 1. Download `arviz_data_04.nc` from the project repository.
+# 2. Place it in the same directory as this script.
+# 3. Set `RUN_SIMULATION = False` to load the results instantly.
 
 # %%
 # Analysis: Parameter Posterior Statistics
@@ -1124,6 +1135,111 @@ if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
     )
 
 # %%
+# **Sigma Analysis: Outlier Detection**
+#
+# Hierarchical modeling allows us to identify stations with unusually high noise,
+# which may indicate instrument problems, terrain correction errors, or localized
+# geological complexity not captured by the model.
+#
+# Stations where the inferred noise (sigma) is much higher than the global mean
+# are candidates for being "problematic".
+
+if "sigma_stations" in data.posterior_predictive:
+    posterior_sigmas = data.posterior_predictive["sigma_stations"].values
+    station_noise_mean = posterior_sigmas.mean(axis=(0, 1))
+    sigma_global_mean = station_noise_mean.mean()
+
+    # Identify stations with noise > 2 standard deviations above mean
+    problematic = np.where(station_noise_mean > 2 * sigma_global_mean)[0]
+    print(f"\nPotential outlier stations identified: {problematic}")
+
+    # Plot sigma distribution
+    az.plot_density(
+        data=[data, data.prior],
+        var_names=["sigma_stations"],
+        filter_vars="like",
+        hdi_prob=0.9999,
+        shade=.2,
+        data_labels=["Posterior", "Prior"],
+        colors=[default_red, default_blue],
+    )
+    plt.title("Per-Station Noise Distribution (Sigma)")
+    plt.show()
+
+# %%
+# **Probability Density Fields and Information Entropy**
+#
+# To visualize the spatial uncertainty of the geological structure, we compute
+# probability density fields and information entropy.
+#
+# * **Probability Density Field**: Shows the probability of each geological unit
+#   existing at any given location.
+# * **Information Entropy**: Quantifies the total uncertainty. High entropy means
+#   high uncertainty about which unit is present.
+
+from mineye.GeoModel.model_one.visualization import compute_probability_density_fields
+
+# We need to ensure the grid is active for probability computation
+gp.set_active_grid(
+    grid=geo_model.grid,
+    grid_type=[geo_model.grid.GridTypes.REGULAR],
+    reset=True
+)
+
+online_prob = compute_probability_density_fields(
+    geo_model=geo_model,
+    inference_data=data.posterior,
+    n_samples=50
+)
+
+# Plot probability of the first unit (Tournaisian Plutonites)
+gpv.plot_2d(
+    geo_model,
+    override_regular_grid=online_prob.probability_field[0],
+    show_data=True,
+    ve=5,
+    kwargs_lithology={'cmap': 'viridis', 'norm': None}
+)
+plt.title("Probability Density Field: Tournaisian Plutonites")
+plt.show()
+
+# Plot Information Entropy
+gpv.plot_2d(
+    geo_model,
+    override_regular_grid=online_prob.entropy,
+    show_data=True,
+    ve=5,
+    kwargs_lithology={'cmap': 'magma', 'norm': None}
+)
+plt.title("Information Entropy (Structural Uncertainty)")
+plt.show()
+
+# %%
+# **3D Entropy Visualization**
+#
+# We can also visualize uncertainty in 3D by injecting the entropy field back
+# into the GemPy solutions object.
+
+# Inject entropy into the scalar field matrix for 3D visualization
+geo_model.solutions.raw_arrays.scalar_field_matrix[0] = online_prob.entropy
+
+gpv.plot_3d(
+    model=geo_model,
+    active_scalar_field="sf_0",
+    show_scalar=True,
+    show_lith=False,
+    show_topography=True,
+    image=False,
+    ve=5,
+    threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
+    kwargs_pyvista_bounds={
+        'show_xlabels': False,
+        'show_ylabels': False,
+        'show_zlabels': False,
+    }
+)
+
+# %%
 # Summary: The Complete Bayesian Gravity Inversion Workflow
 # ----------------------------------------------------------
 #
@@ -1268,4 +1384,4 @@ if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
 # - Diagnose and visualize inference results
 # - Extend this framework to your own problems
 
-# sphinx_gallery_thumbnail_number = 9
+# sphinx_gallery_thumbnail_number = 10

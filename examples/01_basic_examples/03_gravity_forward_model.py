@@ -218,9 +218,30 @@ print(f"Using {len(xy_ravel)} actual measurement points")
 # The grid resolution balances accuracy vs. computation time. Higher resolution captures
 # finer details of the density distribution but increases computation cost.
 #
-# The 5 km radius is chosen to capture the significant gravity contributions from the
-# plutonite body while keeping grids manageable. Distant mass has diminishing influence
-# due to the 1/r² decay of gravitational attraction.
+# **The 1/r² Nature of Gravity**
+#
+# Gravitational attraction follows an inverse-square law:
+#
+# .. math::
+#
+#     F = G \frac{m_1 m_2}{r^2}
+#
+# This means that the contribution of a mass element to the gravity measured at a
+# station decreases rapidly with distance.
+#
+# **Why the Radius Matters in set_centered_grid**
+#
+# The `radius` parameter in `set_centered_grid` defines the 3D volume around each
+# station where GemPy will evaluate the density distribution.
+#
+# * **Too small radius**: Fails to capture the signal from larger or deeper structures,
+#   leading to an underestimated or "chopped" gravity response.
+#
+# * **Too large radius**: Increases computational cost without significantly improving
+#   accuracy, as distant cells have negligible influence.
+#
+# In this example, a 5 km radius ([5000, 5000, 5000]) is chosen to encompass the
+# entire Tharsis plutonite intrusion, ensuring its full gravitational signature is captured.
 
 gp.set_centered_grid(
     grid=simple_geo_model.grid,
@@ -324,7 +345,6 @@ print(f"Density contrast: {density_plutonites - density_sedimentary_host:.1f} g/
 
 simple_geo_model.interpolation_options.mesh_extraction = True
 
-# topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
 gp.set_topography_from_file(
     grid=simple_geo_model.grid,
     filepath=paths.get_topography_path(),
@@ -566,9 +586,12 @@ axes[1].set_xlabel('X (m)')
 plt.colorbar(sc2, ax=axes[1], label='µGal')
 
 # Residuals
+# Use a symmetric diverging colormap centered at zero
+res_max = np.max(np.abs(residuals))
 sc3 = axes[2].scatter(
     xy_ravel[:, 0], xy_ravel[:, 1],
     c=residuals, s=50, cmap='RdBu_r',
+    vmin=-res_max, vmax=res_max,
     edgecolors='black', linewidth=0.5
 )
 axes[2].set_title('Residuals (Obs - Model)')
@@ -696,3 +719,5 @@ print("=" * 50)
 # .. seealso::
 #    * :doc:`../examples_probabilistic/04_gravity_inversion` - Bayesian gravity inversion
 #    * :doc:`../examples_probabilistic/05_magnetics_inversion` - Joint geophysical inversion
+#
+# sphinx_gallery_thumbnail_number = 3
