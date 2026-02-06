@@ -98,8 +98,8 @@ class TestJointInversion:
 
 
     
-    def test_joint_inversion(self, simple_geo_model, geophysical_dir, base_dir, n_samples=50,
-                             arviz_data_filename="arviz_data_joint_Feb05_2026.nc"):
+    def test_joint_inversion(self, simple_geo_model, geophysical_dir, base_dir,
+                             arviz_data_filename="arviz_data_joint_Feb05_2026_v2.nc"):
         """Test joint inversion of gravity and EnMap data."""
 
         # 1. Setup Gravity Data
@@ -175,7 +175,7 @@ class TestJointInversion:
             prob_model=prob_model,
             geo_model=simple_geo_model,
             y_obs_list=joint_obs,
-            n_samples=20,
+            n_samples=200,
             plot_trace=True
         )
 
@@ -190,8 +190,8 @@ class TestJointInversion:
                 adapt_step_size=True,
                 target_accept_prob=0.65,
                 max_tree_depth=5,
-                num_samples=100,
-                warmup_steps=100,
+                num_samples=1000,
+                warmup_steps=1000,
             ),
             plot_trace=True,
             run_posterior_predictive=True
