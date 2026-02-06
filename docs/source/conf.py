@@ -25,6 +25,18 @@ import warnings
 # Add project root to sys.path so we can import mineye without installing it
 sys.path.insert(0, os.path.abspath('../../'))
 
+# --- PyKeOps Path Setup ---
+# PyKeOps dynamically compiles C++ code and stores it in a cache folder.
+# We ensure this folder is in sys.path so Sphinx can find the compiled modules.
+try:
+    import pykeops
+    keops_build_folder = pykeops.get_build_folder()
+    if keops_build_folder not in sys.path:
+        sys.path.append(keops_build_folder)
+except ImportError:
+    pass
+# --------------------------
+
 # Add external dependencies paths
 # sys.path.insert(0, os.path.abspath('/Users/simonvirgo/PycharmProjects/bayseg'))
 
