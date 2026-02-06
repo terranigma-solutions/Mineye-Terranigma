@@ -67,8 +67,8 @@ np.random.seed(seed)
 from mineye.config import paths
 from mineye.GeoModel.model_one.probabilistic_model import _modify_orientations
 from mineye.GeoModel.model_one.visualization import (
-    gempy_viz, 
-    plot_probability_heatmap, 
+    gempy_viz,
+    plot_probability_heatmap,
     compute_probability_density_fields
 )
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import enmap_likelihood_fn
@@ -79,15 +79,10 @@ from mineye.GeoModel.model_one.probabilistic_model_likelihoods import enmap_like
 # We load the orientations and points for our base geological model, 
 # and the EnMap extracted surface points and labels.
 
-# Define paths (adjusting to find the central_xyz files in the project root)
-base_project_path = os.path.abspath(os.path.join(paths.get_base_dir(), ".."))
-xyz_path = os.path.join(base_project_path, 'central_xyz.npy')
-labels_path = os.path.join(base_project_path, 'central_labels.npy')
-
-if not os.path.exists(xyz_path):
-    # Fallback for different environments
-    xyz_path = 'central_xyz.npy'
-    labels_path = 'central_labels.npy'
+# Define paths to find the central_xyz files in the same folder as this script
+base_dir = os.path.dirname(os.path.abspath(__file__))
+xyz_path = os.path.join(base_dir, 'central_xyz.npy')
+labels_path = os.path.join(base_dir, 'central_labels.npy')
 
 # Load EnMap data
 xyz_enmap = np.load(xyz_path)
@@ -133,14 +128,16 @@ gp.set_active_grid(
 # We set a prior distribution on the dip of the geological layers.
 
 model_priors = {
-    'dips': dist.Normal(
-        loc=(torch.ones(simple_geo_model.orientations_copy.xyz.shape[0]) * 10),
-        scale=torch.tensor(10, dtype=torch.float64)
-    )
+        'dips': dist.Normal(
+            loc=(torch.ones(simple_geo_model.orientations_copy.xyz.shape[0]) * 10),
+            scale=torch.tensor(10, dtype=torch.float64)
+        )
 }
+
 
 def set_priors_enmap(samples, geo_model):
     return _modify_orientations(samples=samples, geo_model=geo_model, key="dips")
+
 
 # Create the Pyro model
 prob_model = gpp.make_gempy_pyro_model(

@@ -120,8 +120,8 @@ geo_model.interpolation_options.sigmoid_slope = 100
 # EnMap data is provided as XYZ points and categorical rock-type labels.
 # We add these to the GemPy model as a 'Custom Grid'.
 
-# For this example, we'll assume the files exist in the project root as shown in the tests
-base_dir = os.path.abspath(os.path.join(os.getcwd()))
+# For this example, we'll assume the files exist in the same folder as this script
+base_dir = os.path.dirname(os.path.abspath(__file__))
 xyz_path = os.path.join(base_dir, 'central_xyz.npy')
 labels_path = os.path.join(base_dir, 'central_labels.npy')
 

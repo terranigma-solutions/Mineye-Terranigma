@@ -385,8 +385,6 @@ prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
     priors=model_priors,
     set_interp_input_fn=set_magnetic_priors,
     likelihood_fn=likelihood_fn,
-    pre_forward_deterministics={},
-    post_forward_deterministics=post_forward_dets,
     obs_name="Magnetic Measurement"
 )
 
@@ -784,7 +782,6 @@ if hasattr(data, 'posterior'):
 #
 # We can also visualize uncertainty in 3D by injecting the entropy field back
 # into the GemPy solutions object.
-
 # Note: The 3D visualization is already handled inside probability_fields_for()
 # by injecting the entropy field and calling gpv.plot_3d.
 
@@ -816,4 +813,4 @@ if hasattr(data, 'posterior'):
 #
 # Please refer to :ref:`sphx_glr_02_probabilistic_modeling_04_gravity_inversion.py`
 
-# sphinx_gallery_thumbnail_number = 11
+# sphinx_gallery_thumbnail_number = 24

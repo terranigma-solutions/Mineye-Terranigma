@@ -239,10 +239,3 @@ axes[0].set_ylabel('Y (m)')
 
 plt.tight_layout()
 plt.show()
-
-# %%
-# 3D Visualization
-# ----------------
-# We can also visualize the model in 3D to see how the pluton geometry relates to surface observations.
-
-gpv.plot_3d(simple_geo_model, ve=2, image=False)
