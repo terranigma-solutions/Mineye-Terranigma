@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**03:04.891** total execution time for 12 files **from all galleries**:
+**01:43.662** total execution time for 12 files **from all galleries**:
 
 .. container::
 
@@ -32,14 +32,11 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_examples_probabilistic_04_gravity_inversion.py` (``../../examples/02_probabilistic_modeling/04_gravity_inversion.py``)
-     - 01:49.869
-     - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_06_enmap_inversion.py` (``../../examples/02_probabilistic_modeling/06_enmap_inversion.py``)
-     - 01:13.912
+     - 01:18.013
      - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_07_joint_inversion.py` (``../../examples/02_probabilistic_modeling/07_joint_inversion.py``)
-     - 00:01.108
+     - 00:25.647
      - 0.0
    * - :ref:`sphx_glr_examples_segmentation_01_enmap_lith_segmentation.py` (``../../examples/03_segmentation/01_enmap_lith_segmentation.py``)
      - 00:00.002
@@ -57,6 +54,9 @@ Computation times
      - 00:00.000
      - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_03_error_propagation_dips.py` (``../../examples/02_probabilistic_modeling/03_error_propagation_dips.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_04_gravity_inversion.py` (``../../examples/02_probabilistic_modeling/04_gravity_inversion.py``)
      - 00:00.000
      - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_05_magnetics_inversion.py` (``../../examples/02_probabilistic_modeling/05_magnetics_inversion.py``)

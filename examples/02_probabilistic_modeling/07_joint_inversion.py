@@ -1,4 +1,4 @@
-"""
+r"""
 Bayesian Joint Inversion: Gravity and EnMap
 ===========================================
 
@@ -34,26 +34,26 @@ Bayesian inference provides several advantages over traditional deterministic ap
 
 **The Bayesian Framework**
 
-In Bayesian joint inversion, we seek the posterior distribution of parameters θ given 
-multiple datasets $y_{grav}$ and $y_{enmap}$ using Bayes' theorem:
+In Bayesian joint inversion, we seek the posterior distribution of parameters :math:`\theta` given 
+multiple datasets :math:`y_{grav}` and :math:`y_{enmap}` using Bayes' theorem:
 
-# .. math::
-#
-#     p(\theta | y_{grav}, y_{enmap}) \propto p(y_{grav} | \theta) p(y_{enmap} | \theta) p(\theta)
-#
-# In log-space, this becomes an additive process:
-#
-# .. math::
-#
-#     \log p(\theta | y_{total}) = \log p(y_{grav} | \theta) + \log p(y_{enmap} | \theta) + \log p(\theta)
+.. math::
+
+    p(\theta \mid y_{grav}, y_{enmap}) \propto p(y_{grav} \mid \theta) p(y_{enmap} \mid \theta) p(\theta)
+
+In log-space, this becomes an additive process:
+
+.. math::
+
+    \log p(\theta \mid y_{grav}, y_{enmap}) \propto \log p(y_{grav} \mid \theta) + \log p(y_{enmap} \mid \theta) + \log p(\theta)
 
 **The Forward Model**
 
-We have two distinct forward models mapping the same parameters θ to different observation spaces:
+We have two distinct forward models mapping the same parameters :math:`\theta` to different observation spaces:
 
-1. **Gravity Forward Model**: $y_{grav} = f_{grav}(\theta) + \epsilon_{grav}$
+1. **Gravity Forward Model**: :math:`y_{grav} = f_{grav}(\theta) + \epsilon_{grav}`
    Maps density distributions to gravitational acceleration.
-2. **EnMap Forward Model**: $y_{enmap} = f_{enmap}(\theta) + \epsilon_{enmap}$
+2. **EnMap Forward Model**: :math:`y_{enmap} = f_{enmap}(\theta) + \epsilon_{enmap}`
    Maps unit boundaries to surface lithology classifications.
 
 **Key Concepts in this Tutorial:**
@@ -94,7 +94,7 @@ from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality, 
 from mineye.GeoModel.model_one.visualization import (
     generate_gravity_uncertainty_plots,
     gempy_viz,
-    plot_probability_heatmap
+    plot_probability_heatmap, probability_fields_for
 )
 
 # Set random seeds for reproducibility
@@ -239,7 +239,7 @@ model_priors = {
         'dips'   : dist.Normal(
             loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10),
             scale=torch.tensor(10, dtype=torch.float64)
-        ),
+        ).to_event(1),
         'density': dist.Normal(
             loc=(torch.tensor([2.9 - 2.67, 2.3 - 2.67])),
             scale=torch.tensor(0.15),
@@ -254,7 +254,7 @@ model_priors = {
 #
 # .. math::
 #
-#     p(y_{grav}, y_{enmap}|\theta) = p(y_{grav}|\theta) \cdot p(y_{enmap}|\theta)
+#     p(y_{grav}, y_{enmap} \mid \theta) = p(y_{grav} \mid \theta) \cdot p(y_{enmap} \mid \theta)
 #
 # **Gravity Likelihood**: Hierarchical per-station noise model.
 # **EnMap Likelihood**: Categorical distribution for surface units.
@@ -293,7 +293,7 @@ print(inspect.getsource(enmap_likelihood_fn))
 #            ↓
 #     [Likelihood 1 (Gravity), Likelihood 2 (EnMap)]
 #            ↓
-#     p(data|\theta) → MCMC Proposes Next \theta
+#     p(data | θ) → MCMC Proposes Next θ
 
 prob_model = gpp.make_gempy_pyro_model(
     priors=model_priors,
@@ -344,7 +344,7 @@ if RUN_SIMULATION:
         n_samples=200,
         plot_trace=True
     )
-    
+
     print("\nRunning Joint NUTS Inference...")
     # Reduced samples for tutorial speed; increase for production
     data = gpp.run_nuts_inference(
@@ -407,6 +407,45 @@ plt.show()
 # This shows the probability of each unit at the surface.
 plot_probability_heatmap(data, 'posterior_predictive')
 plt.show()
+# %%
+# **3D Entropy Visualization**
+#
+# We can also visualize uncertainty in 3D by injecting the entropy field back
+# into the GemPy solutions object.
+#
+# Note: The 3D visualization is already handled inside probability_fields_for()
+# by injecting the entropy field and calling gpv.plot_3d.
+
+
+# Resetting the model
+simple_geo_model = gp.create_geomodel(
+    project_name='joint_inversion',
+    extent=extent,
+    refinement=refinement,
+    importer_helper=gp.data.ImporterHelper(
+        path_to_orientations=mod_or_path,
+        path_to_surface_points=mod_pts_path,
+    )
+)
+
+# Prior Probability Fields
+print("\nComputing prior probability fields...")
+
+topography_path = paths.get_topography_path()
+probability_fields_for(
+    geo_model=simple_geo_model,
+    inference_data=data.prior,
+    topography_path=topography_path
+)
+
+# Posterior Probability Fields
+if hasattr(data, 'posterior'):
+    print("\nComputing posterior probability fields...")
+    probability_fields_for(
+        geo_model=simple_geo_model,
+        inference_data=data.posterior,
+        topography_path=topography_path
+    )
 
 # %%
 # **Summary and Conclusions**
@@ -420,12 +459,11 @@ plt.show()
 
 # **Joint Inversion Workflow Recap:**
 #
-#
-#     1. Data Preparation (Gravity + EnMap)
-#     2. Grid Setup (Multi-grid)
-#     3. Prior Definition (Geological constraints)
-#     4. Likelihood Formulation (Noise models)
-#     5. Balance Diagnostic (Crucial for joint!)
-#     6. MCMC Inference (NUTS)
-#     7. Posterior Analysis & Visualization
-# sphinx_gallery_thumbnail_number = 3
+# 1. Data Preparation (Gravity + EnMap)
+# 2. Grid Setup (Multi-grid)
+# 3. Prior Definition (Geological constraints)
+# 4. Likelihood Formulation (Noise models)
+# 5. Balance Diagnostic (Crucial for joint!)
+# 6. MCMC Inference (NUTS)
+# 7. Posterior Analysis & Visualization
+# sphinx_gallery_thumbnail_number = 8
