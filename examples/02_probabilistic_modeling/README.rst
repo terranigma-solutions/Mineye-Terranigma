@@ -53,6 +53,9 @@ Example Descriptions
 * **06_enmap_inversion.py**: Surface lithology inversion using EnMap satellite 
   classifications with Categorical likelihood and ordinal probabilities
 
+* **07_joint_inversion.py**: Joint Bayesian inversion of gravity and EnMap data, 
+  demonstrating multi-grid setup and likelihood balance diagnostics
+
 Inference Methods
 -----------------
 
