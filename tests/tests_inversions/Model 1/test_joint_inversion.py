@@ -234,7 +234,7 @@ class TestJointInversion:
         gempy_viz(geo_model, data, n_samples=20, ve=3)
 
     def test_run_analysis(self, simple_geo_model, geophysical_dir, base_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_joint_Feb05_2026.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_joint_Feb05_2026_v2.nc"))
 
         az.plot_posterior(data, var_names=["dips", "density"])
         plt.show()

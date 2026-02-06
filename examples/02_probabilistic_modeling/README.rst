@@ -50,6 +50,9 @@ Example Descriptions
 * **05_magnetics_inversion.py**: Magnetic data inversion demonstrating joint
   geophysical-geological inference
 
+* **06_enmap_inversion.py**: Surface lithology inversion using EnMap satellite 
+  classifications with Categorical likelihood and ordinal probabilities
+
 Inference Methods
 -----------------
 
