@@ -71,12 +71,12 @@ The forward model f involves:
 
 
 """
-import os
 
 # %%
 # Import Libraries
 # ----------------
 
+import os
 import dotenv
 
 dotenv.load_dotenv()
@@ -1179,6 +1179,15 @@ if "sigma_stations" in data.posterior_predictive:
 #   existing at any given location.
 # * **Information Entropy**: Quantifies the total uncertainty. High entropy means
 #   high uncertainty about which unit is present.
+# %%
+# **3D Entropy Visualization**
+#
+# We can also visualize uncertainty in 3D by injecting the entropy field back
+# into the GemPy solutions object.
+#
+# Note: The 3D visualization is already handled inside probability_fields_for()
+# by injecting the entropy field and calling gpv.plot_3d.
+
 
 # Resetting the model
 geo_model = gp.create_geomodel(
@@ -1210,15 +1219,6 @@ if hasattr(data, 'posterior'):
         inference_data=data.posterior,
         topography_path=topography_path
     )
-
-# %%
-# **3D Entropy Visualization**
-#
-# We can also visualize uncertainty in 3D by injecting the entropy field back
-# into the GemPy solutions object.
-
-# Note: The 3D visualization is already handled inside probability_fields_for()
-# by injecting the entropy field and calling gpv.plot_3d.
 
 # %%
 # Summary: The Complete Bayesian Gravity Inversion Workflow
@@ -1365,4 +1365,4 @@ if hasattr(data, 'posterior'):
 # - Diagnose and visualize inference results
 # - Extend this framework to your own problems
 
-# sphinx_gallery_thumbnail_number = 10
+# sphinx_gallery_thumbnail_number = 7
