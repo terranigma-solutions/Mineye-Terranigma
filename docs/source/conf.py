@@ -25,8 +25,20 @@ import warnings
 # Add project root to sys.path so we can import mineye without installing it
 sys.path.insert(0, os.path.abspath('../../'))
 
+# --- PyKeOps Path Setup ---
+# PyKeOps dynamically compiles C++ code and stores it in a cache folder.
+# We ensure this folder is in sys.path so Sphinx can find the compiled modules.
+try:
+    import pykeops
+    keops_build_folder = pykeops.get_build_folder()
+    if keops_build_folder not in sys.path:
+        sys.path.append(keops_build_folder)
+except ImportError:
+    pass
+# --------------------------
+
 # Add external dependencies paths
-sys.path.insert(0, os.path.abspath('/Users/simonvirgo/PycharmProjects/bayseg'))
+# sys.path.insert(0, os.path.abspath('/Users/simonvirgo/PycharmProjects/bayseg'))
 
 import dotenv
 import pyvista
@@ -191,41 +203,28 @@ sphinx_gallery_conf.update(only_warn_on_example_error=True)
 
 # endregion
 
-# region -- Options for HTML output ----------------------------------------------
-
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
 
 html_theme = 'alabaster'
 html_theme_options = {
-        'github_user'     : 'leguark',
-        'github_repo'     : 'Mineye-Terranigma',
-        'github_type'     : 'star',
-        'logo'            : 'logos/MINEYE_LOGO.png',
-        'logo_name'       : False,
-        'travis_button'   : False,
-        'page_width'      : '1200px',
-        'fixed_sidebar'   : False,
-        'show_related'    : True,
+        'logo_name': True,
+        'description': 'Implicit Geological Modeling & Bayesian Geophysical Inversion',
+        'github_button': False,
         'sidebar_collapse': True,
+        'page_width': '1200px',
+        'sidebar_width': '300px'
 }
 
-# Custom sidebar templates, maps document names to template names.
-# html_sidebars = { '**': ['globaltoc.html', 'relations.html', 'sourcelink.html', 'searchbox.html']}
-
-html_sidebars = {'**': ['about.html', 'navigation.html',
-                        'relations.html',
-                        'searchbox.html',
-                        'donate.html', ]}
+html_logo = '_static/logos/MINEYE_LOGO.png'
+html_favicon = '_static/logos/favicon.ico'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
-# html_favicon = '_static/logos/favicon.ico'  # Uncomment when favicon is created
 
-# endregion
 
 # -- Options for HTMLHelp output ------------------------------------------
 

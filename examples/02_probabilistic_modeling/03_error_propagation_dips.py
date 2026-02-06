@@ -40,7 +40,7 @@ from mineye.GeoModel.model_one.probabilistic_model import create_orientation_mod
 # Define Model Extent and Resolution
 # -----------------------------------
 
-min_x = -709521
+min_x = -707521
 max_x = -675558
 min_y = 4526832
 max_y = 4551949
@@ -84,7 +84,7 @@ geo_model = gp.create_geomodel(
 gp.map_stack_to_surfaces(
     gempy_model=geo_model,
     mapping_object={
-        "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
+            "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
     }
 )
 
@@ -98,7 +98,25 @@ print("✓ Switched to PyTorch backend")
 # %%
 # Define Prior Distribution for Dips
 # -----------------------------------
-# We'll add uncertainty to all orientation dip angles
+#
+# **Prior Predictive Sampling vs. Posterior Sampling**
+#
+# * **Prior Predictive Sampling**: Generating data from the model using parameters drawn
+#   from the prior distribution. It answers: "What kind of models/data do our initial
+#   beliefs produce?" It's a way to check if the model and priors are reasonable before
+#   considering observations.
+#
+# * **Posterior Sampling**: Generating parameters that are consistent with both our
+#   initial beliefs (priors) AND the observed data. It answers: "What parameters are
+#   most likely given the data we've seen?"
+#
+# In this example, we focus on **Prior Predictive Sampling** to see how uncertainty
+# in orientation dip angles propagates to the final structural geometry.
+#
+# We'll add uncertainty to all orientation dip angles.
+
+from mineye.config.example_parameters import TharsisModelConfig
+FORMATION_COLORS = TharsisModelConfig.TharsisDataProcessingConfig.FORMATION_COLORS
 
 n_orientations = geo_model.orientations_copy.xyz.shape[0]
 print(f"Number of orientations: {n_orientations}")
@@ -108,11 +126,11 @@ mean_orientations = torch.ones(n_orientations) * 10.0
 std_orientations = 10.0
 
 model_priors = {
-    r'dips': dist.Normal(
-        loc=mean_orientations,
-        scale=torch.tensor(std_orientations, dtype=torch.float64),
-        validate_args=True
-    )
+        r'dips': dist.Normal(
+            loc=mean_orientations,
+            scale=torch.tensor(std_orientations, dtype=torch.float64),
+            validate_args=True
+        )
 }
 
 print(f"\nPrior distribution:")
@@ -149,6 +167,7 @@ prior_inference_data: az.InferenceData = gpp.run_predictive(
 
 print("✓ Prior predictive sampling complete")
 
+
 # %%
 # Visualize Uncertainty
 # ---------------------
@@ -160,6 +179,7 @@ def update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float, 
         dip=sample_value,
     )
 
+
 # Create base plot
 p2d = gpv.plot_2d(
     model=geo_model,
@@ -167,7 +187,8 @@ p2d = gpv.plot_2d(
     legend=False,
     show_lith=False,
     show_data=False,
-    show=False
+    show=False,
+    ve=5
 )
 
 # Overlay sampled models
@@ -176,8 +197,10 @@ plot_gempy(
     n_samples=20,
     samples=(prior_inference_data.prior[r'dips'].values[0, :]),
     update_model_fn=update_model_for_plotting,
-    gempy_plot=p2d
+    gempy_plot=p2d,
+    contour_colors=[FORMATION_COLORS['Tournaisian Plutonites']]
 )
+# sphinx_gallery_thumbnail_number = 2
 
 print("✓ Visualization complete")
 

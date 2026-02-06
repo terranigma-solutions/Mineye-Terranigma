@@ -71,22 +71,24 @@ The forward model f involves:
 
 
 """
-import os
 
 # %%
 # Import Libraries
 # ----------------
 
+import os
 import dotenv
 
 dotenv.load_dotenv()
 
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
+from mineye.GeoModel.model_one.visualization import probability_fields_for
 from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward, generate_gravity_uncertainty_plots
 
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 import gempy as gp
 import gempy_probability as gpp
@@ -401,13 +403,6 @@ print(f"  Std: 10°")
 # 2. Visualization: Plot how gravity predictions evolve during sampling
 # 3. Diagnostics: Check if normalized values are reasonable
 
-post_forward_dets = {
-        "gravity_response_raw": lambda samples, gm, sol: sol.gravity,
-        "gravity_response"    : lambda samples, gm, sol: align_forward_to_observed(-sol.gravity, norm_params),
-        "mean_gravity"        : lambda samples, gm, sol: torch.mean(align_forward_to_observed(-sol.gravity, norm_params)),
-        "max_gravity"         : lambda samples, gm, sol: torch.max(align_forward_to_observed(-sol.gravity, norm_params), 0),
-}
-
 # %%
 # Step 7: Define Likelihood Function
 # -----------------------------------
@@ -544,6 +539,29 @@ likelihood_fn = generate_multigravity_likelihood_hierarchical_per_station(
 print("✓ Likelihood function created (hierarchical per-station)")
 print(f"  Global mean noise prior: ~5000.0 µGal")
 print(f"  Each station's noise will be inferred from data")
+
+# %%
+# **Inspecting the Likelihood Function Source Code**
+#
+# To fully understand what the likelihood function does internally, we can inspect
+# its source code. This is particularly useful because the likelihood is the most
+# variable component across different inversions - it defines how model predictions
+# connect to observations and what noise model is assumed.
+#
+# The source code reveals:
+#
+# - How simulated geophysics is aligned to observations
+# - What Pyro distributions are used for the noise model
+# - Which parameters are sampled (inferred) vs fixed
+# - The hierarchical structure (hyperpriors → station-level parameters → observations)
+
+import inspect
+
+print("\n" + "=" * 70)
+print("LIKELIHOOD FUNCTION SOURCE CODE")
+print("=" * 70)
+print(inspect.getsource(generate_multigravity_likelihood_hierarchical_per_station))
+print("=" * 70)
 
 # %%
 # Step 8: Create Probabilistic Model
@@ -702,12 +720,10 @@ print(f"  Each station's noise will be inferred from data")
 # - gpp.run_vi_inference() for variational inference (faster approximation)
 
 # %%
-prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
+prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
     priors=model_priors,
     set_interp_input_fn=set_priors,
     likelihood_fn=likelihood_fn,
-    pre_forward_deterministics={},
-    post_forward_deterministics=post_forward_dets,
     obs_name="Gravity Measurement"
 )
 
@@ -844,8 +860,9 @@ gempy_viz(
 
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
-    many_forward_norm=prior_inference_data.prior[r'gravity_response'].values[0, -10:],
-    observed_norm=observed_gravity_ugal
+    many_forward_norm=prior_inference_data.prior[r'$\mu_{gravity}$'].values[0, -10:],
+    observed_norm=observed_gravity_ugal,
+    unit_label='μGal'
 )
 
 # %%
@@ -914,7 +931,7 @@ print("  Warmup: 200 steps")
 print("  Sampling: 200 samples")
 print("  Chains: 1")
 
-RUN_SIMULATION = True
+RUN_SIMULATION = False
 if RUN_SIMULATION:
     data = gpp.run_nuts_inference(
         prob_model=prob_model,
@@ -928,7 +945,6 @@ if RUN_SIMULATION:
             init_strategy='median',
             num_samples=200,
             warmup_steps=200,
-            num_chains=1
         ),
         plot_trace=True,
         run_posterior_predictive=True
@@ -955,7 +971,7 @@ else:
 
     # Get the directory of the current file using inspect
     current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
-    data_path = current_dir / "arviz_data_04.nc"
+    data_path = current_dir / "arviz_data_grav_feb2026.nc"
 
     if not data_path.exists():
         raise FileNotFoundError(
@@ -965,6 +981,17 @@ else:
 
     # Read the data file
     data = az.from_netcdf(str(data_path))
+
+# %%
+# **Interactive: Pre-computed Results**
+#
+# Running full MCMC chains can be computationally expensive. For convenience,
+# pre-computed `.nc` files (ArviZ InferenceData) are available for download.
+#
+# To use them:
+# 1. Download `arviz_data_04.nc` from the project repository.
+# 2. Place it in the same directory as this script.
+# 3. Set `RUN_SIMULATION = False` to load the results instantly.
 
 # %%
 # Analysis: Parameter Posterior Statistics
@@ -1084,8 +1111,9 @@ print(f"  Max absolute: {np.abs(residuals).max():.2f} µGal")
 
 plot_many_observed_vs_forward(
     forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
-    many_forward_norm=data.posterior_predictive[r'gravity_response'].values[0, -20:],
-    observed_norm=observed_gravity_ugal
+    many_forward_norm=data.posterior_predictive[r'$\mu_{gravity}$'].values[0, -20:],
+    observed_norm=observed_gravity_ugal,
+    unit_label='μGal'
 )
 
 # %%
@@ -1109,27 +1137,110 @@ gempy_viz(
 
 # %%
 
-plot_geophysics_comparison(forward_norm=data.prior[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
+plot_geophysics_comparison(forward_norm=data.prior[r'$\mu_{gravity}$'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
 # %%
 
-plot_geophysics_comparison(forward_norm=data.posterior_predictive[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
+plot_geophysics_comparison(forward_norm=data.posterior_predictive[r'$\mu_{gravity}$'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
 # %%
 
 gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-    gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+    gravity_samples_norm=data.prior[r'$\mu_{gravity}$'].values[0, :],  # (n_samples, n_devices)
     observed_gravity_ugal=observed_gravity_ugal,
     xy_ravel=xy_ravel
 )
 
 # %%
 
-if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
+if hasattr(data, 'posterior') and r'$\mu_{gravity}$' in data.prior:
     gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-        gravity_samples_norm=data.posterior_predictive[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+        gravity_samples_norm=data.posterior_predictive[r'$\mu_{gravity}$'].values[0, :],  # (n_samples, n_devices)
         observed_gravity_ugal=observed_gravity_ugal,
         xy_ravel=xy_ravel
+    )
+
+# %%
+# **Sigma Analysis: Outlier Detection**
+#
+# Hierarchical modeling allows us to identify stations with unusually high noise,
+# which may indicate instrument problems, terrain correction errors, or localized
+# geological complexity not captured by the model.
+#
+# Stations where the inferred noise (sigma) is much higher than the global mean
+# are candidates for being "problematic".
+
+if "sigma_stations" in data.posterior_predictive:
+    posterior_sigmas = data.posterior_predictive["sigma_stations"].values
+    station_noise_mean = posterior_sigmas.mean(axis=(0, 1))
+    sigma_global_mean = station_noise_mean.mean()
+
+    # Identify stations with noise > 2 standard deviations above mean
+    problematic = np.where(station_noise_mean > 2 * sigma_global_mean)[0]
+    print(f"\nPotential outlier stations identified: {problematic}")
+
+    # Plot sigma distribution
+    az.plot_density(
+        data=[data, data.prior],
+        var_names=["sigma_stations"],
+        filter_vars="like",
+        hdi_prob=0.9999,
+        shade=.2,
+        data_labels=["Posterior", "Prior"],
+        colors=[default_red, default_blue],
+    )
+    plt.title("Per-Station Noise Distribution (Sigma)")
+    plt.show()
+
+# %%
+# **Probability Density Fields and Information Entropy**
+#
+# To visualize the spatial uncertainty of the geological structure, we compute
+# probability density fields and information entropy.
+#
+# * **Probability Density Field**: Shows the probability of each geological unit
+#   existing at any given location.
+# * **Information Entropy**: Quantifies the total uncertainty. High entropy means
+#   high uncertainty about which unit is present.
+# %%
+# **3D Entropy Visualization**
+#
+# We can also visualize uncertainty in 3D by injecting the entropy field back
+# into the GemPy solutions object.
+#
+# Note: The 3D visualization is already handled inside probability_fields_for()
+# by injecting the entropy field and calling gpv.plot_3d.
+
+
+# Resetting the model
+geo_model = gp.create_geomodel(
+    project_name='gravity_inversion',
+    extent=extent,
+    refinement=refinement,
+    resolution=resolution,
+    importer_helper=gp.data.ImporterHelper(
+        path_to_orientations=mod_or_path,
+        path_to_surface_points=mod_pts_path,
+    )
+)
+
+# Prior Probability Fields
+print("\nComputing prior probability fields...")
+
+topography_path = paths.get_topography_path()
+probability_fields_for(
+    geo_model=geo_model,
+    inference_data=data.prior,
+    topography_path=topography_path
+)
+
+# Posterior Probability Fields
+if hasattr(data, 'posterior'):
+    print("\nComputing posterior probability fields...")
+    probability_fields_for(
+        geo_model=geo_model,
+        inference_data=data.posterior,
+        topography_path=topography_path
     )
 
 # %%
@@ -1277,4 +1388,4 @@ if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
 # - Diagnose and visualize inference results
 # - Extend this framework to your own problems
 
-# sphinx_gallery_thumbnail_number = 9
+# sphinx_gallery_thumbnail_number = 7

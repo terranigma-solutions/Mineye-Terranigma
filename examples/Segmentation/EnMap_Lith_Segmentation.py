@@ -36,16 +36,18 @@ import os
 # ----------
 # Set these paths to your local data. Wavelengths are parsed from the ENMAP metadata XML automatically.
 
-# Examples: enmap_folder = "/path/to/ENMAP_L2A_TILE/"
+from mineye.config import paths
 
-enmap_folder: str = os.path.join(os.path.dirname(__file__), "../Data/Segmentation_Input_Data/Enmap/ENMAP01-____L2A-DT0000026661_20230712T114038Z_001_V010402_20240818T134118Z")  # REQUIRED: EnMAP L2A folder path
+# Get base data directory for segmentation
+enmap_base_dir = paths.get_base_dir()
+enmap_folder: str = os.path.join(enmap_base_dir, "Segmentation_Input_Data/Enmap/ENMAP01-____L2A-DT0000026661_20230712T114038Z_001_V010402_20240818T134118Z")  # REQUIRED: EnMAP L2A folder path
 
 # Segmentation hyperparameters
 n_classes: int = 8
 iterations: int = 400
 beta_init: float = 30.0
 beta_jump: float = 0.1
-output_prefix: str = "examples/Data/Segmentation_Output_Data/EnMap"  # output prefix for results
+output_prefix: str = os.path.join(enmap_base_dir, "Segmentation_Output_Data/EnMap")  # output prefix for results
 save_npy: bool = True  # save intermediate arrays from full_workflow
 
 # Detrending / background-field removal (recommended for the current EnMAP dataset)
@@ -113,10 +115,27 @@ if __name__ == "__main__":
     # 2. QA plotting
     # --------------
     # Visualize the extracted features and diagnostic plots.
+    #
+    # **MNF Quicklooks**
+    #
+    # Maximum Noise Fraction (MNF) transforms are used to de-correlate spectral data
+    # and segregate noise. The first few MNF bands contain most of the geological
+    # signal, while higher bands are dominated by noise.
+
     try:
         output_prefix_abs = os.path.abspath(output_prefix)
         plot_feature_quicklooks(features, output_prefix_abs)
         print(f"[Workflow] Saved feature quicklooks to {output_prefix_abs}_*.png")
+
+        # Display MNF-1 for visualization in the gallery
+        import matplotlib.pyplot as plt
+        if 'MNF-1' in features:
+            plt.figure(figsize=(10, 8))
+            plt.imshow(features['MNF-1'], cmap='viridis')
+            plt.colorbar(label='MNF Intensity')
+            plt.title('Feature Quicklook: MNF Band 1')
+            plt.show()
+
     except Exception as e:
         print(f"[WARN] Could not create feature quicklooks: {e}")
 
@@ -143,6 +162,11 @@ if __name__ == "__main__":
     bands_dict, open_datasets, memfiles = features_to_memory_datasets(features, meta)
     try:
         # Choose a reference layer and compute full bounds (xmin, ymin, xmax, ymax)
+        #
+        # .. note::
+        #    We set the sphinx gallery thumbnail to the MNF band plotted above.
+        #
+        # sphinx_gallery_thumbnail_number = 1
         ref_key = next(iter(bands_dict.keys()))
         ref_ds = bands_dict[ref_key]
         ref_bounds = ref_ds.bounds

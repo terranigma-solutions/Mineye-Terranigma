@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:29.753** total execution time for 8 files **from all galleries**:
+**00:28.240** total execution time for 12 files **from all galleries**:
 
 .. container::
 
@@ -32,27 +32,39 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_examples_basic_03_gravity_forward_model.py` (``..\..\examples\01_basic_examples\03_gravity_forward_model.py``)
-     - 00:22.910
+   * - :ref:`sphx_glr_examples_probabilistic_07_joint_inversion.py` (``../../examples/02_probabilistic_modeling/07_joint_inversion.py``)
+     - 00:28.238
      - 0.0
-   * - :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py` (``..\..\examples\01_basic_examples\01_simple_tharsis_model.py``)
-     - 00:06.748
-     - 0.0
-   * - :ref:`sphx_glr_examples_probabilistic_02_error_propagation.py` (``..\..\examples\02_probabilistic_modeling\02_error_propagation.py``)
-     - 00:00.089
-     - 0.0
-   * - :ref:`sphx_glr_examples_probabilistic_04_gravity_inversion.py` (``..\..\examples\02_probabilistic_modeling\04_gravity_inversion.py``)
+   * - :ref:`sphx_glr_examples_segmentation_01_enmap_lith_segmentation.py` (``../../examples/03_segmentation/01_enmap_lith_segmentation.py``)
      - 00:00.002
      - 0.0
-   * - :ref:`sphx_glr_examples_probabilistic_05_magnetics_inversion.py` (``..\..\examples\02_probabilistic_modeling\05_magnetics_inversion.py``)
-     - 00:00.002
-     - 0.0
-   * - :ref:`sphx_glr_examples_probabilistic_03_error_propagation_dips.py` (``..\..\examples\02_probabilistic_modeling\03_error_propagation_dips.py``)
-     - 00:00.002
-     - 0.0
-   * - :ref:`sphx_glr_examples_basic_02_complex_tharsis_model.py` (``..\..\examples\01_basic_examples\02_complex_tharsis_model.py``)
+   * - :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py` (``../../examples/01_basic_examples/01_simple_tharsis_model.py``)
      - 00:00.000
      - 0.0
-   * - :ref:`sphx_glr_examples_basic_04_bayesian_segmentation.py` (``..\..\examples\01_basic_examples\04_bayesian_segmentation.py``)
+   * - :ref:`sphx_glr_examples_basic_02_complex_tharsis_model.py` (``../../examples/01_basic_examples/02_complex_tharsis_model.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_basic_03_gravity_forward_model.py` (``../../examples/01_basic_examples/03_gravity_forward_model.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_02_error_propagation.py` (``../../examples/02_probabilistic_modeling/02_error_propagation.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_03_error_propagation_dips.py` (``../../examples/02_probabilistic_modeling/03_error_propagation_dips.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_04_gravity_inversion.py` (``../../examples/02_probabilistic_modeling/04_gravity_inversion.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_05_magnetics_inversion.py` (``../../examples/02_probabilistic_modeling/05_magnetics_inversion.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_06_enmap_inversion.py` (``../../examples/02_probabilistic_modeling/06_enmap_inversion.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_segmentation_02_enmap_data_extraction.py` (``../../examples/03_segmentation/02_enmap_data_extraction.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_segmentation_03_enmap_gempy_comparison.py` (``../../examples/03_segmentation/03_enmap_gempy_comparison.py``)
      - 00:00.000
      - 0.0

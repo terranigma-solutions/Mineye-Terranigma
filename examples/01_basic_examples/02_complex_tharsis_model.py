@@ -30,6 +30,25 @@ This example demonstrates a **two-model workflow**:
 3. Finally, the models are merged by overwriting the sedimentary lithologies where
    the plutonite exists
 
+**Why two models instead of one?**
+
+Standard implicit modeling (using a single scalar field) can sometimes struggle with
+**erosive contacts** and complex topological relationships. By using two separate
+models, we gain several advantages:
+
+* **Implicit vs. Explicit Topology**: Instead of relying on the interpolator to correctly
+  handle the cutting relationship (implicit), we explicitly define it during the merge
+  step. This ensures the plutonite always "wins" and cuts cleanly through the host rock.
+
+* **Independent Constraints**: The sedimentary layers are constrained by their own
+  orientations and surface points, while the plutonite is constrained by its unique
+  geometry. This prevents data from one domain from "bleeding" into and distorting
+  the other.
+
+* **Topological Robustness**: It ensures that no "floating" stratigraphic layers appear
+  inside the intrusive body, which can happen in single-model workflows if the
+  interpolated surfaces cross in unphysical ways.
+
 This approach allows each geological domain to be modeled with appropriate constraints
 while still producing a unified 3D model.
 
@@ -67,23 +86,19 @@ np.random.seed(1234)
 # * **Green** for Mid Devonian: Intermediate color for older sediments
 # * **Orange** for Famennian: Distinct color for basement rocks
 
-FORMATION_COLORS = {
-    'Tournaisian Plutonites': '#e74c3c',        # Red - plutonite
-    'Visean Shales': '#3498db',                 # Blue
-    'Mid Devonian Siliciclastics': '#2ecc71',   # Green
-    'Famennian Siliciclastics': '#f39c12',      # Orange - basement
-    'basement': '#8B4513',                      # Brown - default basement
-}
-
 # %%
 # Import Paths and Helper Modules
 # -------------------------------
 #
 # The ``paths`` module provides centralized access to data file locations.
 # The ``helper_plotter`` module contains custom visualization functions.
+# The ``example_parameters`` module contains shared configuration like color schemes.
 
 from mineye.config import paths
+from mineye.config.example_parameters import TharsisModelConfig
 from mineye.GeoModel import helper_plotter
+
+FORMATION_COLORS = TharsisModelConfig.TharsisDataProcessingConfig.FORMATION_COLORS
 
 # %%
 # Define Model Extent and Resolution
@@ -171,7 +186,7 @@ for element in stratigraphic_geo_model.structural_frame.structural_elements:
 gp.map_stack_to_surfaces(
     gempy_model=stratigraphic_geo_model,
     mapping_object={
-        "Strat_Series1": ("Visean Shales", "Mid Devonian Siliciclastics", "Famennian Siliciclastics")
+            "Strat_Series1": ("Visean Shales", "Mid Devonian Siliciclastics", "Famennian Siliciclastics")
     }
 )
 
@@ -187,10 +202,10 @@ gp.set_topography_from_file(
     grid=stratigraphic_geo_model.grid,
     filepath=topography_path,
     crop_to_extent=[
-        stratigraphic_geo_model.grid.extent[0],
-        stratigraphic_geo_model.grid.extent[1],
-        stratigraphic_geo_model.grid.extent[2],
-        stratigraphic_geo_model.grid.extent[3]
+            stratigraphic_geo_model.grid.extent[0],
+            stratigraphic_geo_model.grid.extent[2],
+            stratigraphic_geo_model.grid.extent[1],
+            stratigraphic_geo_model.grid.extent[3]
     ]
 )
 
@@ -225,7 +240,7 @@ plutonite_geo_model = gp.create_geomodel(
 gp.map_stack_to_surfaces(
     gempy_model=plutonite_geo_model,
     mapping_object={
-        "Plutonite_Series": ["Tournaisian Plutonites"]
+            "Plutonite_Series": ["Tournaisian Plutonites"]
     }
 )
 
@@ -236,7 +251,6 @@ for element in plutonite_geo_model.structural_frame.structural_elements:
 
 # Compute the plutonite model
 gp.compute_model(plutonite_geo_model)
-
 
 # %%
 # Merge Models
@@ -284,14 +298,23 @@ lith_block_modified = lith_block_reshaped.flatten()
 # * ID 6: Tournaisian Plutonites (merged from separate model)
 
 FORMATION_ID_MAP = {
-    1: 'Visean Shales',
-    2: 'Mid Devonian Siliciclastics',
-    3: 'Famennian Siliciclastics',
-    6: 'Tournaisian Plutonites',
+        1: 'Visean Shales',
+        2: 'Mid Devonian Siliciclastics',
+        3: 'Famennian Siliciclastics',
+        6: 'Tournaisian Plutonites',
 }
 
 # Get topography points for masking (X, Y, Z)
 topography_points = stratigraphic_geo_model.grid.topography.values
+
+p = gpv.plot_2d(
+    stratigraphic_geo_model,
+    section_names=['topography'],  # this triggers the top-down geological map
+    show_topography=True,
+    show_lith=True,
+    show_boundaries=True,
+    show_data=False
+)
 
 # Plot the combined model with topography masking
 helper_plotter.plot_combined_model(
@@ -304,9 +327,20 @@ helper_plotter.plot_combined_model(
 )
 
 # %%
+gpv.plot_3d(
+    model=stratigraphic_geo_model,
+    ve=5,
+    image=False,
+    kwargs_pyvista_bounds={
+            'show_xlabels': False,
+            'show_ylabels': False,
+            'show_zlabels': False
+    }
+)
+
+# %%
 # Summary and Next Steps
 # ----------------------
-
 # **Key Takeaways**:
 #
 # * Complex geological relationships can be modeled by combining multiple GemPy models
@@ -324,4 +358,4 @@ helper_plotter.plot_combined_model(
 #    * `GemPy Documentation <https://www.gempy.org>`_
 #    * `PyVista for 3D Visualization <https://docs.pyvista.org>`_
 #
-# sphinx_gallery_thumbnail_number = -1
+# sphinx_gallery_thumbnail_number = 1

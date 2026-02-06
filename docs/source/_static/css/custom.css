@@ -1,0 +1,17 @@
+/* Custom CSS to fix gallery layout in Alabaster theme */
+.sphx-glr-thumbnails {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+.sphx-glr-thumbcontainer {
+    width: 200px; /* Adjust this value as needed to fit 3-4 items per row */
+    margin: 10px !important;
+    float: none !important;
+    display: inline-block !important;
+}
+
+.sphx-glr-thumbcontainer .image {
+    width: 100%;
+}

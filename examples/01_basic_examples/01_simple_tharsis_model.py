@@ -37,6 +37,24 @@ This model uses:
 # We use **GemPy** for 3D implicit geological modeling. GemPy uses a universal co-kriging
 # interpolation approach to construct continuous 3D geological surfaces from sparse data points.
 #
+# **Universal Co-Kriging**
+#
+# GemPy's core interpolation engine is based on Universal Co-Kriging, a geostatistical
+# method that combines multiple types of information into a single consistent 3D model.
+#
+# .. math::
+#
+#     Z(x) = \sum_{i=1}^n \lambda_i Z(x_i) + \sum_{j=1}^m \beta_j f_j(x)
+#
+# Where:
+#
+# * :math:`Z(x)` is the value of the potential field at location :math:`x`
+# * :math:`\sum \lambda_i Z(x_i)` represents the **kriging** part (honoring point data)
+# * :math:`\sum \beta_j f_j(x)` represents the **universal** part (honoring orientations/gradients)
+#
+# This approach ensures that the resulting surfaces are both continuous and honor all
+# structural constraints simultaneously.
+#
 # **NumPy** provides numerical computing capabilities for array operations.
 
 import numpy as np
@@ -63,7 +81,7 @@ from mineye.config import paths
 # The vertical extent captures both subsurface structures (down to 500m below sea level)
 # and topography (up to 505m above sea level).
 
-min_x = -709521
+min_x = -707_521  # * Cropping the corrupted area of the geotiff 
 max_x = -675558
 min_y = 4526832
 max_y = 4551949
@@ -150,10 +168,9 @@ simple_geo_model = gp.create_geomodel(
 gp.map_stack_to_surfaces(
     gempy_model=simple_geo_model,
     mapping_object={
-        "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
+            "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
     }
 )
-
 
 # %%
 # Compute Model with Topography
@@ -173,17 +190,17 @@ gp.map_stack_to_surfaces(
 # The DEM is loaded from a raster file and resampled to match the model grid. GemPy
 # automatically clips the geological model at the topographic surface, ensuring that
 # geological units only exist below ground.
-#
-# .. note::
-#    The ``crop_to_extent`` parameter adjusts the X extent to match the available DEM coverage.
-#    In this case, we shift the western boundary from -709521 to -695558 to align with the DEM.
 
 topography_path = paths.get_topography_path()
 gp.set_topography_from_file(
     grid=simple_geo_model.grid,
     filepath=topography_path,
-    crop_to_extent=[-695558, simple_geo_model.grid.extent[2],
-                    simple_geo_model.grid.extent[1], simple_geo_model.grid.extent[3]]
+    crop_to_extent=[
+            simple_geo_model.grid.extent[0],
+            simple_geo_model.grid.extent[2],
+            simple_geo_model.grid.extent[1],
+            simple_geo_model.grid.extent[3]
+    ]
 )
 
 # Compute the model with topography
@@ -192,6 +209,22 @@ gp.compute_model(simple_geo_model)
 # %%
 # Visualize the Model
 # -------------------
+#
+# **2D Cross-Sections**
+#
+# Before diving into 3D, it's often helpful to inspect 2D cross-sections. This allows
+# for a clear view of the internal structural relationships and the behavior of the
+# interpolator along specific planes.
+#
+# We'll plot a cross-section along the Y-axis (North-South) at the center of the model.
+
+import gempy_viewer as gpv
+
+gpv.plot_2d(simple_geo_model, direction='y', cell_number='mid', show_data=True)
+
+# %%
+# **3D Visualization**
+#
 # Create 3D visualization of the geological model
 #
 # **GemPy Viewer** provides interactive 3D visualization capabilities using PyVista.
@@ -209,7 +242,13 @@ gp.compute_model(simple_geo_model)
 
 import gempy_viewer as gpv
 
-gpv.plot_3d(simple_geo_model, ve=5, image=False)
+gpv.plot_3d(simple_geo_model, ve=5, image=False,
+            kwargs_pyvista_bounds={
+                    'show_xlabels': False,
+                    'show_ylabels': False,
+                    'show_zlabels': False
+            }
+            )
 
 # %%
 # Summary and Next Steps
@@ -242,5 +281,4 @@ gpv.plot_3d(simple_geo_model, ve=5, image=False)
 #    * `GemPy Documentation <https://www.gempy.org>`_
 #    * `PyVista for 3D Visualization <https://docs.pyvista.org>`_
 #
-# sphinx_gallery_thumbnail_number = -1
-
+# sphinx_gallery_thumbnail_number = 2

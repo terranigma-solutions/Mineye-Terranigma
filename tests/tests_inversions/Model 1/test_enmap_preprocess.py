@@ -113,7 +113,7 @@ def test_read_EnMap(base_dir, model_extent, simple_geo_model):
         print(f"   Valid pixels: {np.sum(~np.isnan(data))} / {data.size} ({100 * np.sum(~np.isnan(data)) / data.size:.1f}%)")
 
 
-def _extract_points_from_raster(raster_path, extent, step=10, z_value=None):
+def _extract_points_from_raster(raster_path, extent, step=10, z_value=None, topo_path=None, margin=0.0):
     """
     Private method to extract points from a raster within a given extent.
     """
@@ -126,6 +126,14 @@ def _extract_points_from_raster(raster_path, extent, step=10, z_value=None):
         data = src.read(1, window=window)
         transform = src.window_transform(window)
         
+        # 0. Crop points near borders
+        rows, cols = data.shape
+        row_margin = int(rows * margin)
+        col_margin = int(cols * margin)
+        
+        crop_mask = np.zeros_like(data, dtype=bool)
+        crop_mask[row_margin:rows-row_margin, col_margin:cols-col_margin] = True
+        
         rows, cols = data.shape
         row_indices = np.arange(0, rows, step)
         col_indices = np.arange(0, cols, step)
@@ -135,6 +143,11 @@ def _extract_points_from_raster(raster_path, extent, step=10, z_value=None):
         # Flatten indices
         ii_flat = ii.flatten()
         jj_flat = jj.flatten()
+
+        # Filter by crop mask
+        in_crop = crop_mask[ii_flat, jj_flat]
+        ii_flat = ii_flat[in_crop]
+        jj_flat = jj_flat[in_crop]
         
         # Get labels
         labels = data[ii_flat, jj_flat]
@@ -161,16 +174,21 @@ def _extract_points_from_raster(raster_path, extent, step=10, z_value=None):
         xs = np.array(xs)
         ys = np.array(ys)
         
-        if z_value is None:
-            z_value = extent[5]
-        zs = np.full_like(xs, z_value)
+        if topo_path:
+            with rasterio.open(topo_path) as topo_src:
+                coords = zip(xs, ys)
+                zs = np.array([val[0] for val in topo_src.sample(coords)])
+        else:
+            if z_value is None:
+                z_value = extent[5]
+            zs = np.full_like(xs, z_value)
         
         xyz = np.column_stack((xs, ys, zs))
         
         return xyz, labels_valid, data, (left, right, bottom, top)
 
 
-def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step_inner=20, kernel_size=5, z_value=None):
+def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step_inner=20, kernel_size=5, z_value=None, topo_path=None, margin=0.0):
     """
     Extract points using a spatial kernel to identify boundaries and reduce points in homogeneous areas.
     """
@@ -183,6 +201,14 @@ def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step
         # Read the data within the window at full resolution
         data = src.read(1, window=window)
         transform = src.window_transform(window)
+        
+        # 0. Crop points near borders
+        rows, cols = data.shape
+        row_margin = int(rows * margin)
+        col_margin = int(cols * margin)
+        
+        crop_mask = np.zeros_like(data, dtype=bool)
+        crop_mask[row_margin:rows-row_margin, col_margin:cols-col_margin] = True
         
         # Clean data (handle NaNs and label mapping as in previous step)
         # We need to fill NaNs for boundary detection, but we'll mask them out later
@@ -210,7 +236,7 @@ def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step
         inner_mask &= ~boundaries
         
         # Combine masks
-        sampling_mask = boundary_mask | inner_mask
+        sampling_mask = (boundary_mask | inner_mask) & crop_mask
         
         # Mask out NaNs and ignored labels (label 1)
         sampling_mask &= ~mask_nan
@@ -225,19 +251,27 @@ def _extract_points_spatially_reduced(raster_path, extent, step_boundary=2, step
         xs = np.array(xs)
         ys = np.array(ys)
         
-        if z_value is None:
-            z_value = extent[5]
-        zs = np.full_like(xs, z_value)
+        if topo_path:
+            with rasterio.open(topo_path) as topo_src:
+                coords = zip(xs, ys)
+                zs = np.array([val[0] for val in topo_src.sample(coords)])
+        else:
+            if z_value is None:
+                z_value = extent[5]
+            zs = np.full_like(xs, z_value)
         
         xyz = np.column_stack((xs, ys, zs))
         
         return xyz, labels_valid, data, (left, right, bottom, top)
 
 
-def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_value=None):
+def _extract_points_central_reduced(raster_path, extent, min_distance=25, z_value=None, topo_path=None, balance_patches=True, margin=0.05):
     """
     Extract points from the center of geological bodies using distance transform.
     Prioritizes points furthest from boundaries and ensures they are spatially separated.
+    
+    If balance_patches is True, it tries to limit the number of points from small patches
+    and potentially increase the number of points from large patches to avoid over-representation.
     """
     from skimage.segmentation import find_boundaries
     from skimage.feature import peak_local_max
@@ -250,6 +284,14 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_valu
         # Read the data within the window at full resolution
         data = src.read(1, window=window)
         transform = src.window_transform(window)
+        
+        # 0. Crop points near borders
+        rows, cols = data.shape
+        row_margin = int(rows * margin)
+        col_margin = int(cols * margin)
+        
+        crop_mask = np.zeros_like(data, dtype=bool)
+        crop_mask[row_margin:rows-row_margin, col_margin:cols-col_margin] = True
         
         # Clean data (handle NaNs and label mapping)
         data_mapped = data.copy()
@@ -264,7 +306,7 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_valu
         
         # 2. Distance transform: distance to nearest boundary or NaN
         # We want to be far from boundaries AND far from NaN areas (which are outside the domain)
-        dist_mask = ~boundaries & ~mask_nan
+        dist_mask = ~boundaries & ~mask_nan & crop_mask
         dist_transform = ndimage.distance_transform_edt(dist_mask)
         
         # 3. Extract peaks for each label
@@ -275,20 +317,60 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_valu
         all_ii = []
         all_jj = []
         all_labels = []
+
+        # Area calculation for balancing
+        if balance_patches:
+            label_areas = {}
+            for label_val in unique_labels:
+                label_areas[label_val] = np.sum(data_mapped == label_val)
+            
+            max_area = max(label_areas.values()) if label_areas else 1
+            min_area = min(label_areas.values()) if label_areas else 1
+            
+            print(f"\n   Area balancing enabled:")
+            print(f"   Area range: {min_area} to {max_area} pixels")
         
         for label_val in unique_labels:
             mask = (data_mapped == label_val)
             
+            # Dynamic min_distance based on area? 
+            # Or just limit the number of points?
+            
+            current_min_dist = min_distance
+            if balance_patches:
+                area_ratio = label_areas[label_val] / max_area
+                # We use area_ratio to scale the density of points. 
+                # This increases points on large areas and reduces them on small areas.
+                pass
+
             # Use peak_local_max to find central points
-            # This ensures points are at least `min_distance` apart (no correlation)
-            # and they are at local maxima of distance from boundaries.
             peaks = peak_local_max(
                 dist_transform, 
-                min_distance=min_distance, 
+                min_distance=current_min_dist, 
                 labels=mask,
                 exclude_border=False
             )
             
+            if balance_patches:
+                # Heuristic: Target number of points proportional to area, weighted by area_ratio.
+                target_density = 1 / (min_distance**2) # points per pixel
+                
+                # Using area_ratio (label_area / max_area) instead of a constant factor (0.2)
+                # increases points on large areas and reduces them on small areas.
+                target_num_peaks = int(label_areas[label_val] * target_density * area_ratio)
+                
+                # Further correction: for small patches, we no longer force 1 point.
+                # We only ensure at least one point if the label area is significant enough.
+                if target_num_peaks == 0 and label_areas[label_val] >= (min_distance ** 2):
+                    target_num_peaks = 1
+                
+                if len(peaks) > target_num_peaks:
+                     print(f"      Label {label_val}: Area={label_areas[label_val]}, Peaks={len(peaks)} -> Reduced to {target_num_peaks}")
+                     # Sort peaks by distance transform value (most central first)
+                     peak_vals = dist_transform[tuple(peaks.T)]
+                     idx = np.argsort(peak_vals)[::-1]
+                     peaks = peaks[idx[:target_num_peaks]]
+
             if len(peaks) > 0:
                 all_ii.extend(peaks[:, 0])
                 all_jj.extend(peaks[:, 1])
@@ -306,32 +388,38 @@ def _extract_points_central_reduced(raster_path, extent, min_distance=20, z_valu
         xs = np.array(xs)
         ys = np.array(ys)
         
-        if z_value is None:
-            z_value = extent[5]
-        zs = np.full_like(xs, z_value)
+        if topo_path:
+            with rasterio.open(topo_path) as topo_src:
+                coords = zip(xs, ys)
+                zs = np.array([val[0] for val in topo_src.sample(coords)])
+        else:
+            if z_value is None:
+                z_value = extent[5]
+            zs = np.full_like(xs, z_value)
         
         xyz = np.column_stack((xs, ys, zs))
         
         return xyz, labels_valid, data, (left, right, bottom, top)
 
 
-def test_spatial_correlation_reduction(base_dir, model_extent):
+def test_spatial_correlation_reduction(base_dir, model_extent, topography_dir):
     """
     Test point reduction using spatial correlation (boundary detection).
     """
     enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
+    topo_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
 
     if not os.path.exists(enmap_path):
         pytest.skip(f"EnMap file not found at {enmap_path}")
 
     # 1. Standard extraction (for comparison)
     step_standard = 10
-    xyz_std, labels_std, _, _ = _extract_points_from_raster(enmap_path, model_extent, step=step_standard)
+    xyz_std, labels_std, _, _ = _extract_points_from_raster(enmap_path, model_extent, step=step_standard, topo_path=topo_path)
     
     # 2. Spatially reduced extraction
     # We want to keep boundaries dense but interior sparse
     xyz_red, labels_red, data, bounds = _extract_points_spatially_reduced(
-        enmap_path, model_extent, step_boundary=50, step_inner=50
+        enmap_path, model_extent, step_boundary=50, step_inner=50, topo_path=topo_path
     )
     
     print(f"\n📊 Reduction Comparison:")
@@ -398,24 +486,29 @@ def test_spatial_correlation_reduction(base_dir, model_extent):
     print(f"✓ Spatially reduced points saved to reduced_*.npy")
 
 
-def test_central_body_extraction(base_dir, model_extent):
+def test_central_body_extraction(base_dir, model_extent, topography_dir):
     """
     Test extraction of points from the center of bodies to minimize spatial correlation.
     """
     enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
+    topo_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
 
     if not os.path.exists(enmap_path):
         pytest.skip(f"EnMap file not found at {enmap_path}")
 
     # 1. Spatially reduced extraction (previous approach for comparison)
     xyz_red, labels_red, _, _ = _extract_points_spatially_reduced(
-        enmap_path, model_extent, step_boundary=50, step_inner=50
+        enmap_path, model_extent, step_boundary=50, step_inner=50, topo_path=topo_path
     )
     
     # 2. Central extraction (new approach)
     # min_distance ensures points are not correlated
     xyz_central, labels_central, data, bounds = _extract_points_central_reduced(
-        enmap_path, model_extent, min_distance=25
+        enmap_path,
+        model_extent,
+        min_distance=50,
+        topo_path=topo_path,
+        balance_patches=True
     )
     
     print(f"\n📊 Strategy Comparison:")
@@ -453,14 +546,15 @@ def test_central_body_extraction(base_dir, model_extent):
     print(f"\n✅ Central points saved to 'central_xyz.npy' and 'central_labels.npy'")
 
 
-def test_extract_reference_points(base_dir, model_extent, simple_geo_model):
+def test_extract_reference_points(base_dir, model_extent, simple_geo_model, topography_dir):
     enmap_path = os.path.join(base_dir, 'examples', 'Data', 'Segmentation_Input_Data', 'Enmap', 'EPSG3857_EnMap_result_n4_betajump0.1.tif')
+    topo_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
 
     if not os.path.exists(enmap_path):
         pytest.skip(f"EnMap file not found at {enmap_path}")
 
     # Extract points from main model extent
-    xyz, labels, data, bounds = _extract_points_from_raster(enmap_path, model_extent)
+    xyz, labels, data, bounds = _extract_points_from_raster(enmap_path, model_extent, topo_path=topo_path)
     
     print(f"   Extracted {len(xyz)} points from main extent")
     
@@ -496,5 +590,5 @@ def test_extract_reference_points(base_dir, model_extent, simple_geo_model):
         model_extent[5]
     ]
     
-    xyz_extra, labels_extra, _, _ = _extract_points_from_raster(enmap_path, extra_extent, step=5)
+    xyz_extra, labels_extra, _, _ = _extract_points_from_raster(enmap_path, extra_extent, step=5, topo_path=topo_path)
     print(f"✓ Extracted {len(xyz_extra)} points from extra extent (quarter of model)")

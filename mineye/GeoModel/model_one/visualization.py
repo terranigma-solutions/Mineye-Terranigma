@@ -140,16 +140,10 @@ def compute_probability_density_fields(geo_model: gp.data.GeoModel, inference_da
 
 def gempy_viz_pro(geo_model: gp.data.GeoModel, prior_inference_data: arviz.InferenceData):
     p2d = gempy_viz(geo_model, prior_inference_data, n_samples=10)
-
-    if len(x_all):
-        x_all = np.concatenate(x_all);
-        z_all = np.concatenate(z_all)
-        _draw_kde(ax, x_all, z_all, gridsize=400, bw=0.03, alpha=0.5, cmap="Blues", zorder=35, lognorm=True)
-
-    p2d.axes[0].set_title("Uncertainty: KDE background + representative realizations")
+    p2d.axes[0].set_title("Uncertainty: representative realizations")
 
 
-def plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm):
+def plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm, unit_label=r'$\mu$Gal'):
     # Create figure
     fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -170,7 +164,6 @@ def plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm
         ax.plot(sorted_observed, sorted_fw, alpha=0.3, linewidth=1)
 
     # Set up plot attributes
-    unit_label = r'$\mu$Gal'
     ax.set_xlabel(f'Observed ({unit_label})')
     ax.set_ylabel(f'Forward Model ({unit_label})')
     ax.set_title('Observed vs Forward Model Correlation')
@@ -196,3 +189,125 @@ def _update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float,
         geo_model=geo_model,
         dip=sample_value,
     )
+
+def plot_probability_heatmap(data, group='prior', slice_idx=None):
+    # Get the data array from ArviZ InferenceData
+    # Standard Shape: (chain, draw, n_points, n_classes)
+    # Example: (1, 50, 57, 3)
+    probs_da = data[group]['probs_pred']
+    
+    if slice_idx is not None:
+        probs_da = probs_da.isel(Joint_Obs_1_dim_0=slice_idx)
+
+    # 1. Average over 'chain' and 'draw' dimensions to get mean per point
+    # Result Shape: (n_points, n_classes)
+    mean_probs = probs_da.mean(dim=["chain", "draw"]).values
+
+    # 2. Transpose for the Heatmap
+    # We want Y-axis = Classes, X-axis = Points
+    # Result Shape: (n_classes, n_points)
+    heatmap_data = mean_probs.T
+
+    plot_heat_map(group, heatmap_data)
+
+
+
+def plot_heat_map(group, heatmap_data):
+    import seaborn as sns
+    # 3. Plot
+    plt.figure(figsize=(14, 4))
+    sns.heatmap(heatmap_data, cmap="Blues", vmin=0, vmax=1,
+                annot=False,  # Set True if you want numbers inside cells
+                cbar_kws={'label': 'Probability'})
+
+    plt.title(f"Average Class Probabilities per Point ({group.capitalize()})")
+    plt.xlabel("Point Index (0 to 56)")
+    plt.ylabel("Rock Unit (Class)")
+
+    # Fix Y-axis labels to be integers (0, 1, 2)
+    plt.yticks(ticks=np.arange(heatmap_data.shape[0]) + 0.5,
+               labels=np.arange(heatmap_data.shape[0]),
+               rotation=0)
+
+    # plt.tight_layout()
+    plt.show()
+
+
+
+def probability_fields_for(geo_model, inference_data, topography_path):
+    online_prob = compute_probability_density_fields(
+        geo_model,
+        inference_data,
+        n_samples=20
+    )
+    import gempy_viewer as gpv
+
+    if True:
+        gpv.plot_2d(
+            geo_model,
+            override_regular_grid=online_prob.probability_field[0],
+            show_data=True,
+            ve=5,
+            kwargs_lithology={
+                    'cmap': 'viridis',
+                    'norm': None
+            }
+        )
+
+        gpv.plot_2d(
+            geo_model,
+            override_regular_grid=online_prob.probability_field[1],
+            show_data=True,
+            ve=5,
+            kwargs_lithology={
+                    'cmap': 'viridis',
+                    'norm': None
+            }
+        )
+
+        gpv.plot_2d(
+            geo_model,
+            override_regular_grid=online_prob.entropy,
+            show_data=True,
+            ve=5,
+            kwargs_lithology={
+                    'cmap': 'magma',
+                    'norm': None
+            }
+        )
+
+    import gempy as gp
+    import os
+    simple_geo_model = geo_model
+    gp.set_topography_from_file(
+        grid=simple_geo_model.grid,
+        filepath=topography_path,
+        crop_to_extent=[
+                simple_geo_model.grid.extent[0],
+                simple_geo_model.grid.extent[2],
+                simple_geo_model.grid.extent[1],
+                simple_geo_model.grid.extent[3]
+        ]
+    )
+
+    gp.compute_model(geo_model)
+
+    # * We inject the entropy field into the model
+    geo_model.solutions.raw_arrays.scalar_field_matrix[0] = online_prob.entropy
+    p3d = gpv.plot_3d(
+        model=geo_model,
+        active_scalar_field="sf_0",
+        show_scalar=True,
+        show_lith=False,
+        show_topography=True,
+        image=False,
+        ve=4,
+        threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
+        kwargs_pyvista_bounds={
+                'show_xlabels': False,
+                'show_ylabels': False,
+                'show_zlabels': False,
+        }
+    )
+    return online_prob
+

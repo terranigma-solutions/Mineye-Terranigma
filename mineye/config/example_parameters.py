@@ -4,7 +4,7 @@ class TharsisModelConfig:
     """Configuration parameters for the Tharsis geological model."""
 
     PROJECT_NAME = 'simple_model'
-    EXTENT = [-709521, -675558, 4526832, 4551949, -500, 505]
+    EXTENT = [-707521, -675558, 4526832, 4551949, -500, 505]
     RESOLUTION = [64, 64, 64]
     REFINEMENT = 4
     SURFACE_MAPPING = {
@@ -49,6 +49,15 @@ class TharsisModelConfig:
         BOUNDARY_TOLERANCE = 800
         FORMATION_ID = 34
         SIMPLIFICATION_LEVEL = 0.9  # 0=no simplification, 1=maximum simplification
+
+        # Shared color scheme for geological formations
+        FORMATION_COLORS = {
+            'Tournaisian Plutonites': '#e74c3c',        # Red - plutonite
+            'Visean Shales': '#3498db',                 # Blue
+            'Mid Devonian Siliciclastics': '#2ecc71',   # Green
+            'Famennian Siliciclastics': '#f39c12',      # Orange - basement
+            'basement': '#8B4513',                      # Brown - default basement
+        }
 
         # Manual orientations to add at specific point IDs (after filtering/simplification)
         MANUAL_ORIENTATIONS_AT_POINTS = [11]  # Point 19 gets filtered out during boundary removal

@@ -160,3 +160,57 @@ def check_mcmc_quality(data: az.InferenceData, min_ess: float = 400, max_rhat: f
         print("=" * 60 + "\n")
 
     return all_passed
+
+
+import pyro.poutine as poutine
+
+
+def check_likelihood_balance(prob_model, geo_model, y_obs_list):
+    """
+    Runs the model once to inspect the log_prob magnitudes of specific observation sites.
+    """
+    print("\n--- Likelihood Balance Check ---")
+
+    # 1. Capture the trace (Run the model and record execution)
+    # We wrap the model in a trace and execute it.
+    # Note: We don't need 'guide' here because we just want to check the model's 
+    # probabilities at the initial state (or prior mean).
+    trace = poutine.trace(prob_model).get_trace(
+        geo_model=geo_model,
+        obs_data=y_obs_list,
+        # Assuming you added gravity argument to your model
+    )
+
+    trace.compute_log_prob()
+
+    # 2. Extract Log Probs for Observation Nodes
+    # You need to know the exact "name" you gave the sample site in your model.
+    # e.g., dist.Normal(...).to_event(1), name="Gravity Data"
+
+    # -- EnMap Likelihood --
+    try:
+        enmap_node = trace.nodes["Joint_Obs_1"]  # Replace with your exact string name
+        enmap_lp = enmap_node["log_prob_sum"]
+        print(f"EnMap Log-Likelihood:   {enmap_lp:.2f}")
+    except KeyError:
+        print("Could not find node 'EnMap Labels'. Check your obs_name string.")
+
+    # -- Gravity Likelihood --
+    try:
+        gravity_node = trace.nodes["Joint_Obs_0"]  # Replace with your exact string name
+        gravity_lp = gravity_node["log_prob_sum"]
+        print(f"Gravity Log-Likelihood: {gravity_lp:.2f}")
+    except KeyError:
+        print("Could not find node 'Gravity Data'.")
+
+    # 3. Compare
+    if 'enmap_lp' in locals() and 'gravity_lp' in locals():
+        ratio = abs(gravity_lp / enmap_lp)
+        print(f"\nRatio (Gravity / EnMap): {ratio:.1f}x")
+
+        if ratio > 100:
+            print("WARNING: Gravity is dominating. EnMap will be ignored.")
+        elif ratio < 0.01:
+            print("WARNING: EnMap is dominating. Gravity will be ignored.")
+        else:
+            print("STATUS: Balanced. Both datasets should contribute.")
