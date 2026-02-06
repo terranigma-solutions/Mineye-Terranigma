@@ -203,8 +203,8 @@ gp.set_topography_from_file(
     filepath=topography_path,
     crop_to_extent=[
             stratigraphic_geo_model.grid.extent[0],
-            stratigraphic_geo_model.grid.extent[1],
             stratigraphic_geo_model.grid.extent[2],
+            stratigraphic_geo_model.grid.extent[1],
             stratigraphic_geo_model.grid.extent[3]
     ]
 )
@@ -307,6 +307,15 @@ FORMATION_ID_MAP = {
 # Get topography points for masking (X, Y, Z)
 topography_points = stratigraphic_geo_model.grid.topography.values
 
+p = gpv.plot_2d(
+    stratigraphic_geo_model,
+    section_names=['topography'],  # this triggers the top-down geological map
+    show_topography=True,
+    show_lith=True,
+    show_boundaries=True,
+    show_data=False
+)
+
 # Plot the combined model with topography masking
 helper_plotter.plot_combined_model(
     lith_block=lith_block_modified,
@@ -349,4 +358,4 @@ gpv.plot_3d(
 #    * `GemPy Documentation <https://www.gempy.org>`_
 #    * `PyVista for 3D Visualization <https://docs.pyvista.org>`_
 #
-# sphinx_gallery_thumbnail_number = -1
+# sphinx_gallery_thumbnail_number = 1

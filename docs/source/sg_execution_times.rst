@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:05.628** total execution time for 12 files **from all galleries**:
+**00:08.582** total execution time for 12 files **from all galleries**:
 
 .. container::
 
@@ -32,11 +32,11 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_examples_probabilistic_05_magnetics_inversion.py` (``../../examples/02_probabilistic_modeling/05_magnetics_inversion.py``)
-     - 00:03.267
-     - 0.0
    * - :ref:`sphx_glr_examples_basic_02_complex_tharsis_model.py` (``../../examples/01_basic_examples/02_complex_tharsis_model.py``)
-     - 00:02.356
+     - 00:05.385
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_05_magnetics_inversion.py` (``../../examples/02_probabilistic_modeling/05_magnetics_inversion.py``)
+     - 00:03.193
      - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_06_enmap_inversion.py` (``../../examples/02_probabilistic_modeling/06_enmap_inversion.py``)
      - 00:00.002
