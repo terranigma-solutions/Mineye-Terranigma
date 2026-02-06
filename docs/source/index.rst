@@ -39,15 +39,20 @@ Basic Examples
 Foundational workflows for 3D geological modeling and geophysical forward modeling.
 These examples introduce core concepts using real data from the **Tharsis mining district** in Spain.
 
+.. raw:: html
+
+    <div class="sphx-glr-thumbnails">
+
 .. include:: examples_basic/index.rst
-   :start-after: .. thumbnail-parent-div-open
-   :end-before: .. thumbnail-parent-div-close
+    :start-after:     <div class="sphx-glr-thumbnails">
+    :end-before: .. thumbnail-parent-div-close
 
 .. toctree::
-   :maxdepth: 2
-   :hidden:
+    :maxdepth: 2
+    :hidden:
 
-   examples_basic/index
+    examples_basic/index
+
 
 ----
 
@@ -59,15 +64,20 @@ Probabilistic Modeling
 Advanced examples demonstrating uncertainty quantification, error propagation,
 and Bayesian inversion techniques for geological and geophysical applications.
 
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbnails">
+
 .. include:: examples_probabilistic/index.rst
-   :start-after: .. thumbnail-parent-div-open
-   :end-before: .. thumbnail-parent-div-close
+    :start-after:     <div class="sphx-glr-thumbnails">
+    :end-before: .. thumbnail-parent-div-close
 
 .. toctree::
-   :maxdepth: 2
-   :hidden:
+    :maxdepth: 2
+    :hidden:
 
-   examples_probabilistic/index
+    examples_probabilistic/index
 
 ----
 
@@ -79,29 +89,20 @@ Hyperspectral Segmentation
 Workflows for lithological segmentation of EnMap hyperspectral data using Bayesian inference.
 These examples cover feature extraction, preprocessing, and model comparison.
 
+.. raw:: html
+
+    <div class="sphx-glr-thumbnails">
+
 .. include:: examples_segmentation/index.rst
-   :start-after: .. thumbnail-parent-div-open
-   :end-before: .. thumbnail-parent-div-close
+    :start-after:     <div class="sphx-glr-thumbnails">
+    :end-before: .. thumbnail-parent-div-close
 
 .. toctree::
-   :maxdepth: 2
-   :hidden:
+    :maxdepth: 2
+    :hidden:
 
-   examples_segmentation/index
+    examples_segmentation/index
 
-----
-
-API Reference
-=============
-
-Detailed documentation of the Mineye-Terranigma Python API.
-
-.. toctree::
-   :maxdepth: 2
-
-   api_reference
-
-----
 
 Key Features
 ============
@@ -125,6 +126,21 @@ Key Features
        * **Uncertainty Quantification**: Probabilistic geological interpretations
 
 ----
+
+----
+
+API Reference
+=============
+
+Detailed documentation of the Mineye-Terranigma Python API.
+
+.. toctree::
+   :maxdepth: 2
+
+   api_reference
+
+----
+
 
 Indices and Tables
 ==================
