@@ -52,6 +52,8 @@ import torch
 import pyro
 import pyro.distributions as dist
 import arviz as az
+from pathlib import Path
+import inspect
 
 import gempy as gp
 import gempy_probability as gpp
@@ -121,9 +123,9 @@ geo_model.interpolation_options.sigmoid_slope = 100
 # We add these to the GemPy model as a 'Custom Grid'.
 
 # For this example, we'll assume the files exist in the same folder as this script
-base_dir = os.path.dirname(os.path.abspath(__file__))
-xyz_path = os.path.join(base_dir, 'central_xyz.npy')
-labels_path = os.path.join(base_dir, 'central_labels.npy')
+current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
+xyz_path = os.path.join(current_dir, 'central_xyz.npy')
+labels_path = os.path.join(current_dir, 'central_labels.npy')
 
 if not os.path.exists(xyz_path):
     # Fallback to dummy data if real data isn't found for the sphinx build
@@ -232,8 +234,6 @@ if RUN_SIMULATION:
     )
 
 else:
-    from pathlib import Path
-    import inspect
 
     # Get the directory of the current file
     current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()

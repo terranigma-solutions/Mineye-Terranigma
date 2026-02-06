@@ -53,6 +53,8 @@ import gempy_probability as gpp
 import gempy_viewer as gpv
 from gempy_probability.core.samplers_data import NUTSConfig
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
+from pathlib import Path
+import inspect
 
 # Set random seeds for reproducibility
 seed = 4003
@@ -80,9 +82,9 @@ from mineye.GeoModel.model_one.probabilistic_model_likelihoods import enmap_like
 # and the EnMap extracted surface points and labels.
 
 # Define paths to find the central_xyz files in the same folder as this script
-base_dir = os.path.dirname(os.path.abspath(__file__))
-xyz_path = os.path.join(base_dir, 'central_xyz.npy')
-labels_path = os.path.join(base_dir, 'central_labels.npy')
+current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
+xyz_path = os.path.join(current_dir, 'central_xyz.npy')
+labels_path = os.path.join(current_dir, 'central_labels.npy')
 
 # Load EnMap data
 xyz_enmap = np.load(xyz_path)
@@ -200,8 +202,6 @@ if RUN_SIMULATION:
 
     data.extend(prior_data)
 else:
-    from pathlib import Path
-    import inspect
 
     # Get the directory of the current file
     current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
