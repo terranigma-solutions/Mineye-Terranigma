@@ -7,7 +7,8 @@
 
     <title>API Reference &#8212; Mineye-Terranigma 0.1.0 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
-    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=8858d845" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=89af775e" />
+    <link rel="stylesheet" type="text/css" href="_static/css/custom.css?v=665f77bd" />
     <link rel="stylesheet" type="text/css" href="_static/sg_gallery.css?v=d2d258e8" />
     <link rel="stylesheet" type="text/css" href="_static/sg_gallery-binder.css?v=f4aeca0c" />
     <link rel="stylesheet" type="text/css" href="_static/sg_gallery-dataframe.css?v=2082cf3c" />
@@ -15,9 +16,10 @@
     <script src="_static/documentation_options.js?v=01f34227"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="icon" href="_static/favicon.ico"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Bayesian Gravity Inversion: Complete Workflow" href="examples_probabilistic/04_gravity_inversion.html" />
+    <link rel="prev" title="EnMap Likelihood and Model Comparison" href="examples_segmentation/03_enmap_gempy_comparison.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -62,22 +64,15 @@ Currently, the focus is on providing working examples rather than comprehensive 
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="Main">
         <div class="sphinxsidebarwrapper">
-<p class="logo">
-  <a href="index.html">
-    <img class="logo" src="_static/logos/MINEYE_LOGO.png" alt="Logo" />
-    
-  </a>
-</p>
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/MINEYE_LOGO.png" alt="Logo of Mineye-Terranigma"/>
+            </a></p>
+<h1 class="logo"><a href="index.html">Mineye-Terranigma</a></h1>
 
 
 
+<p class="blurb">Implicit Geological Modeling & Bayesian Geophysical Inversion</p>
 
-
-
-<p>
-<iframe src="https://ghbtns.com/github-btn.html?user=leguark&repo=Mineye-Terranigma&type=star&count=true&size=large&v=2"
-  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
-</p>
 
 
 
@@ -85,15 +80,17 @@ Currently, the focus is on providing working examples rather than comprehensive 
 
 <h3>Navigation</h3>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="index.html">About</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Example Galleries</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="examples_basic/index.html">Basic Examples</a></li>
+</ul>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="examples_probabilistic/index.html">Probabilistic Modeling Examples</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="examples_segmentation/index.html">Hyperspectral Segmentation</a></li>
+</ul>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API Reference</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#mineye-package">Mineye Package</a></li>
@@ -105,7 +102,7 @@ Currently, the focus is on providing working examples rather than comprehensive 
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="examples_probabilistic/04_gravity_inversion.html" title="previous chapter">Bayesian Gravity Inversion: Complete Workflow</a></li>
+      <li>Previous: <a href="examples_segmentation/03_enmap_gempy_comparison.html" title="previous chapter">EnMap Likelihood and Model Comparison</a></li>
   </ul></li>
 </ul>
 </div>
@@ -132,7 +129,7 @@ Currently, the focus is on providing working examples rather than comprehensive 
       <div class="clearer"></div>
     </div>
     <div class="footer">
-      &#169;2024-2025, Terranigma Solutions GmbH.
+      &#169;2024-2026, Terranigma Solutions GmbH.
       
       |
       Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>

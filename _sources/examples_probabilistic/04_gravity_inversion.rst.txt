@@ -88,42 +88,29 @@ The forward model f involves:
 3. Forward gravity calculation at observation points
 4. Normalization and alignment to observations
 
-.. GENERATED FROM PYTHON SOURCE LINES 74-77
-
-.. code-block:: Python
-
-    import os
-    import sys
-
-
-
-
-
-
-
-
-.. GENERATED FROM PYTHON SOURCE LINES 78-80
+.. GENERATED FROM PYTHON SOURCE LINES 76-78
 
 Import Libraries
 ----------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 80-111
+.. GENERATED FROM PYTHON SOURCE LINES 78-110
 
 .. code-block:: Python
 
 
+    import os
     import dotenv
+
     dotenv.load_dotenv()
 
     from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
+    from mineye.GeoModel.model_one.visualization import probability_fields_for
     from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward, generate_gravity_uncertainty_plots
 
-
-    from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_gravity_comparison
+    from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 
     import numpy as np
-    from whoami import whoami
-    import multiprocessing as mp
+    import matplotlib.pyplot as plt
 
     import gempy as gp
     import gempy_probability as gpp
@@ -146,22 +133,28 @@ Import Libraries
 
 
 
+.. rst-class:: sphx-glr-script-out
+
+ .. code-block:: none
+
+    Setting Backend To: AvailableBackends.PYTORCH
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 112-113
+
+.. GENERATED FROM PYTHON SOURCE LINES 111-112
 
 Import helper functions
 
-.. GENERATED FROM PYTHON SOURCE LINES 113-119
+.. GENERATED FROM PYTHON SOURCE LINES 112-118
 
 .. code-block:: Python
 
     from mineye.config import paths
     from mineye.GeoModel.geophysics import align_forward_to_observed
     from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
-    from mineye.GeoModel.model_one.probabilistic_model import normalize, create_orientation_modifier, set_priors
-    from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_diagonal, MultiGravityDiagonalLikelihood, generate_multigravity_likelihood_hierarchical_per_station
+    from mineye.GeoModel.model_one.probabilistic_model import normalize, set_priors
+    from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_hierarchical_per_station
 
 
 
@@ -170,17 +163,17 @@ Import helper functions
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 120-122
+.. GENERATED FROM PYTHON SOURCE LINES 119-121
 
 Define Model Extent and Resolution
 -----------------------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 122-135
+.. GENERATED FROM PYTHON SOURCE LINES 121-134
 
 .. code-block:: Python
 
 
-    min_x = -709521
+    min_x = -707_521
     max_x = -675558
     min_y = 4526832
     max_y = 4551949
@@ -199,12 +192,12 @@ Define Model Extent and Resolution
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 136-138
+.. GENERATED FROM PYTHON SOURCE LINES 135-137
 
 Get Data Paths
 --------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 138-147
+.. GENERATED FROM PYTHON SOURCE LINES 137-146
 
 .. code-block:: Python
 
@@ -225,19 +218,19 @@ Get Data Paths
 
  .. code-block:: none
 
-    Orientations: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Output_Data/Simple-Models/temp_inputs/orientations_mod.csv
-    Points: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Output_Data/Simple-Models/temp_inputs/points_mod.csv
-    Geophysical data: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Input_Data/Geophysical_Cleaned_Data
+    Orientations: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/orientations_mod.csv
+    Points: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/points_mod.csv
+    Geophysical data: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/General_Input_Data/Geophysical_Cleaned_Data
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 148-150
+.. GENERATED FROM PYTHON SOURCE LINES 147-149
 
 Create Initial GemPy Model
 ---------------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 150-169
+.. GENERATED FROM PYTHON SOURCE LINES 149-168
 
 .. code-block:: Python
 
@@ -298,7 +291,7 @@ Create Initial GemPy Model
     <br />
     <br />
 
-.. GENERATED FROM PYTHON SOURCE LINES 170-187
+.. GENERATED FROM PYTHON SOURCE LINES 169-186
 
 Step 1: Load Gravity Observations
 ----------------------------------
@@ -318,7 +311,7 @@ The data includes:
 - **gravity_data**: Station locations (x, y, z coordinates)
 - **observed_gravity_ugal**: Measured gravity values in microGals
 
-.. GENERATED FROM PYTHON SOURCE LINES 187-194
+.. GENERATED FROM PYTHON SOURCE LINES 186-193
 
 .. code-block:: Python
 
@@ -346,7 +339,7 @@ The data includes:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 195-208
+.. GENERATED FROM PYTHON SOURCE LINES 194-207
 
 Step 2: Setup Geomodel with Gravity Configuration
 --------------------------------------------------
@@ -362,7 +355,7 @@ Higher values (e.g., 100) create sharper transitions, approximating discontinuou
 interfaces between rock units. This affects gravity computation since density contrasts
 are strongest at sharp boundaries.
 
-.. GENERATED FROM PYTHON SOURCE LINES 208-211
+.. GENERATED FROM PYTHON SOURCE LINES 207-210
 
 .. code-block:: Python
 
@@ -384,12 +377,16 @@ are strongest at sharp boundaries.
 
     Setting Backend To: AvailableBackends.PYTORCH
     Using sequential processing for 1 surfaces
+    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:103: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+    Please either pass the dim explicitly or simply use torch.linalg.cross.
+    The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:63.)
+      return func(*args, **kwargs)
 
-    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fe7a5cb6350>
+    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7f77af35e660>
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 212-223
+.. GENERATED FROM PYTHON SOURCE LINES 211-222
 
 .. code-block:: Python
 
@@ -422,11 +419,11 @@ are strongest at sharp boundaries.
     From version 0.50, passing this as a positional argument will result in a TypeError.
       gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
 
-    <gempy_viewer.modules.plot_3d.vista.GemPyToVista object at 0x7fe7850f4c20>
+    <gempy_viewer.modules.plot_3d.vista.GemPyToVista object at 0x7f77af35da90>
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 224-229
+.. GENERATED FROM PYTHON SOURCE LINES 223-228
 
 .. code-block:: Python
 
@@ -459,7 +456,7 @@ are strongest at sharp boundaries.
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 230-248
+.. GENERATED FROM PYTHON SOURCE LINES 229-247
 
 Step 3: Compute Baseline Forward Model
 ---------------------------------------
@@ -480,7 +477,7 @@ The forward gravity computation involves:
 3. Computing gravitational attraction at each observation station
 4. Accounting for station elevations and 3D geometry
 
-.. GENERATED FROM PYTHON SOURCE LINES 248-254
+.. GENERATED FROM PYTHON SOURCE LINES 247-253
 
 .. code-block:: Python
 
@@ -504,21 +501,21 @@ The forward gravity computation involves:
     ============================================================
     Computing gravity with mean/initial prior parameters...
     Baseline forward model statistics:
-      Mean: -392.57 μGal
-      Std:  9.98 μGal
-      Min:  -422.94 μGal
-      Max:  -387.18 μGal
+      Mean: 24.52 μGal
+      Std:  4.86 μGal
+      Min:  8.20 μGal
+      Max:  28.58 μGal
     ============================================================
 
 
     Baseline forward gravity:
-      Range: 387.2 to 422.9 µGal
-      Mean: 392.6 µGal
+      Range: -28.6 to -8.2 µGal
+      Mean: -24.5 µGal
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 255-275
+.. GENERATED FROM PYTHON SOURCE LINES 254-274
 
 Step 4: Normalize Forward Model to Observations
 ------------------------------------------------
@@ -541,7 +538,7 @@ robustness by considering a range of possible offsets.
 This normalization is crucial because absolute gravity values depend on reference
 frames, but gravity *anomalies* (differences) are what matter for geological interpretation.
 
-.. GENERATED FROM PYTHON SOURCE LINES 275-286
+.. GENERATED FROM PYTHON SOURCE LINES 274-285
 
 .. code-block:: Python
 
@@ -565,16 +562,16 @@ frames, but gravity *anomalies* (differences) are what matter for geological int
  .. code-block:: none
 
     Computing align_to_reference alignment parameters...
-      Alignment params: {'method': 'align_to_reference', 'reference_mean': 25535.6, 'reference_std': 8288.689820472231, 'baseline_forward_mean': 392.5652832578751, 'baseline_forward_std': 9.975905059768074}
+      Alignment params: {'method': 'align_to_reference', 'reference_mean': 25535.6, 'reference_std': 8288.689820472231, 'baseline_forward_mean': -24.516145854322723, 'baseline_forward_std': 4.8571060383169495}
 
     Normalization parameters:
       Method: align_to_reference
-      Parameters: {'method': 'align_to_reference', 'reference_mean': 25535.6, 'reference_std': 8288.689820472231, 'baseline_forward_mean': 392.5652832578751, 'baseline_forward_std': 9.975905059768074}
+      Parameters: {'method': 'align_to_reference', 'reference_mean': 25535.6, 'reference_std': 8288.689820472231, 'baseline_forward_mean': -24.516145854322723, 'baseline_forward_std': 4.8571060383169495}
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 287-320
+.. GENERATED FROM PYTHON SOURCE LINES 286-319
 
 **Understanding plot_gravity_comparison**
 
@@ -610,22 +607,17 @@ observed and forward-modeled gravity data:
   * R ≈ 0.7-0.9: good fit with some misfit
   * R < 0.5: poor fit, model needs improvement
 
-.. GENERATED FROM PYTHON SOURCE LINES 322-329
+.. GENERATED FROM PYTHON SOURCE LINES 321-323
 
 .. code-block:: Python
 
-    plot_gravity_comparison(
-        forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
-        normalization_method="align_to_reference",
-        observed_ugal=observed_gravity_ugal,
-        xy_ravel=xy_ravel
-    )
+    plot_geophysics_comparison(forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)), normalization_method="align_to_reference", observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
 
 
 
 .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_003.png
-   :alt: Observed Gravity (align_to_reference), Forward Model Gravity (align_to_reference), Residuals (Observed - Forward Model) (align_to_reference), Observed vs Forward Model Correlation
+   :alt: Observed  (align_to_reference), Forward Model  (align_to_reference), Residuals (Observed - Forward Model) (align_to_reference), Observed vs Forward Model Correlation
    :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_003.png
    :class: sphx-glr-single-img
 
@@ -633,7 +625,7 @@ observed and forward-modeled gravity data:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 330-367
+.. GENERATED FROM PYTHON SOURCE LINES 324-361
 
 Step 5: Define Prior Distributions
 -----------------------------------
@@ -673,7 +665,7 @@ For a more complex model, we would also define priors on densities:
 
 Where typical crustal densities range from 2.2-3.0 g/cm³.
 
-.. GENERATED FROM PYTHON SOURCE LINES 367-391
+.. GENERATED FROM PYTHON SOURCE LINES 361-385
 
 .. code-block:: Python
 
@@ -689,8 +681,8 @@ Where typical crustal densities range from 2.2-3.0 g/cm³.
             ).to_event(1),
             prior_key_densities: dist.Normal(
                 loc=(torch.tensor([
-                        2.9,  # plutonites
-                        2.3  # host
+                        2.9 - 2.67,  # plutonites
+                        2.3 - 2.67  # host
                 ])),
                 scale=torch.tensor(0.15),
             ).to_event(1)
@@ -711,14 +703,14 @@ Where typical crustal densities range from 2.2-3.0 g/cm³.
 
 
     Prior on dips:
-      Number of orientations: 9
+      Number of orientations: 2
       Mean: 10°
       Std: 10°
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 392-411
+.. GENERATED FROM PYTHON SOURCE LINES 386-405
 
 Step 6: Define Deterministic Functions
 ---------------------------------------
@@ -740,26 +732,7 @@ These deterministics help with:
 2. Visualization: Plot how gravity predictions evolve during sampling
 3. Diagnostics: Check if normalized values are reasonable
 
-.. GENERATED FROM PYTHON SOURCE LINES 411-419
-
-.. code-block:: Python
-
-
-    post_forward_dets = {
-            "gravity_response_raw": lambda samples, gm, sol: sol.gravity,
-            "gravity_response"    : lambda samples, gm, sol: align_forward_to_observed(-sol.gravity, norm_params),
-            "mean_gravity"        : lambda samples, gm, sol: torch.mean(align_forward_to_observed(-sol.gravity, norm_params)),
-            "max_gravity"         : lambda samples, gm, sol: torch.max(align_forward_to_observed(-sol.gravity, norm_params), 0),
-    }
-
-
-
-
-
-
-
-
-.. GENERATED FROM PYTHON SOURCE LINES 420-545
+.. GENERATED FROM PYTHON SOURCE LINES 407-532
 
 Step 7: Define Likelihood Function
 -----------------------------------
@@ -887,7 +860,7 @@ The hierarchical structure provides "partial pooling" between no pooling
 - Stations with many observations stay close to their data
 - Automatically balances individual evidence vs. group information
 
-.. GENERATED FROM PYTHON SOURCE LINES 547-556
+.. GENERATED FROM PYTHON SOURCE LINES 534-543
 
 .. code-block:: Python
 
@@ -915,7 +888,95 @@ The hierarchical structure provides "partial pooling" between no pooling
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 557-711
+.. GENERATED FROM PYTHON SOURCE LINES 544-557
+
+**Inspecting the Likelihood Function Source Code**
+
+To fully understand what the likelihood function does internally, we can inspect
+its source code. This is particularly useful because the likelihood is the most
+variable component across different inversions - it defines how model predictions
+connect to observations and what noise model is assumed.
+
+The source code reveals:
+
+- How simulated geophysics is aligned to observations
+- What Pyro distributions are used for the noise model
+- Which parameters are sampled (inferred) vs fixed
+- The hierarchical structure (hyperpriors → station-level parameters → observations)
+
+.. GENERATED FROM PYTHON SOURCE LINES 557-566
+
+.. code-block:: Python
+
+
+    import inspect
+
+    print("\n" + "=" * 70)
+    print("LIKELIHOOD FUNCTION SOURCE CODE")
+    print("=" * 70)
+    print(inspect.getsource(generate_multigravity_likelihood_hierarchical_per_station))
+    print("=" * 70)
+
+
+
+
+
+.. rst-class:: sphx-glr-script-out
+
+ .. code-block:: none
+
+
+    ======================================================================
+    LIKELIHOOD FUNCTION SOURCE CODE
+    ======================================================================
+    def generate_multigravity_likelihood_hierarchical_per_station(norm_params):
+        """
+        Per-station noise with hierarchical structure.
+        Best for: Different stations with unknown individual noise levels.
+        """
+
+        def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
+            simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
+            pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics.detach())
+            n_stations = simulated_geophysics.shape[0]
+
+            # Global hyperprior on typical noise level
+            mu_log_sigma = pyro.sample(
+                "mu_log_sigma",
+                dist.Normal(
+                    torch.tensor(np.log(5000.0), dtype=torch.float64),
+                    torch.tensor(0.5, dtype=torch.float64)
+                )
+            )
+
+            # How much stations vary from each other
+            tau_log_sigma = pyro.sample(
+                "tau_log_sigma",
+                dist.HalfNormal(torch.tensor(0.5, dtype=torch.float64))
+            )
+
+            # Per-station noise (centered on global mean)
+            log_sigma_stations = pyro.sample(
+                "log_sigma_stations",
+                dist.Normal(
+                    mu_log_sigma.expand([n_stations]),
+                    tau_log_sigma
+                ).to_event(1)
+            )
+
+            sigma_stations = torch.exp(log_sigma_stations)
+            pyro.deterministic("sigma_stations", sigma_stations)
+
+            return dist.Normal(simulated_geophysics, sigma_stations).to_event(1)
+
+        return likelihood_fn
+
+    ======================================================================
+
+
+
+
+.. GENERATED FROM PYTHON SOURCE LINES 567-721
 
 Step 8: Create Probabilistic Model
 -----------------------------------
@@ -1072,16 +1133,14 @@ A GemPyPyroModel object that can be passed to:
 - gpp.run_predictive() for prior/posterior predictive checks
 - gpp.run_vi_inference() for variational inference (faster approximation)
 
-.. GENERATED FROM PYTHON SOURCE LINES 713-730
+.. GENERATED FROM PYTHON SOURCE LINES 723-737
 
 .. code-block:: Python
 
-    prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
+    prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
         priors=model_priors,
         set_interp_input_fn=set_priors,
         likelihood_fn=likelihood_fn,
-        pre_forward_deterministics={},
-        post_forward_deterministics=post_forward_dets,
         obs_name="Gravity Measurement"
     )
 
@@ -1091,7 +1150,6 @@ A GemPyPyroModel object that can be passed to:
     print("    - Forward model: GemPy geological interpolation + gravity")
     print("    - Likelihood: Hierarchical per-station noise")
     print("    - Deterministics: gravity_response, mean_gravity, max_gravity")
-
 
 
 
@@ -1112,7 +1170,7 @@ A GemPyPyroModel object that can be passed to:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 731-762
+.. GENERATED FROM PYTHON SOURCE LINES 738-769
 
 Step 9: Prior Predictive Checks
 --------------------------------
@@ -1146,7 +1204,7 @@ explain certain stations well but fail at others, suggesting:
 
 Prior predictive sampling generates data *as if* we hadn't seen the observations yet.
 
-.. GENERATED FROM PYTHON SOURCE LINES 762-774
+.. GENERATED FROM PYTHON SOURCE LINES 769-781
 
 .. code-block:: Python
 
@@ -1166,7 +1224,7 @@ Prior predictive sampling generates data *as if* we hadn't seen the observations
 
 
 .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_004.png
-   :alt: dips, dips, density, density, mu_log_sigma, mu_log_sigma, tau_log_sigma, tau_log_sigma, log_sigma_stations, log_sigma_stations, gravity_response_raw, gravity_response_raw, gravity_response, gravity_response, mean_gravity, mean_gravity, max_gravity, max_gravity, $\mu_{gravity}$, $\mu_{gravity}$, sigma_stations, sigma_stations, Gravity Measurement, Gravity Measurement
+   :alt: dips, dips, density, density, mu_log_sigma, mu_log_sigma, tau_log_sigma, tau_log_sigma, log_sigma_stations, log_sigma_stations, $\mu_{gravity}$, $\mu_{gravity}$, sigma_stations, sigma_stations, Gravity Measurement, Gravity Measurement
    :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_004.png
    :class: sphx-glr-single-img
 
@@ -1179,14 +1237,12 @@ Prior predictive sampling generates data *as if* we hadn't seen the observations
     Running prior predictive sampling (100 samples)...
     /home/leguark/.venv/2025/lib/python3.13/site-packages/arviz/stats/density_utils.py:488: UserWarning: Your data appears to have a single value or no finite values
       warnings.warn("Your data appears to have a single value or no finite values")
-    /home/leguark/PycharmProjects/gempy_probability/gempy_probability/api/model_runner/_pyro_runner.py:115: UserWarning: The figure layout has changed to tight
-      plt.tight_layout()
     ✓ Prior predictive sampling complete
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 775-802
+.. GENERATED FROM PYTHON SOURCE LINES 782-809
 
 Visualize Prior Geological Models
 ----------------------------------
@@ -1216,7 +1272,7 @@ This function creates a 2D cross-section visualization showing:
 - **Wide, diffuse density**: High uncertainty in structure location
 - **Multiple modes**: Prior suggests multiple possible configurations
 
-.. GENERATED FROM PYTHON SOURCE LINES 802-809
+.. GENERATED FROM PYTHON SOURCE LINES 809-816
 
 .. code-block:: Python
 
@@ -1264,24 +1320,12 @@ This function creates a 2D cross-section visualization showing:
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
-    KDE: Collected 1440 contour vertices
-    X range: [-708990.33, -676088.67]
-    Z range: [-484.30, 489.30]
-    Computing KDE with bandwidth method: 0.1
-    KDE density range: [2.56e-54, 2.44e-07]
-    KDE density mean: 2.85e-08
-    KDE density median: 1.58e-08
-    Applied power transform (exponent=0.3)
-    Transformed density range: [0.00e+00, 1.00e+00]
-    Linear norm range (pre-masking): [0.00e+00, 1.00e+00]
-    Applying 0% threshold: 0.00e+00
-    This masks values below 0.00e+00, keeping colors consistent with full range
 
-    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fe7851ad590>
+    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7f77af26e990>
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 810-853
+.. GENERATED FROM PYTHON SOURCE LINES 817-860
 
 Compare Multiple Prior Predictions to Observations
 ---------------------------------------------------
@@ -1327,15 +1371,16 @@ It helps answer: "Can ANY model from our prior explain the observations?"
 - If NO lines match observations → model structure is inadequate
 - Scatter in lines → posterior will reduce uncertainty by selecting best-fitting models
 
-.. GENERATED FROM PYTHON SOURCE LINES 853-860
+.. GENERATED FROM PYTHON SOURCE LINES 860-868
 
 .. code-block:: Python
 
 
     plot_many_observed_vs_forward(
         forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
-        many_forward_norm=prior_inference_data.prior[r'gravity_response'].values[0, -10:],
-        observed_norm=observed_gravity_ugal
+        many_forward_norm=prior_inference_data.prior[r'$\mu_{gravity}$'].values[0, -10:],
+        observed_norm=observed_gravity_ugal,
+        unit_label='μGal'
     )
 
 
@@ -1350,7 +1395,7 @@ It helps answer: "Can ANY model from our prior explain the observations?"
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 861-920
+.. GENERATED FROM PYTHON SOURCE LINES 869-928
 
 Step 10: Run MCMC Inference with NUTS
 --------------------------------------
@@ -1412,7 +1457,7 @@ NUTS simulates Hamiltonian dynamics to propose new parameter values:
 - **data.posterior_predictive**: Forward gravity predictions from posterior
 - **data.sample_stats**: Diagnostics (divergences, tree depth, acceptance rate)
 
-.. GENERATED FROM PYTHON SOURCE LINES 920-976
+.. GENERATED FROM PYTHON SOURCE LINES 928-985
 
 .. code-block:: Python
 
@@ -1436,7 +1481,6 @@ NUTS simulates Hamiltonian dynamics to propose new parameter values:
                 init_strategy='median',
                 num_samples=200,
                 warmup_steps=200,
-                num_chains=1
             ),
             plot_trace=True,
             run_posterior_predictive=True
@@ -1444,16 +1488,18 @@ NUTS simulates Hamiltonian dynamics to propose new parameter values:
 
         print("✓ NUTS inference complete")
 
-    # Combine Prior and Posterior
-    # ----------------------------
-    #
-    # For comparison and diagnostics, we store both prior and posterior in the same
-    # ArviZ InferenceData object. This allows us to visualize how our beliefs changed
-    # after seeing the data.
+        # Combine Prior and Posterior
+        # ----------------------------
+        #
+        # For comparison and diagnostics, we store both prior and posterior in the same
+        # ArviZ InferenceData object. This allows us to visualize how our beliefs changed
+        # after seeing the data.
 
         data.extend(prior_inference_data)
         print("✓ Prior and posterior combined")
-    
+
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), "New Grav"))
+
     else:
 
         from pathlib import Path
@@ -1461,7 +1507,7 @@ NUTS simulates Hamiltonian dynamics to propose new parameter values:
 
         # Get the directory of the current file using inspect
         current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
-        data_path = current_dir / "arviz_data_04.nc"
+        data_path = current_dir / "arviz_data_grav_feb2026.nc"
 
         if not data_path.exists():
             raise FileNotFoundError(
@@ -1471,7 +1517,7 @@ NUTS simulates Hamiltonian dynamics to propose new parameter values:
 
         # Read the data file
         data = az.from_netcdf(str(data_path))
-    
+
 
 
 
@@ -1489,7 +1535,19 @@ NUTS simulates Hamiltonian dynamics to propose new parameter values:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 977-1001
+.. GENERATED FROM PYTHON SOURCE LINES 986-995
+
+**Interactive: Pre-computed Results**
+
+Running full MCMC chains can be computationally expensive. For convenience,
+pre-computed `.nc` files (ArviZ InferenceData) are available for download.
+
+To use them:
+1. Download `arviz_data_04.nc` from the project repository.
+2. Place it in the same directory as this script.
+3. Set `RUN_SIMULATION = False` to load the results instantly.
+
+.. GENERATED FROM PYTHON SOURCE LINES 997-1021
 
 Analysis: Parameter Posterior Statistics
 -----------------------------------------
@@ -1516,7 +1574,7 @@ observations. This acts like robust regression: outliers (potentially interestin
 geological anomalies) may remain unexplained if they conflict with the majority
 of data.
 
-.. GENERATED FROM PYTHON SOURCE LINES 1001-1018
+.. GENERATED FROM PYTHON SOURCE LINES 1021-1038
 
 .. code-block:: Python
 
@@ -1547,21 +1605,21 @@ of data.
 
 
     Posterior dip statistics:
-      Shape: (1, 200, 9)
-      Mean: 6.74°
-      Std: 8.31°
-      Median: 6.51°
+      Shape: (1, 200, 2)
+      Mean: 3.94°
+      Std: 9.56°
+      Median: 3.87°
 
     Prior dip statistics:
-      Mean: 10.33°
-      Std: 10.00°
+      Mean: 11.48°
+      Std: 10.03°
 
-    Uncertainty reduction: 16.9%
-
-
+    Uncertainty reduction: 4.7%
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 1019-1040
+
+
+.. GENERATED FROM PYTHON SOURCE LINES 1039-1060
 
 Analysis: Predictive Performance
 ---------------------------------
@@ -1585,7 +1643,7 @@ If RMS residuals are large compared to expected measurement noise:
 2. **Wrong physics**: May need different geophysical methods
 3. **Data issues**: Outliers, measurement errors, incorrect corrections
 
-.. GENERATED FROM PYTHON SOURCE LINES 1040-1057
+.. GENERATED FROM PYTHON SOURCE LINES 1060-1077
 
 .. code-block:: Python
 
@@ -1632,7 +1690,7 @@ If RMS residuals are large compared to expected measurement noise:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 1058-1091
+.. GENERATED FROM PYTHON SOURCE LINES 1078-1111
 
 Posterior Predictive: Model Fit Analysis
 -----------------------------------------
@@ -1668,17 +1726,17 @@ ruled out large regions of parameter space that are inconsistent with observatio
 - Future model refinements (additional layers, spatially-varying densities) could
   improve station-by-station fit while maintaining these geometric constraints
 
-.. GENERATED FROM PYTHON SOURCE LINES 1091-1099
+.. GENERATED FROM PYTHON SOURCE LINES 1111-1119
 
 .. code-block:: Python
 
 
     plot_many_observed_vs_forward(
         forward_norm=(align_forward_to_observed(baseline_fw_gravity_np, norm_params)),
-        many_forward_norm=data.posterior_predictive[r'gravity_response'].values[0, -20:],
-        observed_norm=observed_gravity_ugal
+        many_forward_norm=data.posterior_predictive[r'$\mu_{gravity}$'].values[0, -20:],
+        observed_norm=observed_gravity_ugal,
+        unit_label='μGal'
     )
-
 
 
 
@@ -1692,7 +1750,7 @@ ruled out large regions of parameter space that are inconsistent with observatio
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 1100-1110
+.. GENERATED FROM PYTHON SOURCE LINES 1120-1130
 
 .. code-block:: Python
 
@@ -1710,7 +1768,7 @@ ruled out large regions of parameter space that are inconsistent with observatio
 
 
 .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_008.png
-   :alt: density 0, density 1, dips 0, dips 1, dips 2, dips 3, dips 4, dips 5, dips 6, dips 7, dips 8
+   :alt: density 0, density 1, dips 0, dips 1
    :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_008.png
    :class: sphx-glr-single-img
 
@@ -1723,18 +1781,12 @@ ruled out large regions of parameter space that are inconsistent with observatio
     array([[<Axes: title={'center': 'density\n0'}>,
             <Axes: title={'center': 'density\n1'}>,
             <Axes: title={'center': 'dips\n0'}>],
-           [<Axes: title={'center': 'dips\n1'}>,
-            <Axes: title={'center': 'dips\n2'}>,
-            <Axes: title={'center': 'dips\n3'}>],
-           [<Axes: title={'center': 'dips\n4'}>,
-            <Axes: title={'center': 'dips\n5'}>,
-            <Axes: title={'center': 'dips\n6'}>],
-           [<Axes: title={'center': 'dips\n7'}>,
-            <Axes: title={'center': 'dips\n8'}>, <Axes: >]], dtype=object)
+           [<Axes: title={'center': 'dips\n1'}>, <Axes: >, <Axes: >]],
+          dtype=object)
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 1111-1118
+.. GENERATED FROM PYTHON SOURCE LINES 1131-1138
 
 .. code-block:: Python
 
@@ -1782,18 +1834,6 @@ ruled out large regions of parameter space that are inconsistent with observatio
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
-    KDE: Collected 1531 contour vertices
-    X range: [-708990.33, -676088.67]
-    Z range: [-484.30, 489.30]
-    Computing KDE with bandwidth method: 0.1
-    KDE density range: [7.68e-45, 2.26e-07]
-    KDE density mean: 2.85e-08
-    KDE density median: 1.63e-08
-    Applied power transform (exponent=0.3)
-    Transformed density range: [0.00e+00, 1.00e+00]
-    Linear norm range (pre-masking): [0.00e+00, 1.00e+00]
-    Applying 0% threshold: 0.00e+00
-    This masks values below 0.00e+00, keeping colors consistent with full range
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
@@ -1814,40 +1854,23 @@ ruled out large regions of parameter space that are inconsistent with observatio
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
-    KDE: Collected 1292 contour vertices
-    X range: [-708990.33, -676088.67]
-    Z range: [-484.30, 489.30]
-    Computing KDE with bandwidth method: 0.1
-    KDE density range: [1.96e-221, 3.41e-07]
-    KDE density mean: 2.84e-08
-    KDE density median: 5.18e-09
-    Applied power transform (exponent=0.3)
-    Transformed density range: [0.00e+00, 1.00e+00]
-    Linear norm range (pre-masking): [0.00e+00, 1.00e+00]
-    Applying 40% threshold: 7.97e-02
-    This masks values below 7.97e-02, keeping colors consistent with full range
 
-    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fe785293950>
+    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7f778c38d450>
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 1119-1127
+.. GENERATED FROM PYTHON SOURCE LINES 1139-1142
 
 .. code-block:: Python
 
 
-    plot_gravity_comparison(
-        observed_ugal=observed_gravity_ugal,
-        forward_norm=data.prior[r'gravity_response'].mean(axis=1),
-        xy_ravel=xy_ravel,
-        normalization_method='align_to_reference'
-    )
+    plot_geophysics_comparison(forward_norm=data.prior[r'$\mu_{gravity}$'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
 
 
 
 .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_010.png
-   :alt: Observed Gravity (align_to_reference), Forward Model Gravity (align_to_reference), Residuals (Observed - Forward Model) (align_to_reference), Observed vs Forward Model Correlation
+   :alt: Observed  (align_to_reference), Forward Model  (align_to_reference), Residuals (Observed - Forward Model) (align_to_reference), Observed vs Forward Model Correlation
    :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_010.png
    :class: sphx-glr-single-img
 
@@ -1855,23 +1878,18 @@ ruled out large regions of parameter space that are inconsistent with observatio
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 1128-1136
+.. GENERATED FROM PYTHON SOURCE LINES 1143-1146
 
 .. code-block:: Python
 
 
-    plot_gravity_comparison(
-        observed_ugal=observed_gravity_ugal,
-        forward_norm=data.posterior_predictive[r'gravity_response'].mean(axis=1),
-        xy_ravel=xy_ravel,
-        normalization_method='align_to_reference'
-    )
+    plot_geophysics_comparison(forward_norm=data.posterior_predictive[r'$\mu_{gravity}$'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
 
 
 
 .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_011.png
-   :alt: Observed Gravity (align_to_reference), Forward Model Gravity (align_to_reference), Residuals (Observed - Forward Model) (align_to_reference), Observed vs Forward Model Correlation
+   :alt: Observed  (align_to_reference), Forward Model  (align_to_reference), Residuals (Observed - Forward Model) (align_to_reference), Observed vs Forward Model Correlation
    :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_011.png
    :class: sphx-glr-single-img
 
@@ -1879,13 +1897,13 @@ ruled out large regions of parameter space that are inconsistent with observatio
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 1137-1144
+.. GENERATED FROM PYTHON SOURCE LINES 1147-1154
 
 .. code-block:: Python
 
 
     gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-        gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+        gravity_samples_norm=data.prior[r'$\mu_{gravity}$'].values[0, :],  # (n_samples, n_devices)
         observed_gravity_ugal=observed_gravity_ugal,
         xy_ravel=xy_ravel
     )
@@ -1936,27 +1954,27 @@ ruled out large regions of parameter space that are inconsistent with observatio
     ============================================================
     UNCERTAINTY SUMMARY STATISTICS
     ============================================================
-    Mean gravity:        22755.54 ± 9001.98 μGal
-    Mean uncertainty:    21595.50 μGal
-    Max uncertainty:     26741.35 μGal
-    Min uncertainty:     20612.83 μGal
-    Mean CV:             104.32%
-    RMSE:                14565.47 μGal
-    Correlation (R):     -0.366
+    Mean gravity:        24601.52 ± 8021.00 μGal
+    Mean uncertainty:    18425.53 μGal
+    Max uncertainty:     19551.38 μGal
+    Min uncertainty:     14735.75 μGal
+    Mean CV:             81.33%
+    RMSE:                9732.94 μGal
+    Correlation (R):     0.295
     ============================================================
 
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 1145-1153
+.. GENERATED FROM PYTHON SOURCE LINES 1155-1163
 
 .. code-block:: Python
 
 
-    if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
+    if hasattr(data, 'posterior') and r'$\mu_{gravity}$' in data.prior:
         gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-            gravity_samples_norm=data.posterior_predictive[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+            gravity_samples_norm=data.posterior_predictive[r'$\mu_{gravity}$'].values[0, :],  # (n_samples, n_devices)
             observed_gravity_ugal=observed_gravity_ugal,
             xy_ravel=xy_ravel
         )
@@ -2007,20 +2025,312 @@ ruled out large regions of parameter space that are inconsistent with observatio
     ============================================================
     UNCERTAINTY SUMMARY STATISTICS
     ============================================================
-    Mean gravity:        24785.09 ± 527.96 μGal
-    Mean uncertainty:    1845.92 μGal
-    Max uncertainty:     3288.77 μGal
-    Min uncertainty:     1512.29 μGal
-    Mean CV:             7.41%
-    RMSE:                8479.03 μGal
-    Correlation (R):     -0.268
+    Mean gravity:        25192.87 ± 4253.02 μGal
+    Mean uncertainty:    2785.16 μGal
+    Max uncertainty:     5678.72 μGal
+    Min uncertainty:     1713.74 μGal
+    Mean CV:             10.98%
+    RMSE:                7715.81 μGal
+    Correlation (R):     0.388
     ============================================================
 
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 1154-1297
+.. GENERATED FROM PYTHON SOURCE LINES 1164-1172
+
+**Sigma Analysis: Outlier Detection**
+
+Hierarchical modeling allows us to identify stations with unusually high noise,
+which may indicate instrument problems, terrain correction errors, or localized
+geological complexity not captured by the model.
+
+Stations where the inferred noise (sigma) is much higher than the global mean
+are candidates for being "problematic".
+
+.. GENERATED FROM PYTHON SOURCE LINES 1172-1195
+
+.. code-block:: Python
+
+
+    if "sigma_stations" in data.posterior_predictive:
+        posterior_sigmas = data.posterior_predictive["sigma_stations"].values
+        station_noise_mean = posterior_sigmas.mean(axis=(0, 1))
+        sigma_global_mean = station_noise_mean.mean()
+
+        # Identify stations with noise > 2 standard deviations above mean
+        problematic = np.where(station_noise_mean > 2 * sigma_global_mean)[0]
+        print(f"\nPotential outlier stations identified: {problematic}")
+
+        # Plot sigma distribution
+        az.plot_density(
+            data=[data, data.prior],
+            var_names=["sigma_stations"],
+            filter_vars="like",
+            hdi_prob=0.9999,
+            shade=.2,
+            data_labels=["Posterior", "Prior"],
+            colors=[default_red, default_blue],
+        )
+        plt.title("Per-Station Noise Distribution (Sigma)")
+        plt.show()
+
+
+
+
+.. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_018.png
+   :alt: log_sigma_stations 0, log_sigma_stations 1, log_sigma_stations 2, log_sigma_stations 3, log_sigma_stations 4, log_sigma_stations 5, log_sigma_stations 6, log_sigma_stations 7, log_sigma_stations 8, log_sigma_stations 9, log_sigma_stations 10, log_sigma_stations 11, log_sigma_stations 12, log_sigma_stations 13, log_sigma_stations 14, log_sigma_stations 15, log_sigma_stations 16, log_sigma_stations 17, log_sigma_stations 18, log_sigma_stations 19, sigma_stations 0, sigma_stations 1, sigma_stations 2, sigma_stations 3, sigma_stations 4, sigma_stations 5, sigma_stations 6, sigma_stations 7, sigma_stations 8, sigma_stations 9, sigma_stations 10, sigma_stations 11, sigma_stations 12, sigma_stations 13, sigma_stations 14, sigma_stations 15, sigma_stations 16, sigma_stations 17, sigma_stations 18, sigma_stations 19, Per-Station Noise Distribution (Sigma)
+   :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_018.png
+   :class: sphx-glr-single-img
+
+
+.. rst-class:: sphx-glr-script-out
+
+ .. code-block:: none
+
+
+    Potential outlier stations identified: []
+
+
+
+
+.. GENERATED FROM PYTHON SOURCE LINES 1196-1213
+
+**Probability Density Fields and Information Entropy**
+
+To visualize the spatial uncertainty of the geological structure, we compute
+probability density fields and information entropy.
+
+* **Probability Density Field**: Shows the probability of each geological unit
+  existing at any given location.
+* **Information Entropy**: Quantifies the total uncertainty. High entropy means
+  high uncertainty about which unit is present.
+%%
+**3D Entropy Visualization**
+
+We can also visualize uncertainty in 3D by injecting the entropy field back
+into the GemPy solutions object.
+
+Note: The 3D visualization is already handled inside probability_fields_for()
+by injecting the entropy field and calling gpv.plot_3d.
+
+.. GENERATED FROM PYTHON SOURCE LINES 1213-1246
+
+.. code-block:: Python
+
+
+
+    # Resetting the model
+    geo_model = gp.create_geomodel(
+        project_name='gravity_inversion',
+        extent=extent,
+        refinement=refinement,
+        resolution=resolution,
+        importer_helper=gp.data.ImporterHelper(
+            path_to_orientations=mod_or_path,
+            path_to_surface_points=mod_pts_path,
+        )
+    )
+
+    # Prior Probability Fields
+    print("\nComputing prior probability fields...")
+
+    topography_path = paths.get_topography_path()
+    probability_fields_for(
+        geo_model=geo_model,
+        inference_data=data.prior,
+        topography_path=topography_path
+    )
+
+    # Posterior Probability Fields
+    if hasattr(data, 'posterior'):
+        print("\nComputing posterior probability fields...")
+        probability_fields_for(
+            geo_model=geo_model,
+            inference_data=data.posterior,
+            topography_path=topography_path
+        )
+
+
+
+
+.. rst-class:: sphx-glr-horizontal
+
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_019.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_019.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_020.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_020.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_021.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_021.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_022.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_022.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_023.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_023.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_024.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_024.png
+         :class: sphx-glr-multi-img
+
+.. rst-class:: sphx-glr-horizontal
+
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_025.png
+          :alt: 04 gravity inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_025.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_026.png
+          :alt: 04 gravity inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_04_gravity_inversion_026.png
+          :class: sphx-glr-multi-img
+
+
+.. rst-class:: sphx-glr-script-out
+
+ .. code-block:: none
+
+
+    Computing prior probability fields...
+    Active grids: GridTypes.DENSE|NONE
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Active grids: GridTypes.DENSE|TOPOGRAPHY|NONE
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    /home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    ../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+    Computing posterior probability fields...
+    Active grids: GridTypes.DENSE|NONE
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    Active grids: GridTypes.DENSE|TOPOGRAPHY|NONE
+    Setting Backend To: AvailableBackends.PYTORCH
+    Using sequential processing for 1 surfaces
+    /home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    ../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+
+
+
+.. GENERATED FROM PYTHON SOURCE LINES 1247-1390
 
 Summary: The Complete Bayesian Gravity Inversion Workflow
 ----------------------------------------------------------
@@ -2166,13 +2476,12 @@ To enhance this workflow for real-world applications:
 - Diagnose and visualize inference results
 - Extend this framework to your own problems
 
-.. GENERATED FROM PYTHON SOURCE LINES 1297-1299
+.. GENERATED FROM PYTHON SOURCE LINES 1390-1391
 
 .. code-block:: Python
 
 
-    # sphinx_gallery_thumbnail_number = 9
-
+    # sphinx_gallery_thumbnail_number = 7
 
 
 
@@ -2182,7 +2491,7 @@ To enhance this workflow for real-world applications:
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (1 minutes 24.897 seconds)
+   **Total running time of the script:** (1 minutes 49.869 seconds)
 
 
 .. _sphx_glr_download_examples_probabilistic_04_gravity_inversion.py:

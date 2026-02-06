@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Bayesian Joint Inversion: Gravity and EnMap &#8212; Mineye-Terranigma 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=89af775e" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="icon" href="../_static/favicon.ico"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Hyperspectral Segmentation" href="../examples_segmentation/index.html" />
+    <link rel="prev" title="Bayesian EnMap Inversion: Categorical Likelihood and Ordinal Probabilities" href="06_enmap_inversion.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-examples-probabilistic-07-joint-inversion-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code.</p>
+</div>
+<section class="sphx-glr-example-title" id="bayesian-joint-inversion-gravity-and-enmap">
+<span id="sphx-glr-examples-probabilistic-07-joint-inversion-py"></span><h1>Bayesian Joint Inversion: Gravity and EnMap<a class="headerlink" href="#bayesian-joint-inversion-gravity-and-enmap" title="Link to this heading">¶</a></h1>
+<p>This tutorial demonstrates a joint Bayesian inversion combining two disparate data types:
+1. <strong>Gravity Data</strong>: Volumetric measurements sensitive to subsurface density contrasts.
+2. <strong>EnMap Satellite Data</strong>: Surface lithology classifications sensitive to the intersection</p>
+<blockquote>
+<div><p>of geological units with topography.</p>
+</div></blockquote>
+<p>Joint inversion is a powerful technique to reduce non-uniqueness in geophysical models. By
+combining datasets that have different sensitivities, we can better constrain the
+subsurface architecture.</p>
+<p><strong>What are we doing?</strong></p>
+<p>We’re performing Bayesian inference on a geological model using both gravity measurements
+and EnMap surface classifications. The goal is to estimate geological parameters such as:</p>
+<ul class="simple">
+<li><p><strong>Dips</strong>: Orientation angles of geological layers (degrees).</p></li>
+<li><p><strong>Densities</strong>: Rock densities for different lithological units (g/cm³).</p></li>
+</ul>
+<p><strong>Why Bayesian Inference?</strong></p>
+<p>Bayesian inference provides several advantages over traditional deterministic approaches:</p>
+<ol class="arabic simple">
+<li><p><strong>Posterior probability distributions</strong>: Not just point estimates, but full probability
+distributions that quantify uncertainty in our parameter estimates.</p></li>
+<li><p><strong>Uncertainty quantification</strong>: Explicit characterization of what we know and don’t know
+about the subsurface.</p></li>
+<li><p><strong>Prior knowledge incorporation</strong>: Ability to incorporate geological expertise and
+physical constraints into the inversion.</p></li>
+<li><p><strong>Data Integration</strong>: A natural framework for combining multiple datasets with different
+noise characteristics and measurement scales.</p></li>
+</ol>
+<p><strong>The Bayesian Framework</strong></p>
+<p>In Bayesian joint inversion, we seek the posterior distribution of parameters <span class="math notranslate nohighlight">\(\theta\)</span> given
+multiple datasets <span class="math notranslate nohighlight">\(y_{grav}\)</span> and <span class="math notranslate nohighlight">\(y_{enmap}\)</span> using Bayes’ theorem:</p>
+<div class="math notranslate nohighlight">
+\[p(\theta \mid y_{grav}, y_{enmap}) \propto p(y_{grav} \mid \theta) p(y_{enmap} \mid \theta) p(\theta)\]</div>
+<p>In log-space, this becomes an additive process:</p>
+<div class="math notranslate nohighlight">
+\[\log p(\theta \mid y_{grav}, y_{enmap}) \propto \log p(y_{grav} \mid \theta) + \log p(y_{enmap} \mid \theta) + \log p(\theta)\]</div>
+<p><strong>The Forward Model</strong></p>
+<p>We have two distinct forward models mapping the same parameters <span class="math notranslate nohighlight">\(\theta\)</span> to different observation spaces:</p>
+<ol class="arabic simple">
+<li><p><strong>Gravity Forward Model</strong>: <span class="math notranslate nohighlight">\(y_{grav} = f_{grav}(\theta) + \epsilon_{grav}\)</span>
+Maps density distributions to gravitational acceleration.</p></li>
+<li><p><strong>EnMap Forward Model</strong>: <span class="math notranslate nohighlight">\(y_{enmap} = f_{enmap}(\theta) + \epsilon_{enmap}\)</span>
+Maps unit boundaries to surface lithology classifications.</p></li>
+</ol>
+<p><strong>Key Concepts in this Tutorial:</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Multi-Grid Configuration</strong>: How to handle different observation grids (Centered grid for
+gravity, Custom grid for EnMap) within a single GemPy model.</p></li>
+<li><p><strong>Joint Likelihood Formulation</strong>: Defining a Pyro model with multiple likelihood functions.</p></li>
+<li><p><strong>Likelihood Balance Check</strong>: A critical diagnostic step to ensure one dataset doesn’t
+statistically “drown out” the other.</p></li>
+<li><p><strong>Joint Parameter Inference</strong>: Simultaneously estimating layer dips and rock densities.</p></li>
+</ol>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyro</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyro.distributions</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy_probability</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy_viewer</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpv</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gempy_probability.core.samplers_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">NUTSConfig</span>
+
+<span class="c1"># Import Mineye-specific helpers</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">paths</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.model_setup</span><span class="w"> </span><span class="kn">import</span> <span class="n">baseline</span><span class="p">,</span> <span class="n">setup_geomodel</span><span class="p">,</span> <span class="n">read_gravity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.probabilistic_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.joint_probabilistic_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">joint_set_priors</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.probabilistic_model_likelihoods</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">generate_multigravity_likelihood_hierarchical_per_station</span><span class="p">,</span>
+    <span class="n">enmap_likelihood_fn</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.inference_diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_mcmc_quality</span><span class="p">,</span> <span class="n">check_likelihood_balance</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.visualization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">generate_gravity_uncertainty_plots</span><span class="p">,</span>
+    <span class="n">gempy_viz</span><span class="p">,</span>
+    <span class="n">plot_probability_heatmap</span><span class="p">,</span> <span class="n">probability_fields_for</span>
+<span class="p">)</span>
+
+<span class="c1"># Set random seeds for reproducibility</span>
+<span class="n">seed</span> <span class="o">=</span> <span class="mi">42</span>
+<span class="n">pyro</span><span class="o">.</span><span class="n">set_rng_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+<a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span></a></a><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+</pre></div>
+</div>
+<section id="setup-model-extent-and-load-data">
+<h2>1. Setup Model Extent and Load Data<a class="headerlink" href="#setup-model-extent-and-load-data" title="Link to this heading">¶</a></h2>
+<p><strong>Model Configuration</strong></p>
+<p>We define the spatial extent of our geological model and the resolution (refinement).
+Higher refinement leads to more accurate results but increases computation time.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">extent</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">707521</span><span class="p">,</span> <span class="o">-</span><span class="mi">675558</span><span class="p">,</span> <span class="mi">4526832</span><span class="p">,</span> <span class="mi">4551949</span><span class="p">,</span> <span class="o">-</span><span class="mi">500</span><span class="p">,</span> <span class="mi">505</span><span class="p">]</span>
+<span class="n">refinement</span> <span class="o">=</span> <span class="mi">5</span>
+
+<span class="n">mod_or_path</span> <span class="o">=</span> <span class="n">paths</span><span class="o">.</span><span class="n">get_orientations_path</span><span class="p">()</span>
+<span class="n">mod_pts_path</span> <span class="o">=</span> <span class="n">paths</span><span class="o">.</span><span class="n">get_points_path</span><span class="p">()</span>
+<span class="n">geophysical_dir</span> <span class="o">=</span> <span class="n">paths</span><span class="o">.</span><span class="n">get_geophysical_dir</span><span class="p">()</span>
+
+<span class="c1"># Create Initial GemPy Model</span>
+<span class="n">simple_geo_model</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">create_geomodel</span><span class="p">(</span>
+    <span class="n">project_name</span><span class="o">=</span><span class="s1">&#39;joint_inversion&#39;</span><span class="p">,</span>
+    <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">,</span>
+    <span class="n">refinement</span><span class="o">=</span><span class="n">refinement</span><span class="p">,</span>
+    <span class="n">importer_helper</span><span class="o">=</span><span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ImporterHelper</span><span class="p">(</span>
+        <span class="n">path_to_orientations</span><span class="o">=</span><span class="n">mod_or_path</span><span class="p">,</span>
+        <span class="n">path_to_surface_points</span><span class="o">=</span><span class="n">mod_pts_path</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="n">gp</span><span class="o">.</span><span class="n">map_stack_to_surfaces</span><span class="p">(</span>
+    <span class="n">gempy_model</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="p">,</span>
+    <span class="n">mapping_object</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Tournaisian_Plutonites&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Tournaisian Plutonites&quot;</span><span class="p">]}</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="output_subarea output_html rendered_html output_result">
+
+        <table>
+          <tr><td>Structural Groups:</td><td>
+    <table style="border-left:1.2px solid black;>
+      <tr><th colspan="2"><b>StructuralGroup:</b></th></tr>
+      <tr><td>Name:</td><td>Tournaisian_Plutonites</td></tr>
+      <tr><td>Structural Relation:</td><td>StackRelationType.ERODE</td></tr>
+      <tr><td>Elements:</td><td>
+    <table width="50%" style="border-left:15px solid #015482;">
+      <tr><th colspan="2"><b>StructuralElement:</b></th></tr>
+      <tr><td>Name:</td><td>Tournaisian Plutonites</td></tr>
+    </table>
+        </td></tr>
+    </table>
+        </td></tr>
+          <tr><td>Fault Relations:</td><td><table style="border-collapse: collapse; table-layout: fixed;"><th></th><th style="transform: rotate(-35deg); height:150px; vertical-align: bottom; text-align: center;">Tournaisia...</th><tr><th>Tournaisian_Plutonites</th><td style="background-color: #FFB6C1; width: 20px; height: 20px; border: 1px solid black;"></td></tr></table></td></tr>
+          <tr><td></td><td>
+        <table>
+          <tr>
+            <td><div style="display: inline-block; background-color: #527682; width: 20px; height: 20px; border: 1px solid black;"></div> True</td>
+            <td><div style="display: inline-block; background-color: #FFB6C1; width: 20px; height: 20px; border: 1px solid black;"></div> False</td>
+          </tr>
+        </table>
+        </td></tr>
+        </table>
+
+</div>
+<br />
+<br /></section>
+<section id="setup-gravity-observations">
+<h2>2. Setup Gravity Observations<a class="headerlink" href="#setup-gravity-observations" title="Link to this heading">¶</a></h2>
+<p><strong>What is gravity data?</strong></p>
+<p>Gravity data measures small variations in the Earth’s gravitational field caused by
+density differences in the subsurface.</p>
+<p><strong>Units</strong>: μGal (microgal)</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gravity_data</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a> <span class="o">=</span> <span class="n">read_gravity</span><span class="p">(</span><span class="n">geophysical_dir</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Gravity observations:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Number of measurements: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Range: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> μGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> μGal&quot;</span><span class="p">)</span>
+
+<span class="n">geo_model</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xy_ravel</span></a></a> <span class="o">=</span> <span class="n">setup_geomodel</span><span class="p">(</span><span class="n">gravity_data</span><span class="p">,</span> <span class="n">simple_geo_model</span><span class="p">)</span>
+<span class="n">geo_model</span><span class="o">.</span><span class="n">interpolation_options</span><span class="o">.</span><span class="n">sigmoid_slope</span> <span class="o">=</span> <span class="mi">100</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Gravity observations:
+  Number of measurements: 20
+  Range: 11717.0 to 39037.0 μGal
+  Mean: 25535.6 μGal
+Setting Backend To: AvailableBackends.PYTORCH
+Using actual gravity measurement locations...
+Using 20 actual measurement points
+Computing forward gravity model...
+Setting up centered grid...
+Active grids: GridTypes.OCTREE|CENTERED|NONE
+Calculating gravity gradient...
+Configuring geophysics input...
+Active grids: GridTypes.CENTERED|NONE
+Setting Backend To: AvailableBackends.PYTORCH
+</pre></div>
+</div>
+</section>
+<section id="setup-enmap-observations-custom-grid">
+<h2>3. Setup EnMap Observations (Custom Grid)<a class="headerlink" href="#setup-enmap-observations-custom-grid" title="Link to this heading">¶</a></h2>
+<p><strong>What is EnMap data?</strong></p>
+<p>EnMap (Environmental Mapping and Analysis Program) is a hyperspectral satellite mission.
+In this context, we use it as a categorical surface classification of rock types.</p>
+<p><strong>Data Representation</strong>: Categorical labels mapping to geological units.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># For this example, we&#39;ll assume the files exist in the same folder as this script</span>
+<span class="n">current_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">getfile</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">currentframe</span><span class="p">()))</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+<span class="n">xyz_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">current_dir</span><span class="p">,</span> <span class="s1">&#39;central_xyz.npy&#39;</span><span class="p">)</span>
+<span class="n">labels_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">current_dir</span><span class="p">,</span> <span class="s1">&#39;central_labels.npy&#39;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">xyz_path</span><span class="p">):</span>
+    <span class="c1"># Fallback to dummy data if real data isn&#39;t found for the sphinx build</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: Real EnMap data not found. Using dummy data for demonstration.&quot;</span><span class="p">)</span>
+    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">array</span></a></a><span class="p">([[</span><span class="o">-</span><span class="mi">690000</span><span class="p">,</span> <span class="mi">4540000</span><span class="p">,</span> <span class="mi">500</span><span class="p">]])</span>
+    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">array</span></a></a><span class="p">([</span><span class="mi">1</span><span class="p">])</span>
+<span class="k">else</span><span class="p">:</span>
+    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">load</span></a></a><span class="p">(</span><span class="n">xyz_path</span><span class="p">)</span>
+    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">load</span></a></a><span class="p">(</span><span class="n">labels_path</span><span class="p">)</span>
+    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a><span class="p">[</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a> <span class="o">==</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># Normalize labels to match model units</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">EnMap observations:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Number of pixels: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Categories: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">unique</span></a></a><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Configure Custom Grid for EnMap</span>
+<span class="n">gp</span><span class="o">.</span><span class="n">set_custom_grid</span><span class="p">(</span><span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a><span class="p">)</span>
+
+<span class="c1"># Activate both Centered (Gravity) and Custom (EnMap) grids</span>
+<span class="n">gp</span><span class="o">.</span><span class="n">set_active_grid</span><span class="p">(</span>
+    <span class="n">grid</span><span class="o">=</span><span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span>
+    <span class="n">grid_type</span><span class="o">=</span><span class="p">[</span><span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">GridTypes</span><span class="o">.</span><span class="n">CENTERED</span><span class="p">,</span> <span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">GridTypes</span><span class="o">.</span><span class="n">CUSTOM</span><span class="p">],</span>
+    <span class="n">reset</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>EnMap observations:
+  Number of pixels: 57
+  Categories: [0 1]
+Active grids: GridTypes.CUSTOM|CENTERED|NONE
+Active grids: GridTypes.CUSTOM|CENTERED|NONE
+
+Grid(values=array([[-6.86311507e+05,  4.53422704e+06,  1.31536606e+02],
+       [-6.84340294e+05,  4.53983741e+06,  3.46467194e+02],
+       [-6.96432927e+05,  4.54468963e+06,  3.20259308e+02],
+       ...,
+       [-6.78457499e+05,  4.53496092e+06, -8.63073923e+02],
+       [-6.78457499e+05,  4.53496092e+06, -1.34724562e+03],
+       [-6.78457499e+05,  4.53496092e+06, -2.02000000e+03]],
+      shape=(38777, 3)), length=array([], dtype=float64), _octree_grid=RegularGrid(resolution=array([512, 400,  32]), extent=array([-7.075210e+05, -6.755580e+05,  4.526832e+06,  4.551949e+06,
+       -5.000000e+02,  5.050000e+02]), values=array([[-7.07489786e+05,  4.52686340e+06, -4.84296875e+02],
+       [-7.07489786e+05,  4.52686340e+06, -4.52890625e+02],
+       [-7.07489786e+05,  4.52686340e+06, -4.21484375e+02],
+       ...,
+       [-6.75589214e+05,  4.55191760e+06,  4.26484375e+02],
+       [-6.75589214e+05,  4.55191760e+06,  4.57890625e+02],
+       [-6.75589214e+05,  4.55191760e+06,  4.89296875e+02]],
+      shape=(6553600, 3)), mask_topo=array([], shape=(0, 3), dtype=bool), _transform=None, _base_resolution=array([32, 25,  2])), _dense_grid=None, _custom_grid=CustomGrid(values=array([[-6.86311507e+05,  4.53422704e+06,  1.31536606e+02],
+       [-6.84340294e+05,  4.53983741e+06,  3.46467194e+02],
+       [-6.96432927e+05,  4.54468963e+06,  3.20259308e+02],
+       [-6.91163723e+05,  4.54302168e+06,  2.81383545e+02],
+       [-6.89533682e+05,  4.53085323e+06,  3.19174347e+02],
+       [-6.95447321e+05,  4.53923089e+06,  4.63476868e+02],
+       [-6.91504895e+05,  4.53479566e+06,  2.90548767e+02],
+       [-6.81648830e+05,  4.53252118e+06,  1.20361305e+02],
+       [-6.94916609e+05,  4.53570545e+06,  3.06075592e+02],
+       [-7.05151754e+05,  4.54359030e+06,  3.37633240e+02],
+       [-7.02460290e+05,  4.54700201e+06,  4.37251770e+02],
+       [-7.00868156e+05,  4.54920067e+06,  5.18035645e+02],
+       [-6.98025061e+05,  4.53892762e+06,  4.07593109e+02],
+       [-7.01626315e+05,  4.54396938e+06,  3.42894135e+02],
+       [-6.98138785e+05,  4.53225582e+06,  3.96869446e+02],
+       [-7.01702131e+05,  4.53005716e+06,  3.33882172e+02],
+       [-7.05341293e+05,  4.53399959e+06,  4.36949951e+02],
+       [-7.04279871e+05,  4.53619825e+06,  4.22504150e+02],
+       [-6.78957366e+05,  4.53585708e+06,  3.16025940e+02],
+       [-6.77668496e+05,  4.53824528e+06,  3.09397583e+02],
+       [-6.82558621e+05,  4.52861666e+06,  2.47029175e+02],
+       [-6.78995274e+05,  4.54571314e+06,  3.88674500e+02],
+       [-7.04962214e+05,  4.53877599e+06,  3.19339355e+02],
+       [-6.80094604e+05,  4.52941273e+06,  2.73347809e+02],
+       [-6.83657951e+05,  4.54529616e+06,  3.62819458e+02],
+       [-6.96849914e+05,  4.52865457e+06,  2.98927002e+02],
+       [-6.86576862e+05,  4.54685038e+06,  4.12333984e+02],
+       [-7.01323052e+05,  4.53976160e+06,  3.07448608e+02],
+       [-6.89950669e+05,  4.53972369e+06,  2.46116455e+02],
+       [-6.80056696e+05,  4.54321122e+06,  3.16967072e+02],
+       [-6.95030333e+05,  4.54817716e+06,  2.64292694e+02],
+       [-7.03673344e+05,  4.54525825e+06,  4.04202576e+02],
+       [-6.95636860e+05,  4.53134603e+06,  2.56243866e+02],
+       [-7.05038030e+05,  4.54040603e+06,  3.10769226e+02],
+       [-7.01019788e+05,  4.53657733e+06,  2.82767090e+02],
+       [-6.79753433e+05,  4.53468193e+06,  2.85022522e+02],
+       [-6.99996274e+05,  4.53172511e+06,  4.26705627e+02],
+       [-6.97342718e+05,  4.53616034e+06,  2.89172455e+02],
+       [-6.89761129e+05,  4.54499289e+06,  3.07890228e+02],
+       [-6.79412261e+05,  4.53733549e+06,  3.21680176e+02],
+       [-6.94006819e+05,  4.53445449e+06,  3.16392212e+02],
+       [-6.84302386e+05,  4.54324913e+06,  2.76777466e+02],
+       [-6.85325900e+05,  4.54582687e+06,  3.95587402e+02],
+       [-6.86842218e+05,  4.54355239e+06,  3.20481750e+02],
+       [-6.95902216e+05,  4.54203607e+06,  1.92909485e+02],
+       [-7.03445896e+05,  4.53172511e+06,  3.84196045e+02],
+       [-7.05379201e+05,  4.52876829e+06,  2.67404938e+02],
+       [-6.94764978e+05,  4.52854085e+06,  2.83653137e+02],
+       [-6.99693010e+05,  4.54552360e+06,  3.34157135e+02],
+       [-6.99768826e+05,  4.54787390e+06,  2.46570984e+02],
+       [-7.04393595e+05,  4.53471984e+06,  4.75726532e+02],
+       [-6.99996274e+05,  4.54290796e+06,  3.11612671e+02],
+       [-6.87676193e+05,  4.52945064e+06,  2.93266357e+02],
+       [-6.84567741e+05,  4.52929901e+06,  3.24543060e+02],
+       [-6.83278871e+05,  4.53161139e+06,  2.89459503e+02],
+       [-7.05682465e+05,  4.54836670e+06,  3.66013245e+02],
+       [-6.88282720e+05,  4.53183884e+06,  1.89883438e+02]])), _topography=None, _sections=None, _centered_grid=CenteredGrid(centers=array([[-7.05136851e+05,  4.53298811e+06,  5.00000000e+02],
+       [-6.97556326e+05,  4.54392817e+06,  5.00000000e+02],
+       [-6.89202793e+05,  4.52921231e+06,  5.00000000e+02],
+       [-6.90716496e+05,  4.54251429e+06,  5.00000000e+02],
+       [-7.02871591e+05,  4.54468798e+06,  5.00000000e+02],
+       [-6.96778079e+05,  4.53456324e+06,  5.00000000e+02],
+       [-7.05932225e+05,  4.54103010e+06,  5.00000000e+02],
+       [-6.97759999e+05,  4.53020714e+06,  5.00000000e+02],
+       [-6.89698506e+05,  4.54704240e+06,  5.00000000e+02],
+       [-7.06108138e+05,  4.53003321e+06,  5.00000000e+02],
+       [-7.00368871e+05,  4.54002472e+06,  5.00000000e+02],
+       [-6.94523994e+05,  4.54804049e+06,  5.00000000e+02],
+       [-6.91953387e+05,  4.53651263e+06,  5.00000000e+02],
+       [-6.94228488e+05,  4.53198213e+06,  5.00000000e+02],
+       [-6.94478080e+05,  4.54018665e+06,  5.00000000e+02],
+       [-6.99853919e+05,  4.54746797e+06,  5.00000000e+02],
+       [-7.01111262e+05,  4.53124209e+06,  5.00000000e+02],
+       [-7.02545850e+05,  4.53694946e+06,  5.00000000e+02],
+       [-7.05547079e+05,  4.54714491e+06,  5.00000000e+02],
+       [-6.80457499e+05,  4.52996092e+06,  5.00000000e+02]]), resolution=array([10, 10, 15]), radius=array([2000, 5000, 2000]), kernel_grid_centers=array([[-2000.        , -5000.        ,  -120.        ],
+       [-2000.        , -5000.        ,  -144.        ],
+       [-2000.        , -5000.        ,  -153.34789186],
+       ...,
+       [ 2000.        ,  5000.        , -1363.07392302],
+       [ 2000.        ,  5000.        , -1847.2456152 ],
+       [ 2000.        ,  5000.        , -2520.        ]], shape=(1936, 3)), left_voxel_edges=array([[ 683.77223398, 1709.43058496,  -12.        ],
+       [ 683.77223398, 1709.43058496,  -12.        ],
+       [ 683.77223398, 1709.43058496,   -4.67394593],
+       ...,
+       [ 683.77223398, 1709.43058496, -174.22571507],
+       [ 683.77223398, 1709.43058496, -242.08584609],
+       [ 683.77223398, 1709.43058496, -336.3771924 ]], shape=(1936, 3)), right_voxel_edges=array([[ 683.77223398, 1709.43058496,  -12.        ],
+       [ 683.77223398, 1709.43058496,   -4.67394593],
+       [ 683.77223398, 1709.43058496,   -6.49442681],
+       ...,
+       [ 683.77223398, 1709.43058496, -242.08584609],
+       [ 683.77223398, 1709.43058496, -336.3771924 ],
+       [ 683.77223398, 1709.43058496, -336.3771924 ]], shape=(1936, 3))), _transform=None, _octree_levels=-1)
+</pre></div>
+</div>
+</section>
+<section id="normalization-and-likelihood-setup">
+<h2>4. Normalization and Likelihood Setup<a class="headerlink" href="#normalization-and-likelihood-setup" title="Link to this heading">¶</a></h2>
+<p><strong>Gravity Normalization</strong></p>
+<p>Since gravity data often has a regional component, we align our forward model to
+the observations using a baseline model run.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">norm_params</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span>
+    <span class="n">baseline_fw_gravity_np</span><span class="o">=</span><span class="n">baseline</span><span class="p">(</span><span class="n">geo_model</span><span class="p">),</span>
+    <span class="n">observed_gravity</span><span class="o">=</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;align_to_reference&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>============================================================
+COMPUTING BASELINE FORWARD MODEL
+============================================================
+Computing gravity with mean/initial prior parameters...
+Baseline forward model statistics:
+  Mean: 24.52 μGal
+  Std:  4.86 μGal
+  Min:  8.20 μGal
+  Max:  28.58 μGal
+============================================================
+
+Computing align_to_reference alignment parameters...
+  Alignment params: {&#39;method&#39;: &#39;align_to_reference&#39;, &#39;reference_mean&#39;: 25535.6, &#39;reference_std&#39;: 8288.689820472231, &#39;baseline_forward_mean&#39;: -24.516145854322723, &#39;baseline_forward_std&#39;: 4.8571060383169495}
+</pre></div>
+</div>
+</section>
+<section id="step-5-define-prior-distributions">
+<h2><strong>Step 5: Define Prior Distributions</strong><a class="headerlink" href="#step-5-define-prior-distributions" title="Link to this heading">¶</a></h2>
+<p><strong>Prior Knowledge in Bayesian Inference</strong></p>
+<p>Priors encode our geological knowledge <em>before</em> seeing the data. We define priors
+for layer dips and rock densities.</p>
+<p><strong>Prior on Dips</strong></p>
+<p>We use a Normal distribution for orientations:</p>
+<div class="math notranslate nohighlight">
+\[\text{dips} \sim \mathcal{N}(\mu=10^\circ, \sigma=10^\circ)\]</div>
+<p><strong>Prior on Density</strong></p>
+<p>We define density contrasts relative to a background density (2.67 g/cm³):</p>
+<div class="math notranslate nohighlight">
+\[\text{density} \sim \mathcal{N}(\mu, \sigma=0.15)\]</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">model_priors</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;dips&#39;</span>   <span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span>
+            <span class="n">loc</span><span class="o">=</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">geo_model</span><span class="o">.</span><span class="n">orientations_copy</span><span class="o">.</span><span class="n">xyz</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="mi">10</span><span class="p">),</span>
+            <span class="n">scale</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">to_event</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span>
+        <span class="s1">&#39;density&#39;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span>
+            <span class="n">loc</span><span class="o">=</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.9</span> <span class="o">-</span> <span class="mf">2.67</span><span class="p">,</span> <span class="mf">2.3</span> <span class="o">-</span> <span class="mf">2.67</span><span class="p">])),</span>
+            <span class="n">scale</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.15</span><span class="p">),</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">to_event</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="step-6-define-joint-likelihood">
+<h2><strong>Step 6: Define Joint Likelihood</strong><a class="headerlink" href="#step-6-define-joint-likelihood" title="Link to this heading">¶</a></h2>
+<p>The joint likelihood is the product of individual likelihoods:</p>
+<div class="math notranslate nohighlight">
+\[p(y_{grav}, y_{enmap} \mid \theta) = p(y_{grav} \mid \theta) \cdot p(y_{enmap} \mid \theta)\]</div>
+<p><strong>Gravity Likelihood</strong>: Hierarchical per-station noise model.
+<strong>EnMap Likelihood</strong>: Categorical distribution for surface units.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gravity_likelihood</span> <span class="o">=</span> <span class="n">generate_multigravity_likelihood_hierarchical_per_station</span><span class="p">(</span><span class="n">norm_params</span><span class="p">)</span>
+<span class="n">enmap_likelihood</span> <span class="o">=</span> <span class="n">enmap_likelihood_fn</span>
+</pre></div>
+</div>
+<p><strong>Inspecting the Likelihood Functions</strong></p>
+<p>To understand exactly what happens inside, we can inspect the source code:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Gravity Likelihood Function:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">30</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">getsource</span><span class="p">(</span><span class="n">generate_multigravity_likelihood_hierarchical_per_station</span><span class="p">))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">EnMap Likelihood Function:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">30</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">getsource</span><span class="p">(</span><span class="n">enmap_likelihood_fn</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Gravity Likelihood Function:
+==============================
+def generate_multigravity_likelihood_hierarchical_per_station(norm_params):
+    &quot;&quot;&quot;
+    Per-station noise with hierarchical structure.
+    Best for: Different stations with unknown individual noise levels.
+    &quot;&quot;&quot;
+
+    def likelihood_fn(solutions: gp.data.Solutions) -&gt; dist.Distribution:
+        simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
+        pyro.deterministic(r&#39;$\mu_{gravity}$&#39;, simulated_geophysics.detach())
+        n_stations = simulated_geophysics.shape[0]
+
+        # Global hyperprior on typical noise level
+        mu_log_sigma = pyro.sample(
+            &quot;mu_log_sigma&quot;,
+            dist.Normal(
+                torch.tensor(np.log(5000.0), dtype=torch.float64),
+                torch.tensor(0.5, dtype=torch.float64)
+            )
+        )
+
+        # How much stations vary from each other
+        tau_log_sigma = pyro.sample(
+            &quot;tau_log_sigma&quot;,
+            dist.HalfNormal(torch.tensor(0.5, dtype=torch.float64))
+        )
+
+        # Per-station noise (centered on global mean)
+        log_sigma_stations = pyro.sample(
+            &quot;log_sigma_stations&quot;,
+            dist.Normal(
+                mu_log_sigma.expand([n_stations]),
+                tau_log_sigma
+            ).to_event(1)
+        )
+
+        sigma_stations = torch.exp(log_sigma_stations)
+        pyro.deterministic(&quot;sigma_stations&quot;, sigma_stations)
+
+        return dist.Normal(simulated_geophysics, sigma_stations).to_event(1)
+
+    return likelihood_fn
+
+
+EnMap Likelihood Function:
+==============================
+def enmap_likelihood_fn(solutions: gp.data.Solutions):
+    output_center: &quot;gempy_engine.core.data.interp_output.InterpOutput&quot; = solutions.octrees_output[0].last_output_center
+    scalar_field_at_custom_grid = output_center.exported_fields.scalar_field[output_center.grid.custom_grid_slice]
+
+
+    if not isinstance(scalar_field_at_custom_grid, torch.Tensor):
+        scalar_field_at_custom_grid = torch.tensor(scalar_field_at_custom_grid, dtype=torch.float64)
+
+    # DEFINE YOUR BOUNDARIES HERE
+    # These should match the isovalues of your interfaces.
+    # If your model is normalized, they might be roughly integers or fixed floats.
+    # Example: If Unit 0 is &lt; 1.0, Unit 1 is 1.0 to 2.0, Unit 2 is &gt; 2.0
+    # boundaries = torch.tensor([1.0, 2.0], dtype=torch.float64)
+    boundaries = torch.tensor(solutions.scalar_field_at_surface_points, dtype=torch.float64)
+
+    # Calculate probabilities
+    probs = _get_ordinal_probs(scalar_field_at_custom_grid, boundaries, temperature=0.1)
+
+    # 2. Save the class probabilities (The &quot;Confidence&quot;)
+    # This will be shape (n_points, n_classes)
+    pyro.deterministic(&quot;probs_pred&quot;, probs.detach())
+
+    # 3. (Optional) Save the boundaries if they change per iteration
+    pyro.deterministic(&quot;boundaries_pred&quot;, boundaries)
+
+    # Use Categorical directly with probabilities (no need for logits)
+    return dist.Categorical(probs=probs).to_event(1)
+</pre></div>
+</div>
+</section>
+<section id="probabilistic-model-creation">
+<h2><strong>Probabilistic Model Creation</strong><a class="headerlink" href="#probabilistic-model-creation" title="Link to this heading">¶</a></h2>
+<p>We combine everything using <cite>make_gempy_pyro_model</cite>.</p>
+<p><strong>Internal Workflow Diagram</strong>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Sample θ (Dips, Densities)
+       ↓
+joint_set_priors(θ) → Update GeoModel
+       ↓
+Forward Model Computation (Gravity + Custom Grid)
+       ↓
+[Likelihood 1 (Gravity), Likelihood 2 (EnMap)]
+       ↓
+p(data | θ) → MCMC Proposes Next θ
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">prob_model</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">make_gempy_pyro_model</span><span class="p">(</span>
+    <span class="n">priors</span><span class="o">=</span><span class="n">model_priors</span><span class="p">,</span>
+    <span class="n">set_interp_input_fn</span><span class="o">=</span><span class="n">joint_set_priors</span><span class="p">,</span>
+    <span class="n">likelihood_fn</span><span class="o">=</span><span class="p">[</span><span class="n">gravity_likelihood</span><span class="p">,</span> <span class="n">enmap_likelihood</span><span class="p">],</span>
+    <span class="n">obs_name</span><span class="o">=</span><span class="s2">&quot;Joint_Obs&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Prepare observed data tensors</span>
+<span class="n">gravity_obs_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+<span class="n">enmap_obs_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+<span class="n">joint_obs</span> <span class="o">=</span> <span class="p">[</span><span class="n">gravity_obs_tensor</span><span class="p">,</span> <span class="n">enmap_obs_tensor</span><span class="p">]</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+</pre></div>
+</div>
+</section>
+<section id="check-likelihood-balance">
+<h2>5. Check Likelihood Balance<a class="headerlink" href="#check-likelihood-balance" title="Link to this heading">¶</a></h2>
+<p>This is a crucial step! We calculate the log-probabilities of each dataset
+at the starting parameters to see if one dominates.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">--- Performing Likelihood Balance Check ---&quot;</span><span class="p">)</span>
+<span class="n">check_likelihood_balance</span><span class="p">(</span>
+    <span class="n">prob_model</span><span class="o">=</span><span class="n">prob_model</span><span class="p">,</span>
+    <span class="n">geo_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+    <span class="n">y_obs_list</span><span class="o">=</span><span class="n">joint_obs</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>--- Performing Likelihood Balance Check ---
+
+--- Likelihood Balance Check ---
+EnMap Log-Likelihood:   -40.33
+Gravity Log-Likelihood: -356.12
+
+Ratio (Gravity / EnMap): 8.8x
+STATUS: Balanced. Both datasets should contribute.
+</pre></div>
+</div>
+</section>
+<section id="run-joint-inference-nuts">
+<h2>6. Run Joint Inference (NUTS)<a class="headerlink" href="#run-joint-inference-nuts" title="Link to this heading">¶</a></h2>
+<p>We use the No-U-Turn Sampler (NUTS), a state-of-the-art MCMC algorithm.</p>
+<p><strong>Configuration Parameters</strong>:
+- <cite>num_samples</cite>: Number of posterior samples to collect.
+- <cite>warmup_steps</cite>: Iterations for the sampler to adapt its parameters.
+- <cite>target_accept_prob</cite>: Target acceptance rate (0.8 is usually a good balance).
+- <cite>step_size</cite>: Initial integration step size.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">RUN_SIMULATION</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="k">if</span> <span class="n">RUN_SIMULATION</span><span class="p">:</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running joint prior predictive...&quot;</span><span class="p">)</span>
+    <span class="n">prior_data</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">run_predictive</span><span class="p">(</span>
+        <span class="n">prob_model</span><span class="o">=</span><span class="n">prob_model</span><span class="p">,</span>
+        <span class="n">geo_model</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="p">,</span>
+        <span class="n">y_obs_list</span><span class="o">=</span><span class="n">joint_obs</span><span class="p">,</span>
+        <span class="n">n_samples</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+        <span class="n">plot_trace</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Running Joint NUTS Inference...&quot;</span><span class="p">)</span>
+    <span class="c1"># Reduced samples for tutorial speed; increase for production</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">run_nuts_inference</span><span class="p">(</span>
+        <span class="n">prob_model</span><span class="o">=</span><span class="n">prob_model</span><span class="p">,</span>
+        <span class="n">geo_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+        <span class="n">y_obs_list</span><span class="o">=</span><span class="n">joint_obs</span><span class="p">,</span>
+        <span class="n">config</span><span class="o">=</span><span class="n">NUTSConfig</span><span class="p">(</span>
+            <span class="n">num_samples</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+            <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+            <span class="n">target_accept_prob</span><span class="o">=</span><span class="mf">0.8</span>
+        <span class="p">),</span>
+        <span class="n">plot_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">run_posterior_predictive</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+<span class="k">else</span><span class="p">:</span>
+
+    <span class="c1"># Get the directory of the current file</span>
+    <span class="n">current_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">getfile</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">currentframe</span><span class="p">()))</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">data_path</span> <span class="o">=</span> <span class="n">current_dir</span> <span class="o">/</span> <span class="s2">&quot;arviz_data_joint_feb2026.nc&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Data file not found at </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Please run the simulation first with RUN_SIMULATION=True&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Read the data file</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">from_netcdf</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">data_path</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot; Loaded inference results from </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Loaded inference results from /home/leguark/PycharmProjects/Mineye-Terranigma/examples/02_probabilistic_modeling/arviz_data_joint_feb2026.nc
+</pre></div>
+</div>
+</section>
+<section id="analyze-results">
+<h2>7. Analyze Results<a class="headerlink" href="#analyze-results" title="Link to this heading">¶</a></h2>
+<p><strong>Posterior Analysis</strong></p>
+<p>We evaluate the quality of our inference by looking at the trace plots and
+posterior distributions.</p>
+<p><strong>Trace Plot</strong>: Should show “fuzzy caterpillar” chains indicating good mixing.
+<strong>Posterior Distributions</strong>: Should be narrower than the priors, indicating
+that the data has informed our knowledge.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Trace Plot</span>
+<span class="n">az</span><span class="o">.</span><span class="n">plot_trace</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;dips&quot;</span><span class="p">,</span> <span class="s2">&quot;density&quot;</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="c1"># Posterior Distributions</span>
+<span class="n">az</span><span class="o">.</span><span class="n">plot_posterior</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;density&quot;</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Posterior Densities (Joint Inversion)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../_images/sphx_glr_07_joint_inversion_001.png" srcset="../_images/sphx_glr_07_joint_inversion_001.png" alt="dips, dips, density, density" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_002.png" srcset="../_images/sphx_glr_07_joint_inversion_002.png" alt="density 0, Posterior Densities (Joint Inversion)" class = "sphx-glr-multi-img"/></li>
+</ul>
+<p><strong>Predictive Checks</strong></p>
+<p>We check how well our posterior models can replicate the observed data.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Probability Heatmap (EnMap predictive check)</span>
+<span class="c1"># This shows the probability of each unit at the surface.</span>
+<span class="n">plot_probability_heatmap</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;posterior_predictive&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_07_joint_inversion_003.png" srcset="../_images/sphx_glr_07_joint_inversion_003.png" alt="Average Class Probabilities per Point (Posterior_predictive)" class = "sphx-glr-single-img"/><p><strong>3D Entropy Visualization</strong></p>
+<p>We can also visualize uncertainty in 3D by injecting the entropy field back
+into the GemPy solutions object.</p>
+<p>Note: The 3D visualization is already handled inside probability_fields_for()
+by injecting the entropy field and calling gpv.plot_3d.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Resetting the model</span>
+<span class="n">simple_geo_model</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">create_geomodel</span><span class="p">(</span>
+    <span class="n">project_name</span><span class="o">=</span><span class="s1">&#39;joint_inversion&#39;</span><span class="p">,</span>
+    <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">,</span>
+    <span class="n">refinement</span><span class="o">=</span><span class="n">refinement</span><span class="p">,</span>
+    <span class="n">importer_helper</span><span class="o">=</span><span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ImporterHelper</span><span class="p">(</span>
+        <span class="n">path_to_orientations</span><span class="o">=</span><span class="n">mod_or_path</span><span class="p">,</span>
+        <span class="n">path_to_surface_points</span><span class="o">=</span><span class="n">mod_pts_path</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Prior Probability Fields</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Computing prior probability fields...&quot;</span><span class="p">)</span>
+
+<span class="n">topography_path</span> <span class="o">=</span> <span class="n">paths</span><span class="o">.</span><span class="n">get_topography_path</span><span class="p">()</span>
+<span class="n">probability_fields_for</span><span class="p">(</span>
+    <span class="n">geo_model</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="p">,</span>
+    <span class="n">inference_data</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">prior</span><span class="p">,</span>
+    <span class="n">topography_path</span><span class="o">=</span><span class="n">topography_path</span>
+<span class="p">)</span>
+
+<span class="c1"># Posterior Probability Fields</span>
+<span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;posterior&#39;</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Computing posterior probability fields...&quot;</span><span class="p">)</span>
+    <span class="n">probability_fields_for</span><span class="p">(</span>
+        <span class="n">geo_model</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="p">,</span>
+        <span class="n">inference_data</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">posterior</span><span class="p">,</span>
+        <span class="n">topography_path</span><span class="o">=</span><span class="n">topography_path</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../_images/sphx_glr_07_joint_inversion_004.png" srcset="../_images/sphx_glr_07_joint_inversion_004.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_005.png" srcset="../_images/sphx_glr_07_joint_inversion_005.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_006.png" srcset="../_images/sphx_glr_07_joint_inversion_006.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_007.png" srcset="../_images/sphx_glr_07_joint_inversion_007.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_008.png" srcset="../_images/sphx_glr_07_joint_inversion_008.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_009.png" srcset="../_images/sphx_glr_07_joint_inversion_009.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
+</ul>
+<ul class="sphx-glr-horizontal">
+<li><img src="../_images/sphx_glr_07_joint_inversion_010.png" srcset="../_images/sphx_glr_07_joint_inversion_010.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_011.png" srcset="../_images/sphx_glr_07_joint_inversion_011.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Computing prior probability fields...
+Active grids: GridTypes.DENSE|NONE
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+/home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:103: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:63.)
+  return func(*args, **kwargs)
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Active grids: GridTypes.DENSE|TOPOGRAPHY|NONE
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+/home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+Computing posterior probability fields...
+Active grids: GridTypes.DENSE|NONE
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Active grids: GridTypes.DENSE|TOPOGRAPHY|NONE
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+/home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+</pre></div>
+</div>
+</section>
+<section id="summary-and-conclusions">
+<h2><strong>Summary and Conclusions</strong><a class="headerlink" href="#summary-and-conclusions" title="Link to this heading">¶</a></h2>
+<p>In this tutorial, we’ve successfully:
+1. Configured a GemPy model with multiple grids (Centered for Gravity, Custom for EnMap).
+2. Defined a joint Bayesian model with multiple likelihood functions.
+3. Performed a Likelihood Balance Check to ensure fair data integration.
+4. Inferred subsurface dips and densities from joint observations.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># **Joint Inversion Workflow Recap:**</span>
+<span class="c1">#</span>
+<span class="c1"># 1. Data Preparation (Gravity + EnMap)</span>
+<span class="c1"># 2. Grid Setup (Multi-grid)</span>
+<span class="c1"># 3. Prior Definition (Geological constraints)</span>
+<span class="c1"># 4. Likelihood Formulation (Noise models)</span>
+<span class="c1"># 5. Balance Diagnostic (Crucial for joint!)</span>
+<span class="c1"># 6. MCMC Inference (NUTS)</span>
+<span class="c1"># 7. Posterior Analysis &amp; Visualization</span>
+<span class="c1"># sphinx_gallery_thumbnail_number = 8</span>
+</pre></div>
+</div>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 28.238 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-examples-probabilistic-07-joint-inversion-py">
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/08a7e451bfc7adf14ba03de8d38555e3/07_joint_inversion.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">07_joint_inversion.ipynb</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/7821b90cc9674e1a20a73ae7e261782a/07_joint_inversion.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">07_joint_inversion.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-zip docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/7e232a76feae83802b50778b05f38dcf/07_joint_inversion.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">zipped:</span> <span class="pre">07_joint_inversion.zip</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/MINEYE_LOGO.png" alt="Logo of Mineye-Terranigma"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Mineye-Terranigma</a></h1>
+
+
+
+<p class="blurb">Implicit Geological Modeling & Bayesian Geophysical Inversion</p>
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_basic/index.html">Basic Examples</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Probabilistic Modeling Examples</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#gallery-overview">Gallery Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#why-probabilistic-modeling">Why Probabilistic Modeling?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#example-descriptions">Example Descriptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#inference-methods">Inference Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#computational-requirements">Computational Requirements</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#visualization-and-diagnostics">Visualization and Diagnostics</a></li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_segmentation/index.html">Hyperspectral Segmentation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Probabilistic Modeling Examples</a><ul>
+      <li>Previous: <a href="06_enmap_inversion.html" title="previous chapter">Bayesian EnMap Inversion: Categorical Likelihood and Ordinal Probabilities</a></li>
+      <li>Next: <a href="../examples_segmentation/index.html" title="next chapter">Hyperspectral Segmentation</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024-2026, Terranigma Solutions GmbH.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="../_sources/examples_probabilistic/07_joint_inversion.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

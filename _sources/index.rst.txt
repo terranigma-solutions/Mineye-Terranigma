@@ -1,78 +1,149 @@
+.. Mineye-Terranigma documentation master file
 
-About
-=====
-Mineye-Terranigma
-*****************
+==============================
+Mineye-Terranigma Documentation
+==============================
 
 Overview
---------
+========
 
-``Mineye-Terranigma`` is a research project focused on:
+``Mineye-Terranigma`` is a research project for **probabilistic geological modeling**
+and **geophysical inversion**. The project combines state-of-the-art implicit geological
+modeling with Bayesian inference techniques.
 
-* **Bayesian Segmentation of Satellite Imagery:** Advanced methods for processing and analyzing satellite data
-* **Probabilistic Geological Modeling:** Uncertainty quantification and stochastic modeling using `GemPy <https://www.gempy.org>`_
-* **Joint Inversion:** Integrating multiple geophysical data sources with geological models
+**Core Capabilities:**
 
-This project leverages the `Pyro <https://pyro.ai>`_ probabilistic programming framework
-for Bayesian inference and combines it with geophysical forward modeling capabilities.
+* **3D Geological Modeling**: Build implicit 3D models from structural data using `GemPy <https://www.gempy.org>`_
+* **Geophysical Forward Modeling**: Compute gravity and magnetic responses from geological models
+* **Probabilistic Inference**: Quantify uncertainty using `Pyro <https://pyro.ai>`_ and PyTorch
+* **Satellite Image Segmentation**: Bayesian classification of remote sensing data
+* **Joint Inversion**: Integrate multiple data sources for improved geological interpretations
 
-Contents:
+----
+
+Getting Started
+===============
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
-   self
    installation
 
+----
+
+.. _basic-examples:
+
+Basic Examples
+==============
+
+Foundational workflows for 3D geological modeling and geophysical forward modeling.
+These examples introduce core concepts using real data from the **Tharsis mining district** in Spain.
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbnails">
+
+.. include:: examples_basic/index.rst
+    :start-after:     <div class="sphx-glr-thumbnails">
+    :end-before: .. thumbnail-parent-div-close
+
+.. toctree::
+    :maxdepth: 2
+    :hidden:
+
+    examples_basic/index
+
+
+----
+
+.. _probabilistic-examples:
+
+Probabilistic Modeling
+======================
+
+Advanced examples demonstrating uncertainty quantification, error propagation,
+and Bayesian inversion techniques for geological and geophysical applications.
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbnails">
+
+.. include:: examples_probabilistic/index.rst
+    :start-after:     <div class="sphx-glr-thumbnails">
+    :end-before: .. thumbnail-parent-div-close
+
+.. toctree::
+    :maxdepth: 2
+    :hidden:
+
+    examples_probabilistic/index
+
+----
+
+.. _segmentation-examples:
+
+Hyperspectral Segmentation
+==========================
+
+Workflows for lithological segmentation of EnMap hyperspectral data using Bayesian inference.
+These examples cover feature extraction, preprocessing, and model comparison.
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbnails">
+
+.. include:: examples_segmentation/index.rst
+    :start-after:     <div class="sphx-glr-thumbnails">
+    :end-before: .. thumbnail-parent-div-close
+
+.. toctree::
+    :maxdepth: 2
+    :hidden:
+
+    examples_segmentation/index
+
+----
+
+Key Features
+============
+
+.. list-table::
+   :widths: 50 50
+   :header-rows: 0
+
+   * - **Bayesian Inference with Pyro**
+     - **Geological Modeling with GemPy**
+   * - The project uses PyTorch and Pyro for probabilistic programming, enabling:
+
+       * **Variational Inference (VI)**: Fast approximate posterior estimation
+       * **Hamiltonian Monte Carlo (HMC/NUTS)**: Accurate sampling for complex posteriors
+       * **GPU Acceleration**: Scalable inference for large-scale inversions
+     - Building on the GemPy framework, the project supports:
+
+       * **Implicit Surface Modeling**: Continuous 3D geological surfaces from sparse data
+       * **Structural Complexity**: Faults, unconformities, and erosive contacts
+       * **Forward Modeling**: Gravity and magnetic field computations
+       * **Uncertainty Quantification**: Probabilistic geological interpretations
+
+
+----
+
+API Reference
+=============
+
+Detailed documentation of the Mineye-Terranigma Python API.
+
 .. toctree::
    :maxdepth: 2
-   :caption: API Reference
 
    api_reference
 
-
-Example Galleries
-=================
-
-Explore practical examples demonstrating the capabilities of Mineye-Terranigma.
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Galleries
-
-   examples_basic/index
-   examples_probabilistic/index
+----
 
 
-Key Features
-^^^^^^^^^^^^
-
-**Bayesian Inference with Pyro**
-
-The project uses PyTorch and Pyro for probabilistic programming, enabling:
-
-* Variational Inference (VI) for fast approximate posterior estimation
-* Hamiltonian Monte Carlo (HMC/NUTS) for accurate sampling
-* GPU acceleration for large-scale inversions
-
-**Geological Modeling**
-
-Building on ``GemPy``, the project supports:
-
-* 3D structural geological modeling
-* Forward modeling of geophysical observables (gravity, magnetics)
-* Uncertainty quantification in geological interpretations
-* Joint inversion of multiple data types
-
-Indices and tables
+Indices and Tables
 ==================
 
 * :ref:`genindex`
 * :ref:`search`
-
-
-.. image:: _static/logos/MINEYE_LOGO.png
-   :width: 40%
-
-.. image:: _static/logos/Terranigma.png
-   :width: 40%

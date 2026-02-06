@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Bayesian EnMap Inversion: Categorical Likelihood and Ordinal Probabilities &#8212; Mineye-Terranigma 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=89af775e" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="icon" href="../_static/favicon.ico"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Bayesian Joint Inversion: Gravity and EnMap" href="07_joint_inversion.html" />
+    <link rel="prev" title="Bayesian Magnetic Inversion: TMI Inversion Workflow" href="05_magnetics_inversion.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-examples-probabilistic-06-enmap-inversion-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code.</p>
+</div>
+<section class="sphx-glr-example-title" id="bayesian-enmap-inversion-categorical-likelihood-and-ordinal-probabilities">
+<span id="sphx-glr-examples-probabilistic-06-enmap-inversion-py"></span><h1>Bayesian EnMap Inversion: Categorical Likelihood and Ordinal Probabilities<a class="headerlink" href="#bayesian-enmap-inversion-categorical-likelihood-and-ordinal-probabilities" title="Link to this heading">¶</a></h1>
+<p>This tutorial demonstrates how to perform Bayesian inversion using surface lithological
+classifications (e.g., from EnMap satellite data) as observations. Unlike gravity
+inversion which uses continuous values, EnMap inversion deals with discrete categorical labels.</p>
+<p><strong>What are we doing?</strong></p>
+<p>We’re inferring geological parameters (like layer orientations) by comparing the
+predicted lithology at the surface with observed lithological labels derived from
+remote sensing data.</p>
+<p><strong>Why Bayesian Inference?</strong></p>
+<p>Bayesian inference allows us to:
+1.  <strong>Quantify Uncertainty</strong>: Instead of a single “best-fit” model, we get a posterior</p>
+<blockquote>
+<div><p>distribution representing all models consistent with both our prior knowledge and
+the EnMap observations.</p>
+</div></blockquote>
+<ol class="arabic simple" start="2">
+<li><p><strong>Incorporate Prior Knowledge</strong>: We can formally include geological information
+(e.g., typical layer dips) through prior distributions.</p></li>
+<li><p><strong>Handle Classification Errors</strong>: The probabilistic approach naturally accounts
+for potential misclassifications in the remote sensing data.</p></li>
+</ol>
+<p><strong>The Bayesian Framework</strong></p>
+<p>We seek the posterior distribution of geological parameters <span class="math notranslate nohighlight">\(\theta\)</span> given
+the observed EnMap labels <span class="math notranslate nohighlight">\(y\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[p(\theta|y) = \frac{p(y|\theta) p(\theta)}{p(y)}\]</div>
+<p>Where:
+- <span class="math notranslate nohighlight">\(p(\theta)\)</span> is the <strong>prior</strong>, encoding our initial knowledge.
+- <span class="math notranslate nohighlight">\(p(y|\theta)\)</span> is the <strong>likelihood</strong>, describing the probability of the</p>
+<blockquote>
+<div><p>labels given a specific geological configuration.</p>
+</div></blockquote>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(p(y)\)</span> is the <strong>evidence</strong> (marginal likelihood).</p></li>
+</ul>
+<p><strong>The Forward Model</strong></p>
+<p>The relationship between parameters and observations is given by:</p>
+<div class="math notranslate nohighlight">
+\[y = f(\theta) + \epsilon\]</div>
+<p>Where <span class="math notranslate nohighlight">\(f(\theta)\)</span> is the GemPy geological model that predicts rock types
+at the surface, and <span class="math notranslate nohighlight">\(\epsilon\)</span> represents the observation noise or
+classification uncertainty.</p>
+<p><strong>The Likelihood: Categorical with Ordinal Probabilities</strong></p>
+<p>Since the observed data consists of discrete rock type labels (e.g., 0 for Unit A, 1 for Unit B),
+we use a <strong>Categorical likelihood</strong>. However, GemPy’s forward model is differentiable
+and produces a continuous scalar field. To bridge this gap, we use an <strong>Ordinal Probabilities</strong>
+approach.</p>
+<ol class="arabic">
+<li><p><strong>Scalar Field to Probabilities</strong>: We take the continuous scalar field value at the surface.</p></li>
+<li><p><strong>Sigmoid Boundaries</strong>: We define boundaries (thresholds) between units. We use
+sigmoid functions centered at these boundaries to compute the probability of a
+point belonging to each unit.</p>
+<div class="math notranslate nohighlight">
+\[P(\text{below boundary}) = \sigma\left(\frac{\text{boundary} - \text{scalar}}{\text{temperature}}\right)\]</div>
+</li>
+<li><p><strong>Softmax-like behavior</strong>: The difference between cumulative probabilities at
+successive boundaries gives the probability mass for each discrete class.</p></li>
+<li><p><strong>Temperature</strong>: A ‘temperature’ parameter controls the sharpness of these
+probabilistic transitions. Lower temperature means sharper, more deterministic boundaries.</p></li>
+</ol>
+<p><strong>Why this approach?</strong></p>
+<ul class="simple">
+<li><p><strong>Differentiability</strong>: The sigmoid-based mapping is fully differentiable, which
+is crucial for Gradient-based MCMC methods like <strong>NUTS</strong> (No-U-Turn Sampler).</p></li>
+<li><p><strong>Uncertainty</strong>: It naturally accounts for classification uncertainty near
+geological interfaces.</p></li>
+</ul>
+<section id="import-libraries">
+<h2>Import Libraries<a class="headerlink" href="#import-libraries" title="Link to this heading">¶</a></h2>
+<p>We load the required scientific packages, GemPy ecosystem, and Pyro for
+probabilistic programming.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyro</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyro.distributions</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="c1"># GemPy ecosystem</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy_probability</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy_viewer</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpv</span>
+
+<span class="c1"># Configuration and helpers</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">paths</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gempy_probability.core.samplers_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">NUTSConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gempy_probability.modules.plot.plot_posterior</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_red</span><span class="p">,</span> <span class="n">default_blue</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.probabilistic_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">_modify_orientations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.visualization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">gempy_viz</span><span class="p">,</span>
+    <span class="n">plot_probability_heatmap</span><span class="p">,</span>
+    <span class="n">compute_probability_density_fields</span><span class="p">,</span>
+    <span class="n">plot_many_observed_vs_forward</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.probabilistic_model_likelihoods</span><span class="w"> </span><span class="kn">import</span> <span class="n">enmap_likelihood_fn</span>
+
+<span class="c1"># Set random seeds for reproducibility</span>
+<span class="n">seed</span> <span class="o">=</span> <span class="mi">4003</span>
+<span class="n">pyro</span><span class="o">.</span><span class="n">set_rng_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+<a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span></a></a></a><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+</pre></div>
+</div>
+</section>
+<section id="step-1-model-configuration">
+<h2>Step 1: Model Configuration<a class="headerlink" href="#step-1-model-configuration" title="Link to this heading">¶</a></h2>
+<p>We define the spatial extent of our study area and the resolution of the
+geological model.</p>
+<p><strong>Model Extent</strong>:
+- X: -707521 to -675558
+- Y: 4526832 to 4551949
+- Z: -500 to 505 (meters)</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define Model Extent (matching the gravity example area)</span>
+<span class="n">extent</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">707521</span><span class="p">,</span> <span class="o">-</span><span class="mi">675558</span><span class="p">,</span> <span class="mi">4526832</span><span class="p">,</span> <span class="mi">4551949</span><span class="p">,</span> <span class="o">-</span><span class="mi">500</span><span class="p">,</span> <span class="mi">505</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="step-2-load-enmap-observations">
+<h2>Step 2: Load EnMap Observations<a class="headerlink" href="#step-2-load-enmap-observations" title="Link to this heading">¶</a></h2>
+<p><strong>What is EnMap data?</strong></p>
+<p>EnMap (Environmental Mapping and Analysis Program) provides hyperspectral
+satellite imagery. In this example, we use a lithological classification
+derived from such data.</p>
+<p><strong>Units</strong>: Discrete categorical labels (0, 1, 2…).</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define paths to find the central_xyz files in the same folder as this script</span>
+<span class="n">current_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">getfile</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">currentframe</span><span class="p">()))</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+<span class="n">xyz_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">current_dir</span><span class="p">,</span> <span class="s1">&#39;central_xyz.npy&#39;</span><span class="p">)</span>
+<span class="n">labels_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">current_dir</span><span class="p">,</span> <span class="s1">&#39;central_labels.npy&#39;</span><span class="p">)</span>
+
+<span class="c1"># Load EnMap data</span>
+<a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">load</span></a></a></a><span class="p">(</span><span class="n">xyz_path</span><span class="p">)</span>
+<a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">load</span></a></a></a><span class="p">(</span><span class="n">labels_path</span><span class="p">)</span>
+<a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a><span class="p">[</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a> <span class="o">==</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># Normalize labels to binary for this example</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">EnMap observations:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Number of measurements: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Classes present: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">unique</span></a></a></a><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Class 0 count: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.sum.html#numpy.sum" title="numpy.sum" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.sum.html#numpy.sum" title="numpy.sum" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.sum.html#numpy.sum" title="numpy.sum" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">sum</span></a></a></a><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Class 1 count: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.sum.html#numpy.sum" title="numpy.sum" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.sum.html#numpy.sum" title="numpy.sum" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.sum.html#numpy.sum" title="numpy.sum" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">sum</span></a></a></a><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>EnMap observations:
+  Number of measurements: 57
+  Classes present: [0 1]
+  Class 0 count: 27
+  Class 1 count: 30
+</pre></div>
+</div>
+</section>
+<section id="step-3-initial-geological-model-setup">
+<h2>Step 3: Initial Geological Model Setup<a class="headerlink" href="#step-3-initial-geological-model-setup" title="Link to this heading">¶</a></h2>
+<p>We create the base GemPy model using geological orientations and points.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create Initial GemPy Model</span>
+<span class="n">simple_geo_model</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">create_geomodel</span><span class="p">(</span>
+    <span class="n">project_name</span><span class="o">=</span><span class="s1">&#39;enmap_inversion&#39;</span><span class="p">,</span>
+    <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">,</span>
+    <span class="n">refinement</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">importer_helper</span><span class="o">=</span><span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ImporterHelper</span><span class="p">(</span>
+        <span class="n">path_to_orientations</span><span class="o">=</span><span class="n">paths</span><span class="o">.</span><span class="n">get_orientations_path</span><span class="p">(),</span>
+        <span class="n">path_to_surface_points</span><span class="o">=</span><span class="n">paths</span><span class="o">.</span><span class="n">get_points_path</span><span class="p">(),</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="n">gp</span><span class="o">.</span><span class="n">map_stack_to_surfaces</span><span class="p">(</span>
+    <span class="n">gempy_model</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="p">,</span>
+    <span class="n">mapping_object</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Tournaisian_Plutonites&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Tournaisian Plutonites&quot;</span><span class="p">]}</span>
+<span class="p">)</span>
+
+<span class="c1"># Compute initial model</span>
+<span class="n">gp</span><span class="o">.</span><span class="n">compute_model</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="p">)</span>
+
+<span class="c1"># Visualize initial model</span>
+<span class="n">gpv</span><span class="o">.</span><span class="n">plot_2d</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="s1">&#39;z&#39;</span><span class="p">,</span> <span class="n">show_data</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Initial Geological Model (Surface)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_06_enmap_inversion_001.png" srcset="../_images/sphx_glr_06_enmap_inversion_001.png" alt="Initial Geological Model (Surface)" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+/home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:103: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:63.)
+  return func(*args, **kwargs)
+</pre></div>
+</div>
+</section>
+<section id="step-4-configure-custom-grid-for-observations">
+<h2>Step 4: Configure Custom Grid for Observations<a class="headerlink" href="#step-4-configure-custom-grid-for-observations" title="Link to this heading">¶</a></h2>
+<p>We set a custom grid at the exact XYZ locations where we have EnMap labels.
+This ensures GemPy predicts rock types exactly where we have observations.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gp</span><span class="o">.</span><span class="n">set_custom_grid</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a></a><span class="p">)</span>
+<span class="n">gp</span><span class="o">.</span><span class="n">set_active_grid</span><span class="p">(</span>
+    <span class="n">grid</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span>
+    <span class="n">grid_type</span><span class="o">=</span><span class="p">[</span><span class="n">simple_geo_model</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">GridTypes</span><span class="o">.</span><span class="n">CUSTOM</span><span class="p">],</span>
+    <span class="n">reset</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Active grids: GridTypes.OCTREE|CUSTOM|NONE
+Active grids: GridTypes.CUSTOM|NONE
+
+Grid(values=array([[-6.86311507e+05,  4.53422704e+06,  1.31536606e+02],
+       [-6.84340294e+05,  4.53983741e+06,  3.46467194e+02],
+       [-6.96432927e+05,  4.54468963e+06,  3.20259308e+02],
+       [-6.91163723e+05,  4.54302168e+06,  2.81383545e+02],
+       [-6.89533682e+05,  4.53085323e+06,  3.19174347e+02],
+       [-6.95447321e+05,  4.53923089e+06,  4.63476868e+02],
+       [-6.91504895e+05,  4.53479566e+06,  2.90548767e+02],
+       [-6.81648830e+05,  4.53252118e+06,  1.20361305e+02],
+       [-6.94916609e+05,  4.53570545e+06,  3.06075592e+02],
+       [-7.05151754e+05,  4.54359030e+06,  3.37633240e+02],
+       [-7.02460290e+05,  4.54700201e+06,  4.37251770e+02],
+       [-7.00868156e+05,  4.54920067e+06,  5.18035645e+02],
+       [-6.98025061e+05,  4.53892762e+06,  4.07593109e+02],
+       [-7.01626315e+05,  4.54396938e+06,  3.42894135e+02],
+       [-6.98138785e+05,  4.53225582e+06,  3.96869446e+02],
+       [-7.01702131e+05,  4.53005716e+06,  3.33882172e+02],
+       [-7.05341293e+05,  4.53399959e+06,  4.36949951e+02],
+       [-7.04279871e+05,  4.53619825e+06,  4.22504150e+02],
+       [-6.78957366e+05,  4.53585708e+06,  3.16025940e+02],
+       [-6.77668496e+05,  4.53824528e+06,  3.09397583e+02],
+       [-6.82558621e+05,  4.52861666e+06,  2.47029175e+02],
+       [-6.78995274e+05,  4.54571314e+06,  3.88674500e+02],
+       [-7.04962214e+05,  4.53877599e+06,  3.19339355e+02],
+       [-6.80094604e+05,  4.52941273e+06,  2.73347809e+02],
+       [-6.83657951e+05,  4.54529616e+06,  3.62819458e+02],
+       [-6.96849914e+05,  4.52865457e+06,  2.98927002e+02],
+       [-6.86576862e+05,  4.54685038e+06,  4.12333984e+02],
+       [-7.01323052e+05,  4.53976160e+06,  3.07448608e+02],
+       [-6.89950669e+05,  4.53972369e+06,  2.46116455e+02],
+       [-6.80056696e+05,  4.54321122e+06,  3.16967072e+02],
+       [-6.95030333e+05,  4.54817716e+06,  2.64292694e+02],
+       [-7.03673344e+05,  4.54525825e+06,  4.04202576e+02],
+       [-6.95636860e+05,  4.53134603e+06,  2.56243866e+02],
+       [-7.05038030e+05,  4.54040603e+06,  3.10769226e+02],
+       [-7.01019788e+05,  4.53657733e+06,  2.82767090e+02],
+       [-6.79753433e+05,  4.53468193e+06,  2.85022522e+02],
+       [-6.99996274e+05,  4.53172511e+06,  4.26705627e+02],
+       [-6.97342718e+05,  4.53616034e+06,  2.89172455e+02],
+       [-6.89761129e+05,  4.54499289e+06,  3.07890228e+02],
+       [-6.79412261e+05,  4.53733549e+06,  3.21680176e+02],
+       [-6.94006819e+05,  4.53445449e+06,  3.16392212e+02],
+       [-6.84302386e+05,  4.54324913e+06,  2.76777466e+02],
+       [-6.85325900e+05,  4.54582687e+06,  3.95587402e+02],
+       [-6.86842218e+05,  4.54355239e+06,  3.20481750e+02],
+       [-6.95902216e+05,  4.54203607e+06,  1.92909485e+02],
+       [-7.03445896e+05,  4.53172511e+06,  3.84196045e+02],
+       [-7.05379201e+05,  4.52876829e+06,  2.67404938e+02],
+       [-6.94764978e+05,  4.52854085e+06,  2.83653137e+02],
+       [-6.99693010e+05,  4.54552360e+06,  3.34157135e+02],
+       [-6.99768826e+05,  4.54787390e+06,  2.46570984e+02],
+       [-7.04393595e+05,  4.53471984e+06,  4.75726532e+02],
+       [-6.99996274e+05,  4.54290796e+06,  3.11612671e+02],
+       [-6.87676193e+05,  4.52945064e+06,  2.93266357e+02],
+       [-6.84567741e+05,  4.52929901e+06,  3.24543060e+02],
+       [-6.83278871e+05,  4.53161139e+06,  2.89459503e+02],
+       [-7.05682465e+05,  4.54836670e+06,  3.66013245e+02],
+       [-6.88282720e+05,  4.53183884e+06,  1.89883438e+02]]), length=array([], dtype=float64), _octree_grid=RegularGrid(resolution=array([512, 400,  32]), extent=array([-7.075210e+05, -6.755580e+05,  4.526832e+06,  4.551949e+06,
+       -5.000000e+02,  5.050000e+02]), values=array([[-7.07489786e+05,  4.52686340e+06, -4.84296875e+02],
+       [-7.07489786e+05,  4.52686340e+06, -4.52890625e+02],
+       [-7.07489786e+05,  4.52686340e+06, -4.21484375e+02],
+       ...,
+       [-6.75589214e+05,  4.55191760e+06,  4.26484375e+02],
+       [-6.75589214e+05,  4.55191760e+06,  4.57890625e+02],
+       [-6.75589214e+05,  4.55191760e+06,  4.89296875e+02]],
+      shape=(6553600, 3)), mask_topo=array([], shape=(0, 3), dtype=bool), _transform=None, _base_resolution=array([32, 25,  2])), _dense_grid=None, _custom_grid=CustomGrid(values=array([[-6.86311507e+05,  4.53422704e+06,  1.31536606e+02],
+       [-6.84340294e+05,  4.53983741e+06,  3.46467194e+02],
+       [-6.96432927e+05,  4.54468963e+06,  3.20259308e+02],
+       [-6.91163723e+05,  4.54302168e+06,  2.81383545e+02],
+       [-6.89533682e+05,  4.53085323e+06,  3.19174347e+02],
+       [-6.95447321e+05,  4.53923089e+06,  4.63476868e+02],
+       [-6.91504895e+05,  4.53479566e+06,  2.90548767e+02],
+       [-6.81648830e+05,  4.53252118e+06,  1.20361305e+02],
+       [-6.94916609e+05,  4.53570545e+06,  3.06075592e+02],
+       [-7.05151754e+05,  4.54359030e+06,  3.37633240e+02],
+       [-7.02460290e+05,  4.54700201e+06,  4.37251770e+02],
+       [-7.00868156e+05,  4.54920067e+06,  5.18035645e+02],
+       [-6.98025061e+05,  4.53892762e+06,  4.07593109e+02],
+       [-7.01626315e+05,  4.54396938e+06,  3.42894135e+02],
+       [-6.98138785e+05,  4.53225582e+06,  3.96869446e+02],
+       [-7.01702131e+05,  4.53005716e+06,  3.33882172e+02],
+       [-7.05341293e+05,  4.53399959e+06,  4.36949951e+02],
+       [-7.04279871e+05,  4.53619825e+06,  4.22504150e+02],
+       [-6.78957366e+05,  4.53585708e+06,  3.16025940e+02],
+       [-6.77668496e+05,  4.53824528e+06,  3.09397583e+02],
+       [-6.82558621e+05,  4.52861666e+06,  2.47029175e+02],
+       [-6.78995274e+05,  4.54571314e+06,  3.88674500e+02],
+       [-7.04962214e+05,  4.53877599e+06,  3.19339355e+02],
+       [-6.80094604e+05,  4.52941273e+06,  2.73347809e+02],
+       [-6.83657951e+05,  4.54529616e+06,  3.62819458e+02],
+       [-6.96849914e+05,  4.52865457e+06,  2.98927002e+02],
+       [-6.86576862e+05,  4.54685038e+06,  4.12333984e+02],
+       [-7.01323052e+05,  4.53976160e+06,  3.07448608e+02],
+       [-6.89950669e+05,  4.53972369e+06,  2.46116455e+02],
+       [-6.80056696e+05,  4.54321122e+06,  3.16967072e+02],
+       [-6.95030333e+05,  4.54817716e+06,  2.64292694e+02],
+       [-7.03673344e+05,  4.54525825e+06,  4.04202576e+02],
+       [-6.95636860e+05,  4.53134603e+06,  2.56243866e+02],
+       [-7.05038030e+05,  4.54040603e+06,  3.10769226e+02],
+       [-7.01019788e+05,  4.53657733e+06,  2.82767090e+02],
+       [-6.79753433e+05,  4.53468193e+06,  2.85022522e+02],
+       [-6.99996274e+05,  4.53172511e+06,  4.26705627e+02],
+       [-6.97342718e+05,  4.53616034e+06,  2.89172455e+02],
+       [-6.89761129e+05,  4.54499289e+06,  3.07890228e+02],
+       [-6.79412261e+05,  4.53733549e+06,  3.21680176e+02],
+       [-6.94006819e+05,  4.53445449e+06,  3.16392212e+02],
+       [-6.84302386e+05,  4.54324913e+06,  2.76777466e+02],
+       [-6.85325900e+05,  4.54582687e+06,  3.95587402e+02],
+       [-6.86842218e+05,  4.54355239e+06,  3.20481750e+02],
+       [-6.95902216e+05,  4.54203607e+06,  1.92909485e+02],
+       [-7.03445896e+05,  4.53172511e+06,  3.84196045e+02],
+       [-7.05379201e+05,  4.52876829e+06,  2.67404938e+02],
+       [-6.94764978e+05,  4.52854085e+06,  2.83653137e+02],
+       [-6.99693010e+05,  4.54552360e+06,  3.34157135e+02],
+       [-6.99768826e+05,  4.54787390e+06,  2.46570984e+02],
+       [-7.04393595e+05,  4.53471984e+06,  4.75726532e+02],
+       [-6.99996274e+05,  4.54290796e+06,  3.11612671e+02],
+       [-6.87676193e+05,  4.52945064e+06,  2.93266357e+02],
+       [-6.84567741e+05,  4.52929901e+06,  3.24543060e+02],
+       [-6.83278871e+05,  4.53161139e+06,  2.89459503e+02],
+       [-7.05682465e+05,  4.54836670e+06,  3.66013245e+02],
+       [-6.88282720e+05,  4.53183884e+06,  1.89883438e+02]])), _topography=None, _sections=None, _centered_grid=None, _transform=None, _octree_levels=-1)
+</pre></div>
+</div>
+</section>
+<section id="step-5-baseline-forward-model">
+<h2>Step 5: Baseline Forward Model<a class="headerlink" href="#step-5-baseline-forward-model" title="Link to this heading">¶</a></h2>
+<p>We compute the model at the custom grid locations to establish a baseline
+comparison with the observations.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compute model on custom grid</span>
+<span class="n">sol</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">compute_model</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="p">)</span>
+
+<span class="c1"># The results at custom grid are stored in solutions</span>
+<span class="n">output_center</span> <span class="o">=</span> <span class="n">sol</span><span class="o">.</span><span class="n">octrees_output</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">last_output_center</span>
+<span class="n">scalar_field_at_custom_grid</span> <span class="o">=</span> <span class="n">output_center</span><span class="o">.</span><span class="n">exported_fields</span><span class="o">.</span><span class="n">scalar_field</span><span class="p">[</span><span class="n">output_center</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">custom_grid_slice</span><span class="p">]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Baseline Forward Model:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Scalar field range: </span><span class="si">{</span><span class="n">scalar_field_at_custom_grid</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">scalar_field_at_custom_grid</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+
+Baseline Forward Model:
+  Scalar field range: -0.04 to 0.05
+</pre></div>
+</div>
+</section>
+<section id="step-6-define-prior-distributions">
+<h2>Step 6: Define Prior Distributions<a class="headerlink" href="#step-6-define-prior-distributions" title="Link to this heading">¶</a></h2>
+<p><strong>Prior Knowledge in Bayesian Inference</strong></p>
+<p>Priors encode our geological knowledge <em>before</em> seeing the data. Here we
+specify our uncertainty about the dip of the geological layers.</p>
+<p><strong>Prior on Dips</strong></p>
+<p>We use a Normal distribution:</p>
+<div class="math notranslate nohighlight">
+\[\text{dips} \sim \mathcal{N}(10^\circ, 10^\circ)\]</div>
+<p><strong>Interpretation</strong>:
+- <strong>Mean (μ)</strong>: 10 degrees. Our best guess for the regional dip.
+- <strong>Std (σ)</strong>: 10 degrees. Represents significant uncertainty in our knowledge.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">model_priors</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;dips&#39;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span>
+            <span class="n">loc</span><span class="o">=</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="o">.</span><span class="n">orientations_copy</span><span class="o">.</span><span class="n">xyz</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="mi">10</span><span class="p">),</span>
+            <span class="n">scale</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">to_event</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">set_priors_enmap</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">geo_model</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">_modify_orientations</span><span class="p">(</span><span class="n">samples</span><span class="o">=</span><span class="n">samples</span><span class="p">,</span> <span class="n">geo_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;dips&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="step-7-inspecting-the-likelihood-function">
+<h2>Step 7: Inspecting the Likelihood Function<a class="headerlink" href="#step-7-inspecting-the-likelihood-function" title="Link to this heading">¶</a></h2>
+<p><strong>Understanding the Likelihood Function</strong></p>
+<p>The likelihood function is crucial for connecting model predictions to
+observations. For EnMap data, we use an ordinal classification likelihood.
+Let’s inspect what it does internally:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Display the function signature and docstring</span>
+<span class="n">help</span><span class="p">(</span><span class="n">enmap_likelihood_fn</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Help on function enmap_likelihood_fn in module mineye.GeoModel.model_one.probabilistic_model_likelihoods:
+
+enmap_likelihood_fn(solutions: gempy_engine.core.data.solutions.Solutions)
+</pre></div>
+</div>
+<p><strong>Full Source Code</strong></p>
+<p>For complete transparency, here’s the full implementation of the
+EnMap likelihood function:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Likelihood function source code:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">getsource</span><span class="p">(</span><span class="n">enmap_likelihood_fn</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Likelihood function source code:
+============================================================
+def enmap_likelihood_fn(solutions: gp.data.Solutions):
+    output_center: &quot;gempy_engine.core.data.interp_output.InterpOutput&quot; = solutions.octrees_output[0].last_output_center
+    scalar_field_at_custom_grid = output_center.exported_fields.scalar_field[output_center.grid.custom_grid_slice]
+
+
+    if not isinstance(scalar_field_at_custom_grid, torch.Tensor):
+        scalar_field_at_custom_grid = torch.tensor(scalar_field_at_custom_grid, dtype=torch.float64)
+
+    # DEFINE YOUR BOUNDARIES HERE
+    # These should match the isovalues of your interfaces.
+    # If your model is normalized, they might be roughly integers or fixed floats.
+    # Example: If Unit 0 is &lt; 1.0, Unit 1 is 1.0 to 2.0, Unit 2 is &gt; 2.0
+    # boundaries = torch.tensor([1.0, 2.0], dtype=torch.float64)
+    boundaries = torch.tensor(solutions.scalar_field_at_surface_points, dtype=torch.float64)
+
+    # Calculate probabilities
+    probs = _get_ordinal_probs(scalar_field_at_custom_grid, boundaries, temperature=0.1)
+
+    # 2. Save the class probabilities (The &quot;Confidence&quot;)
+    # This will be shape (n_points, n_classes)
+    pyro.deterministic(&quot;probs_pred&quot;, probs.detach())
+
+    # 3. (Optional) Save the boundaries if they change per iteration
+    pyro.deterministic(&quot;boundaries_pred&quot;, boundaries)
+
+    # Use Categorical directly with probabilities (no need for logits)
+    return dist.Categorical(probs=probs).to_event(1)
+</pre></div>
+</div>
+</section>
+<section id="step-8-probabilistic-model-creation">
+<h2>Step 8: Probabilistic Model Creation<a class="headerlink" href="#step-8-probabilistic-model-creation" title="Link to this heading">¶</a></h2>
+<p>We combine the priors, the geological model update function, and the
+likelihood function into a single Pyro model.</p>
+<p><strong>Internal Workflow</strong>:
+1. Sample <span class="math notranslate nohighlight">\(\theta\)</span> (dips) from priors.
+2. Update GemPy model with sampled <span class="math notranslate nohighlight">\(\theta\)</span>.
+3. Compute forward model (predict scalar fields at surface).
+4. Apply <cite>enmap_likelihood_fn</cite> to compute <span class="math notranslate nohighlight">\(p(data|\theta)\)</span>.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create the Pyro model</span>
+<span class="n">prob_model</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">make_gempy_pyro_model</span><span class="p">(</span>
+    <span class="n">priors</span><span class="o">=</span><span class="n">model_priors</span><span class="p">,</span>
+    <span class="n">set_interp_input_fn</span><span class="o">=</span><span class="n">set_priors_enmap</span><span class="p">,</span>
+    <span class="n">likelihood_fn</span><span class="o">=</span><span class="n">enmap_likelihood_fn</span><span class="p">,</span>
+    <span class="n">obs_name</span><span class="o">=</span><span class="s2">&quot;EnMap Labels&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Prepare observed data as a torch tensor</span>
+<span class="n">labels_enmap_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+</pre></div>
+</div>
+</section>
+<section id="step-9-prior-predictive-check">
+<h2>Step 9: Prior Predictive Check<a class="headerlink" href="#step-9-prior-predictive-check" title="Link to this heading">¶</a></h2>
+<p>Before running expensive inference, we check if our priors allow for the
+observed rock types. If the prior predictions don’t even cover the
+observations, the model might be poorly specified.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running prior predictive...&quot;</span><span class="p">)</span>
+<span class="n">prior_data</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">run_predictive</span><span class="p">(</span>
+    <span class="n">prob_model</span><span class="o">=</span><span class="n">prob_model</span><span class="p">,</span>
+    <span class="n">geo_model</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="p">,</span>
+    <span class="n">y_obs_list</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">n_samples</span><span class="o">=</span><span class="mi">100</span>
+<span class="p">)</span>
+
+<span class="c1"># Plotting the prior distribution of labels vs observed</span>
+<span class="n">pred_labels</span> <span class="o">=</span> <span class="n">prior_data</span><span class="o">.</span><span class="n">prior</span><span class="p">[</span><span class="s1">&#39;EnMap Labels&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">([</span><span class="n">pred_labels</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a><span class="p">],</span>
+         <span class="n">label</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Prior Predicted&#39;</span><span class="p">,</span> <span class="s1">&#39;Observed Ground Truth&#39;</span><span class="p">],</span>
+         <span class="n">bins</span><span class="o">=</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.arange.html#numpy.arange" title="numpy.arange" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.arange.html#numpy.arange" title="numpy.arange" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.arange.html#numpy.arange" title="numpy.arange" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">arange</span></a></a></a><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">rwidth</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Rock Type Label&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Density&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Prior Predictive Check&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_06_enmap_inversion_002.png" srcset="../_images/sphx_glr_06_enmap_inversion_002.png" alt="Prior Predictive Check" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Running prior predictive...
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+Using sequential processing for 1 surfaces
+</pre></div>
+</div>
+</section>
+<section id="step-10-mcmc-inference-using-nuts">
+<h2>Step 10: MCMC Inference using NUTS<a class="headerlink" href="#step-10-mcmc-inference-using-nuts" title="Link to this heading">¶</a></h2>
+<p>We use the No-U-Turn Sampler (NUTS) to sample from the posterior distribution.
+NUTS is an efficient Hamiltonian Monte Carlo algorithm that avoids the need
+for manual tuning of step sizes.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">RUN_SIMULATION</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="k">if</span> <span class="n">RUN_SIMULATION</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running NUTS inference...&quot;</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">run_nuts_inference</span><span class="p">(</span>
+        <span class="n">prob_model</span><span class="o">=</span><span class="n">prob_model</span><span class="p">,</span>
+        <span class="n">geo_model</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="p">,</span>
+        <span class="n">y_obs_list</span><span class="o">=</span><span class="n">labels_enmap_tensor</span><span class="p">,</span>
+        <span class="n">config</span><span class="o">=</span><span class="n">NUTSConfig</span><span class="p">(</span>
+            <span class="n">num_samples</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+            <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+            <span class="n">target_accept_prob</span><span class="o">=</span><span class="mf">0.65</span><span class="p">,</span>
+            <span class="n">max_tree_depth</span><span class="o">=</span><span class="mi">5</span>
+        <span class="p">),</span>
+        <span class="n">plot_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">run_posterior_predictive</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="n">data</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">prior_data</span><span class="p">)</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">to_netcdf</span><span class="p">(</span><span class="s2">&quot;arviz_data_enmap.nc&quot;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="c1"># Get the directory of the current file</span>
+    <span class="n">current_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">getfile</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">currentframe</span><span class="p">()))</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">data_path</span> <span class="o">=</span> <span class="n">current_dir</span> <span class="o">/</span> <span class="s2">&quot;arviz_data_enmap_feb2026.nc&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Data file not found at </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Please run the simulation first with RUN_SIMULATION=True&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Read the data file</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">from_netcdf</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">data_path</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded inference results from </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Loaded inference results from /home/leguark/PycharmProjects/Mineye-Terranigma/examples/02_probabilistic_modeling/arviz_data_enmap_feb2026.nc
+</pre></div>
+</div>
+</section>
+<section id="step-11-posterior-analysis">
+<h2>Step 11: Posterior Analysis<a class="headerlink" href="#step-11-posterior-analysis" title="Link to this heading">¶</a></h2>
+<p>We visualize how the data has informed our knowledge of the layer dips and
+assess the reduction in uncertainty.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Posterior Density Plot</span>
+<span class="n">az</span><span class="o">.</span><span class="n">plot_density</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="n">data</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">prior</span><span class="p">],</span>
+    <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;dips&quot;</span><span class="p">],</span>
+    <span class="n">data_labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Posterior&quot;</span><span class="p">,</span> <span class="s2">&quot;Prior&quot;</span><span class="p">],</span>
+    <span class="n">colors</span><span class="o">=</span><span class="p">[</span><span class="n">default_red</span><span class="p">,</span> <span class="n">default_blue</span><span class="p">],</span>
+    <span class="n">shade</span><span class="o">=</span><span class="mf">0.2</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Update of Dip Distributions&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="c1"># Uncertainty Reduction Calculation</span>
+<a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><span class="n">prior_std</span></a></a></a> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">prior</span><span class="p">[</span><span class="s2">&quot;dips&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+<a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><span class="n">post_std</span></a></a></a> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">&quot;dips&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+<a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><span class="n">reduction</span></a></a></a> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><span class="n">post_std</span></a></a></a> <span class="o">/</span> <a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><span class="n">prior_std</span></a></a></a><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Uncertainty Reduction in Dips: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><a href="https://numpy.org/doc/stable/reference/arrays.scalars.html#numpy.float64" title="numpy.float64" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-attribute"><span class="n">reduction</span></a></a></a><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%&quot;</span><span class="p">)</span>
+
+<span class="c1"># Visualize the resulting geological model uncertainty</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Visualizing geological uncertainty...&quot;</span><span class="p">)</span>
+<span class="n">gempy_viz</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../_images/sphx_glr_06_enmap_inversion_003.png" srcset="../_images/sphx_glr_06_enmap_inversion_003.png" alt="dips 0, Update of Dip Distributions" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_06_enmap_inversion_004.png" srcset="../_images/sphx_glr_06_enmap_inversion_004.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Uncertainty Reduction in Dips: 4.6%
+
+Visualizing geological uncertainty...
+Active grids: GridTypes.OCTREE|NONE
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+/home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: &#39;linewidth&#39;, &#39;contour_colors&#39;
+  contour_set = ax.contour(
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+Setting Backend To: AvailableBackends.PYTORCH
+Using sequential processing for 1 surfaces
+
+&lt;gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fb30a248e10&gt;
+</pre></div>
+</div>
+</section>
+<section id="step-12-summary-and-conclusions">
+<h2>Step 12: Summary and Conclusions<a class="headerlink" href="#step-12-summary-and-conclusions" title="Link to this heading">¶</a></h2>
+<p><strong>Workflow Recap</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Prior Definition</strong>: Normal distribution on layer dips.</p></li>
+<li><p><strong>Likelihood Construction</strong>: Ordinal classification using sigmoids.</p></li>
+<li><p><strong>Model Integration</strong>: Pyro/GemPy bridge.</p></li>
+<li><p><strong>Inference</strong>: NUTS sampling.</p></li>
+<li><p><strong>Validation</strong>: Posterior density and geological visualization.</p></li>
+</ol>
+<p><strong>Key Insights</strong>:
+- Categorical data can be used for inversion by mapping continuous fields to</p>
+<blockquote>
+<div><p>probabilities via sigmoid functions.</p>
+</div></blockquote>
+<ul class="simple">
+<li><p>Differentiability is preserved, allowing for efficient gradient-based sampling.</p></li>
+<li><p>Remote sensing observations can significantly reduce uncertainty in subsurface
+geometrical parameters.</p></li>
+</ul>
+<p>Final workflow visualization (ASCII art)</p>
+<p>┌─────────────────────────────────────────────────────────────────┐
+│ 1. PRIOR DEFINITION                                             │
+│    dips ~ Normal(10, 10)                                        │
+└─────────────────────────────────────────────────────────────────┘</p>
+<blockquote>
+<div><p>↓</p>
+</div></blockquote>
+<p>┌─────────────────────────────────────────────────────────────────┐
+│ 2. PROBABILISTIC MODEL CONSTRUCTION                             │
+│    Bridge GemPy and Pyro with enmap_likelihood_fn               │
+└─────────────────────────────────────────────────────────────────┘</p>
+<blockquote>
+<div><p>↓</p>
+</div></blockquote>
+<p>┌─────────────────────────────────────────────────────────────────┐
+│ 3. MCMC INFERENCE (NUTS)                                        │
+│    Sample posterior p(dips | EnMap Labels)                      │
+└─────────────────────────────────────────────────────────────────┘</p>
+<blockquote>
+<div><p>↓</p>
+</div></blockquote>
+<p>┌─────────────────────────────────────────────────────────────────┐
+│ 4. POSTERIOR ANALYSIS                                           │
+│    Compare prior vs posterior distributions                     │
+└─────────────────────────────────────────────────────────────────┘
+sphinx_gallery_thumbnail_number = 2</p>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (1 minutes 18.013 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-examples-probabilistic-06-enmap-inversion-py">
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/3a0a3cc5b0e032e69f294892b7e0ead1/06_enmap_inversion.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">06_enmap_inversion.ipynb</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/595f43d76a2b1ffc633d7e855ef649f0/06_enmap_inversion.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">06_enmap_inversion.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-zip docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/1693254c7d3cb6793fb2468ab1252201/06_enmap_inversion.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">zipped:</span> <span class="pre">06_enmap_inversion.zip</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/MINEYE_LOGO.png" alt="Logo of Mineye-Terranigma"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Mineye-Terranigma</a></h1>
+
+
+
+<p class="blurb">Implicit Geological Modeling & Bayesian Geophysical Inversion</p>
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_basic/index.html">Basic Examples</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Probabilistic Modeling Examples</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#gallery-overview">Gallery Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#why-probabilistic-modeling">Why Probabilistic Modeling?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#example-descriptions">Example Descriptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#inference-methods">Inference Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#computational-requirements">Computational Requirements</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#visualization-and-diagnostics">Visualization and Diagnostics</a></li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_segmentation/index.html">Hyperspectral Segmentation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Probabilistic Modeling Examples</a><ul>
+      <li>Previous: <a href="05_magnetics_inversion.html" title="previous chapter">Bayesian Magnetic Inversion: TMI Inversion Workflow</a></li>
+      <li>Next: <a href="07_joint_inversion.html" title="next chapter">Bayesian Joint Inversion: Gravity and EnMap</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024-2026, Terranigma Solutions GmbH.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="../_sources/examples_probabilistic/06_enmap_inversion.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

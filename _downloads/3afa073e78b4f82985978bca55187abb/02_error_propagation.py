@@ -39,7 +39,7 @@ from mineye.config import paths
 # Define Model Extent and Resolution
 # -----------------------------------
 
-min_x = -709521
+min_x = -707521
 max_x = -675558
 min_y = 4526832
 max_y = 4551949
@@ -98,7 +98,25 @@ print("✓ Switched to PyTorch backend")
 # %%
 # Define Prior Distribution
 # --------------------------
-# We'll add uncertainty to the Z-coordinate of the first surface point
+#
+# **Prior Predictive Sampling vs. Posterior Sampling**
+#
+# * **Prior Predictive Sampling**: Generating data from the model using parameters drawn
+#   from the prior distribution. It answers: "What kind of models/data do our initial
+#   beliefs produce?" It's a way to check if the model and priors are reasonable before
+#   considering observations.
+#
+# * **Posterior Sampling**: Generating parameters that are consistent with both our
+#   initial beliefs (priors) AND the observed data. It answers: "What parameters are
+#   most likely given the data we've seen?"
+#
+# In this example, we focus on **Prior Predictive Sampling** to see how uncertainty
+# in input coordinates propagates to the final structural geometry.
+#
+# We'll add uncertainty to the Z-coordinate of the first surface point.
+
+from mineye.config.example_parameters import TharsisModelConfig
+FORMATION_COLORS = TharsisModelConfig.TharsisDataProcessingConfig.FORMATION_COLORS
 
 def modify_z_for_surface_point1(
     samples: dict[str, Distribution],
@@ -129,7 +147,7 @@ print(f"Original Z-coordinate: {original_z:.2f}")
 model_priors = {
     r'$\mu_{top}$': dist.Normal(
         loc=original_z,
-        scale=torch.tensor(0.001, dtype=torch.float64)
+        scale=torch.tensor(0.002, dtype=torch.float64)
     )
 }
 
@@ -191,17 +209,18 @@ p2d = gpv.plot_2d(
     legend=False,
     show_lith=False,
     show_data=False,
-    show=False
+    show=False,
+    ve=5
 )
 
 # Overlay sampled models
 plot_gempy(
     geo_model=geo_model,
-    n_samples=20,
+    n_samples=50,
     samples=(prior_inference_data.prior[r'$\mu_{top}$'].values[0, :]),
     update_model_fn=update_model_for_plotting,
     gempy_plot=p2d,
-    ve=5
+    contour_colors=[FORMATION_COLORS['Tournaisian Plutonites']]
 )
 
 print("✓ Visualization complete")
@@ -218,4 +237,4 @@ print(f"  Min: {samples.min():.4f}")
 print(f"  Max: {samples.max():.4f}")
 print(f"  Original: {original_z:.4f}")
 
-# sphinx_gallery_thumbnail_number = -1
+# sphinx_gallery_thumbnail_number = 2

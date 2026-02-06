@@ -90,7 +90,7 @@ Define Model Extent and Resolution
 .. code-block:: Python
 
 
-    min_x = -709521
+    min_x = -707521
     max_x = -675558
     min_y = 4526832
     max_y = 4551949
@@ -133,8 +133,8 @@ Get Data Paths
 
  .. code-block:: none
 
-    Orientations: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Output_Data/Simple-Models/temp_inputs/orientations_mod.csv
-    Points: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Output_Data/Simple-Models/temp_inputs/points_mod.csv
+    Orientations: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/orientations_mod.csv
+    Points: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/points_mod.csv
 
 
 
@@ -180,7 +180,7 @@ Map Geological Units
     gp.map_stack_to_surfaces(
         gempy_model=geo_model,
         mapping_object={
-            "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
+                "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
         }
     )
 
@@ -249,16 +249,34 @@ Switch to PyTorch Backend
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 99-102
+.. GENERATED FROM PYTHON SOURCE LINES 99-117
 
 Define Prior Distribution for Dips
 -----------------------------------
-We'll add uncertainty to all orientation dip angles
 
-.. GENERATED FROM PYTHON SOURCE LINES 102-122
+**Prior Predictive Sampling vs. Posterior Sampling**
+
+* **Prior Predictive Sampling**: Generating data from the model using parameters drawn
+  from the prior distribution. It answers: "What kind of models/data do our initial
+  beliefs produce?" It's a way to check if the model and priors are reasonable before
+  considering observations.
+
+* **Posterior Sampling**: Generating parameters that are consistent with both our
+  initial beliefs (priors) AND the observed data. It answers: "What parameters are
+  most likely given the data we've seen?"
+
+In this example, we focus on **Prior Predictive Sampling** to see how uncertainty
+in orientation dip angles propagates to the final structural geometry.
+
+We'll add uncertainty to all orientation dip angles.
+
+.. GENERATED FROM PYTHON SOURCE LINES 117-140
 
 .. code-block:: Python
 
+
+    from mineye.config.example_parameters import TharsisModelConfig
+    FORMATION_COLORS = TharsisModelConfig.TharsisDataProcessingConfig.FORMATION_COLORS
 
     n_orientations = geo_model.orientations_copy.xyz.shape[0]
     print(f"Number of orientations: {n_orientations}")
@@ -268,11 +286,11 @@ We'll add uncertainty to all orientation dip angles
     std_orientations = 10.0
 
     model_priors = {
-        r'dips': dist.Normal(
-            loc=mean_orientations,
-            scale=torch.tensor(std_orientations, dtype=torch.float64),
-            validate_args=True
-        )
+            r'dips': dist.Normal(
+                loc=mean_orientations,
+                scale=torch.tensor(std_orientations, dtype=torch.float64),
+                validate_args=True
+            )
     }
 
     print(f"\nPrior distribution:")
@@ -287,7 +305,7 @@ We'll add uncertainty to all orientation dip angles
 
  .. code-block:: none
 
-    Number of orientations: 9
+    Number of orientations: 2
 
     Prior distribution:
       Mean dip: 10.0°
@@ -296,12 +314,12 @@ We'll add uncertainty to all orientation dip angles
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 123-125
+.. GENERATED FROM PYTHON SOURCE LINES 141-143
 
 Create Probabilistic Model
 ---------------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 125-135
+.. GENERATED FROM PYTHON SOURCE LINES 143-153
 
 .. code-block:: Python
 
@@ -329,12 +347,12 @@ Create Probabilistic Model
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 136-138
+.. GENERATED FROM PYTHON SOURCE LINES 154-156
 
 Run Prior Predictive Sampling
 ------------------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 138-152
+.. GENERATED FROM PYTHON SOURCE LINES 156-171
 
 .. code-block:: Python
 
@@ -351,6 +369,7 @@ Run Prior Predictive Sampling
     )
 
     print("✓ Prior predictive sampling complete")
+
 
 
 
@@ -419,19 +438,17 @@ Run Prior Predictive Sampling
     Using sequential processing for 1 surfaces
     Using sequential processing for 1 surfaces
     Using sequential processing for 1 surfaces
-    /home/leguark/PycharmProjects/gempy_probability/gempy_probability/api/model_runner/_pyro_runner.py:115: UserWarning: The figure layout has changed to tight
-      plt.tight_layout()
     ✓ Prior predictive sampling complete
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 153-155
+.. GENERATED FROM PYTHON SOURCE LINES 172-174
 
 Visualize Uncertainty
 ---------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 155-184
+.. GENERATED FROM PYTHON SOURCE LINES 174-207
 
 .. code-block:: Python
 
@@ -443,6 +460,7 @@ Visualize Uncertainty
             dip=sample_value,
         )
 
+
     # Create base plot
     p2d = gpv.plot_2d(
         model=geo_model,
@@ -450,7 +468,8 @@ Visualize Uncertainty
         legend=False,
         show_lith=False,
         show_data=False,
-        show=False
+        show=False,
+        ve=5
     )
 
     # Overlay sampled models
@@ -459,8 +478,10 @@ Visualize Uncertainty
         n_samples=20,
         samples=(prior_inference_data.prior[r'dips'].values[0, :]),
         update_model_fn=update_model_for_plotting,
-        gempy_plot=p2d
+        gempy_plot=p2d,
+        contour_colors=[FORMATION_COLORS['Tournaisian Plutonites']]
     )
+    # sphinx_gallery_thumbnail_number = 2
 
     print("✓ Visualization complete")
 
@@ -524,12 +545,12 @@ Visualize Uncertainty
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 185-187
+.. GENERATED FROM PYTHON SOURCE LINES 208-210
 
 Summary Statistics
 ------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 187-196
+.. GENERATED FROM PYTHON SOURCE LINES 210-219
 
 .. code-block:: Python
 
@@ -552,10 +573,10 @@ Summary Statistics
 
 
     Sampled dip angle statistics:
-      Mean: 9.88°
-      Std: 9.86°
-      Min: -24.19°
-      Max: 32.95°
+      Mean: 11.42°
+      Std: 9.28°
+      Min: -11.49°
+      Max: 30.64°
       Target mean: 10.00°
       Target std: 10.00°
 
@@ -565,7 +586,7 @@ Summary Statistics
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 25.758 seconds)
+   **Total running time of the script:** (0 minutes 43.492 seconds)
 
 
 .. _sphx_glr_download_examples_probabilistic_03_error_propagation_dips.py:
