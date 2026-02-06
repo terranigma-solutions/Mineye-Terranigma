@@ -159,7 +159,7 @@ print("Running prior predictive...")
 prior_data = gpp.run_predictive(
     prob_model=prob_model,
     geo_model=simple_geo_model,
-    y_obs_list=[labels_enmap_tensor],
+    y_obs_list=None,
     n_samples=100
 )
 
@@ -184,7 +184,7 @@ plt.show()
 RUN_SIMULATION = False
 if RUN_SIMULATION:
     print("Running NUTS inference...")
-    inference_data = gpp.run_nuts_inference(
+    data = gpp.run_nuts_inference(
         prob_model=prob_model,
         geo_model=simple_geo_model,
         y_obs_list=labels_enmap_tensor,
@@ -197,6 +197,8 @@ if RUN_SIMULATION:
         plot_trace=True,
         run_posterior_predictive=True
     )
+
+    data.extend(prior_data)
 else:
     from pathlib import Path
     import inspect
@@ -221,7 +223,7 @@ else:
 # We visualize how the data has informed our knowledge of the layer dips.
 
 az.plot_density(
-    data=[inference_data, prior_data],
+    data=[data, data.prior],
     var_names=["dips"],
     data_labels=["Posterior", "Prior"],
     colors=[default_red, default_blue],
@@ -231,7 +233,7 @@ plt.title("Update of Dip Distributions")
 plt.show()
 
 # Visualize the resulting geological model uncertainty
-gempy_viz(simple_geo_model, inference_data)
+gempy_viz(simple_geo_model, data)
 
 # %%
 # Explanation of the EnMap Likelihood Function
