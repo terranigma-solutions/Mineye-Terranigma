@@ -2,12 +2,14 @@ from typing import Any
 
 import arviz
 import numpy as np
+import xarray
 from matplotlib import pyplot as plt
 
 import gempy as gp
 import gempy_viewer as gpv
 from gempy_probability.modules.plot.plot_gempy import plot_gempy
 from gempy_probability.modules.plot.plot_posterior import default_blue, default_red
+from gempy_probability.modules.fields import fields
 
 
 def generate_gravity_uncertainty_plots(gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, Any]:
@@ -77,26 +79,15 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
         legend=False,
         show_lith=False,
         show_data=False,
-        show=False
+        show=False,
+        ve=ve
     )
     plot_gempy(
         geo_model=geo_model,
         n_samples=n_samples,
         samples=(prior_inference_data.prior[r'dips'].values[0, :]),
         update_model_fn=_update_model_for_plotting,
-        gempy_plot=p2d,
-        contour_colors=[default_blue],
-        ve=ve,
-        kde_kwargs={
-                'gridsize'         : 300,
-                'bw'               : 0.1,
-                'alpha'            : 1,
-                'cmap'             : 'Blues',
-                'lognorm'          : True,  # Use log normalization
-                'density_threshold': 0,  # Mask bottom 10%
-                'vmin_percentile'  : 0,  # Start color scale at 5th percentile
-                'vmax_percentile'  : 100  # End color scale at 95th percentile
-        },
+        gempy_plot=p2d
     )
 
     if hasattr(prior_inference_data, 'posterior') and True:
@@ -107,20 +98,44 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
             update_model_fn=_update_model_for_plotting,
             gempy_plot=p2d,
             contour_colors=[default_red],
-            ve=ve,
-            kde_kwargs={
-                    'gridsize'         : 300,
-                    'bw'               : 0.1,
-                    'alpha'            : 1,
-                    'cmap'             : 'Reds',
-                    'lognorm'          : False,  # Use log normalization
-                    'density_threshold': 40,  # Mask bottom 10%iaa
-                    'vmin_percentile'  : 0,  # Start color scale at 5th percentile
-                    'vmax_percentile'  : 100  # End color scale at 95th percentile
-            }
         )
 
     return p2d
+
+
+def compute_probability_density_fields(geo_model: gp.data.GeoModel, inference_data: xarray.Dataset,
+                                       n_samples=50) -> fields.OnlineProbability:
+    from gempy.core.data.grid_modules import RegularGrid
+    geo_model.grid.dense_grid = RegularGrid(
+        geo_model.grid.extent,
+        np.array([50, 50, 50])
+    )
+    gp.set_active_grid(
+        grid=geo_model.grid,
+        grid_type=[geo_model.grid.GridTypes.DENSE],
+        reset=True
+    )
+
+    geo_model.geophysics_input = None
+
+    gp.compute_model(gempy_model=geo_model)
+    lith = geo_model.solutions.raw_arrays.lith_block
+
+    online_prob = fields.OnlineProbability(
+        n_cells=lith.shape[0],
+        unique_lithologies=(np.unique(lith))
+    )
+
+    for i in np.linspace(0, inference_data.draw.size - 1, n_samples, dtype=int):
+        _update_model_for_plotting(
+            geo_model=geo_model,
+            sample_value=(inference_data[r'dips'].values[0, :][i]),
+            sample_idx=i
+        )
+        gp.compute_model(gempy_model=geo_model)
+        online_prob.update(geo_model.solutions.raw_arrays.lith_block)
+
+    return online_prob
 
 
 def gempy_viz_pro(geo_model: gp.data.GeoModel, prior_inference_data: arviz.InferenceData):

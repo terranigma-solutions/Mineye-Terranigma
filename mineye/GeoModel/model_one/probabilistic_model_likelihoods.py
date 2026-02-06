@@ -77,7 +77,7 @@ def generate_multigravity_likelihood_hierarchical_per_station(norm_params):
 
     def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
         simulated_geophysics = align_forward_to_observed(-solutions.gravity, norm_params)
-        pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics)
+        pyro.deterministic(r'$\mu_{gravity}$', simulated_geophysics.detach())
         n_stations = simulated_geophysics.shape[0]
 
         # Global hyperprior on typical noise level

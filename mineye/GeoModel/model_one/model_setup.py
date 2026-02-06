@@ -40,12 +40,17 @@ def setup_geomodel(gravity_data, simple_geo_model: gp.data.GeoModel):
     xy_ravel = np.column_stack([
             np.array(gravity_data.geometry.x.values),
             np.array(gravity_data.geometry.y.values),
-            np.full(len(gravity_data), 0)  # Set Z to surface elevation
+            np.full(len(gravity_data), 500)  # Set Z to surface elevation
     ])
 
-    _gravity_precomputations(density_plutonites=2.9, density_sedimentary_host=2.3, xy_ravel=xy_ravel, simple_geo_model=geo_model)
+    _gravity_precomputations(
+        density_plutonites=2.9 - 2.67, 
+        density_sedimentary_host=2.3 -2.67,
+        xy_ravel=xy_ravel,
+        simple_geo_model=geo_model
+    )
     import torch
-    geo_model.geophysics_input.tz = torch.tensor(geo_model.geophysics_input.tz)
+    geo_model.geophysics_input.tz = torch.tensor(geo_model.geophysics_input.tz, requires_grad=True)
     geo_model.interpolation_options.mesh_extraction = False
 
     gp.set_active_grid(
@@ -98,7 +103,7 @@ def _gravity_precomputations(density_plutonites: float, density_sedimentary_host
         grid=simple_geo_model.grid,
         centers=xy_ravel,
         resolution=np.array([10, 10, 15]),
-        radius=np.array([5000, 5000, 5000])
+        radius=np.array([2000, 5000, 2000])
     )
 
     # Step 2: Calculate gravity gradient (tz component)
@@ -109,5 +114,5 @@ def _gravity_precomputations(density_plutonites: float, density_sedimentary_host
     print("Configuring geophysics input...")
     simple_geo_model.geophysics_input = gp.data.GeophysicsInput(
         tz=gravity_gradient,
-        densities=torch.tensor([density_plutonites, density_sedimentary_host])  # kg/m³ for different formations,
+        densities=torch.tensor([density_plutonites, density_sedimentary_host], requires_grad=True)  # kg/m³ for different formations,
     )

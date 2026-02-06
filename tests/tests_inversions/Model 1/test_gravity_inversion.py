@@ -14,10 +14,14 @@ from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
 from mineye.GeoModel.model_one.model_setup import baseline, setup_geomodel, read_gravity
 from mineye.GeoModel.model_one.probabilistic_model import normalize, set_priors
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multigravity_likelihood_hierarchical_per_station
-from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots, gempy_viz, plot_many_observed_vs_forward
+from mineye.GeoModel.model_one.visualization import (generate_gravity_uncertainty_plots,
+                                                     gempy_viz,
+                                                     plot_many_observed_vs_forward,
+                                                     compute_probability_density_fields)
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 # noinspection PyUnusedImports
 from tests import conftest
+from tests.tests_inversions.conftest import simple_geo_model, topography_dir
 
 
 class TestProbabilisticInversion:
@@ -28,7 +32,7 @@ class TestProbabilisticInversion:
         geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
 
         # * 7) Run predictive
-        gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
+        gravity_observations_tensor = torch.tensor(observed_gravity_ugal, requires_grad=False)
         compute_prior_predictive = True
         if compute_prior_predictive:
             prior_inference_data: az.InferenceData = gpp.run_predictive(
@@ -40,14 +44,14 @@ class TestProbabilisticInversion:
             )
 
     def test_gravity_inversion(self, simple_geo_model, geophysical_dir, n_samples=50,
-                               arviz_data_filename="arviz_data_Nov10_I_hierarchical.nc"):
+                               arviz_data_filename="arviz_data_Feb2_I_hierarchical.nc"):
         """Test reading and computing a geological model."""
         print("Test gravity inversion...")
         # Use actual gravity measurement device locations
         geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
 
         # * 7) Run predictive
-        gravity_observations_tensor = torch.tensor(observed_gravity_ugal)
+        gravity_observations_tensor = torch.tensor(observed_gravity_ugal, requires_grad=False)
         compute_prior_predictive = True
         if compute_prior_predictive:
             prior_inference_data: az.InferenceData = gpp.run_predictive(
@@ -70,11 +74,11 @@ class TestProbabilisticInversion:
                 target_accept_prob=0.65,
                 max_tree_depth=5,
                 init_strategy='median',
-                # num_samples=20,
+                # num_samples=10,
                 # warmup_steps=5,
                 num_samples=200,
                 warmup_steps=200,
-                num_chains=1
+                # num_chains=1
             ),
             plot_trace=True,
             run_posterior_predictive=True
@@ -109,8 +113,8 @@ class TestProbabilisticInversion:
                 ),
                 TestProbabilisticInversion.prior_key_density: dist.Normal(
                     loc=(torch.tensor([
-                            2.9,  # plutonites
-                            2.3  # host
+                            2.9 - 2.67,  # plutonites
+                            2.3 - 2.67  # host
                     ])),
                     scale=torch.tensor(0.15),
                 ).to_event(1)
@@ -132,12 +136,12 @@ class TestProbabilisticInversion:
         )
 
         # * 6) Set up Pyro model
-        prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model_extended(
+        prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
             priors=model_priors,
             set_interp_input_fn=set_priors,
             likelihood_fn=likelihood_fn,
-            pre_forward_deterministics={},
-            post_forward_deterministics=post_forward_dets,
+            # pre_forward_deterministics={},
+            # post_forward_deterministics=post_forward_dets,
             obs_name="Gravity Measurement"
         )
         return geo_model, observed_gravity_ugal, prob_model
@@ -148,30 +152,33 @@ class TestProbabilisticInversion:
         check_mcmc_quality(data, verbose=True, plot=True)
 
     def test_run_predictive_analysis(self, simple_geo_model, geophysical_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
+        az.plot_trace(data.prior)
+        plt.show()
+
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
         # Prepare data
         observed_norm = observed_gravity_ugal
-        forward_norm = data.prior[r'gravity_response'].mean(axis=1)
+        forward_norm = data.prior[r'$\mu_{gravity}$'].mean(axis=1)
         if PRIOR := True:
-            many_forward_norm = data.prior[r'gravity_response'].values[0, -20:]
+            many_forward_norm = data.prior[r'$\mu_{gravity}$'].values[0, -20:]
         else:
-            many_forward_norm = data.posterior_predictive[r'gravity_response'].values[0, -40:-20]
+            many_forward_norm = data.posterior_predictive[r'$\mu_{gravity}$'].values[0, -40:-20]
 
         plot_many_observed_vs_forward(forward_norm, many_forward_norm, observed_norm)
 
     def test_run_kde_sections(self, simple_geo_model, geophysical_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
 
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
-        gempy_viz(geo_model, data, n_samples=100)
+        gempy_viz(geo_model, data, n_samples=100, ve=3)
 
     def test_run_outlier_detection(self, simple_geo_model, geophysical_dir):
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
 
         posterior_sigmas = data.posterior_predictive["sigma_stations"].values  # shape: (chains, samples, 20)
 
@@ -198,7 +205,7 @@ class TestProbabilisticInversion:
 
     def test_run_analysis(self, simple_geo_model, geophysical_dir):
 
-        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Nov10_I_hierarchical.nc"))
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
         data.posterior
 
         az.plot_posterior(data, var_names=["dips", "density"])
@@ -223,24 +230,113 @@ class TestProbabilisticInversion:
         )
 
         plt.show()
-        plot_geophysics_comparison(forward_norm=data.prior[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
+        response = r'$\mu_{gravity}$'  # r'gravity_response'
+        plot_geophysics_comparison(forward_norm=data.prior[response].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
-        plot_geophysics_comparison(forward_norm=data.posterior_predictive[r'gravity_response'].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
+        plot_geophysics_comparison(forward_norm=data.posterior_predictive[response].mean(axis=1), normalization_method='align_to_reference', observed_ugal=observed_gravity_ugal, xy_ravel=xy_ravel)
 
         # * 9) Analysis inference
-        if hasattr(data, 'prior') and r'gravity_response' in data.prior:
+        if hasattr(data, 'prior') and response in data.prior:
             gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-                gravity_samples_norm=data.prior[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+                gravity_samples_norm=data.prior[response].values[0, :],  # (n_samples, n_devices)
                 observed_gravity_ugal=observed_gravity_ugal,
                 xy_ravel=xy_ravel
             )
 
-        if hasattr(data, 'posterior') and r'gravity_response' in data.prior:
+        if hasattr(data, 'posterior') and response in data.prior:
             gravity_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-                gravity_samples_norm=data.posterior_predictive[r'gravity_response'].values[0, :],  # (n_samples, n_devices)
+                gravity_samples_norm=data.posterior_predictive[response].values[0, :],  # (n_samples, n_devices)
                 observed_gravity_ugal=observed_gravity_ugal,
                 xy_ravel=xy_ravel
             )
 
         # * 9) Analysis Gempy Model
         gempy_viz(geo_model, data)
+
+    def test_probability_plots(self, simple_geo_model, geophysical_dir, topography_dir):
+
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_Feb2_I_hierarchical.nc"))
+
+        gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
+        geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
+
+        # TODO: Make the probability plot
+        self._probability_fields_for(geo_model, data.prior, topography_dir)
+        self._probability_fields_for(geo_model, data.posterior)
+
+    @staticmethod
+    def _probability_fields_for(geo_model, inference_data, topography_dir):
+        online_prob = compute_probability_density_fields(
+            geo_model,
+            inference_data,
+            n_samples=20
+        )
+        import gempy_viewer as gpv
+
+        if True:
+            gpv.plot_2d(
+                geo_model,
+                override_regular_grid=online_prob.probability_field[0],
+                show_data=True,
+                ve=5,
+                kwargs_lithology={
+                        'cmap': 'viridis',
+                        'norm': None
+                }
+            )
+
+            gpv.plot_2d(
+                geo_model,
+                override_regular_grid=online_prob.probability_field[1],
+                show_data=True,
+                ve=5,
+                kwargs_lithology={
+                        'cmap': 'viridis',
+                        'norm': None
+                }
+            )
+
+            gpv.plot_2d(
+                geo_model,
+                override_regular_grid=online_prob.entropy,
+                show_data=True,
+                ve=5,
+                kwargs_lithology={
+                        'cmap': 'magma',
+                        'norm': None
+                }
+            )
+
+        import gempy as gp
+        simple_geo_model = geo_model
+        topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
+        gp.set_topography_from_file(
+            grid=simple_geo_model.grid,
+            filepath=topography_path,
+            crop_to_extent=[
+                    simple_geo_model.grid.extent[0],
+                    simple_geo_model.grid.extent[2],
+                    simple_geo_model.grid.extent[1],
+                    simple_geo_model.grid.extent[3]
+            ]
+        )
+
+        gp.compute_model(geo_model)
+
+        # * We inject the entropy field into the model
+        geo_model.solutions.raw_arrays.scalar_field_matrix[0] = online_prob.entropy
+        p3d = gpv.plot_3d(
+            model=geo_model,
+            active_scalar_field="sf_0",
+            show_scalar=True,
+            show_lith=False,
+            show_topography=True,
+            image=False,
+            ve=4,
+            threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
+            kwargs_pyvista_bounds={
+                    'show_xlabels': False,
+                    'show_ylabels': False,
+                    'show_zlabels': False,
+            }
+        )
