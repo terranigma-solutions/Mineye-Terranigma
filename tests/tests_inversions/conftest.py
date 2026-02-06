@@ -42,7 +42,7 @@ def topography_dir(data_dir):
 @pytest.fixture(scope="session")
 def tmp_dir(geomodel_dir):
     """Temporary directory for model inputs."""
-    return os.path.join(geomodel_dir, 'Simple-Models', 'Simpel-Model-Inputs')
+    return os.path.join(geomodel_dir, 'Simple-Models')
 
 
 @pytest.fixture(scope="session")
@@ -63,10 +63,11 @@ def model_paths(tmp_dir):
 @pytest.fixture(scope="session")
 def model_extent():
     """Model extent coordinates [min_x, max_x, min_y, max_y, min_z, max_z]."""
-    min_x = -709521
+    # min_x = -709521
+    min_x = -707_521  # * Cropping the corrupted area of the geotiff 
     max_x = -675558
-    min_y = 4526832
-    max_y = 4551949
+    min_y = 4_526_832
+    max_y = 4_551_949
     max_z = 505
     model_depth = -500
     return [min_x, max_x, min_y, max_y, model_depth, max_z]
@@ -84,7 +85,7 @@ def simple_geo_model(model_extent, model_resolution, model_paths):
     """Factory for creating simple geological models with custom parameters."""
     model_resolution =None # ! Let's use octrees 
     
-    def _create_model(project_name='simple_model', refinement=5, extent=None, resolution=None):
+    def _create_model(project_name='simple_model', refinement=4, extent=None, resolution=None):
         geo_model = gp.create_geomodel(
             project_name=project_name,
             extent=extent or model_extent,

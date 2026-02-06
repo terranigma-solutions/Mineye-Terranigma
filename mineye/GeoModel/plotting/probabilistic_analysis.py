@@ -120,7 +120,7 @@ def plot_fw_geophysics(fw_values, observed_data: DataFrame, xy_ravel: np.ndarray
     ])
 
     plt.scatter(actual_measurement_points[:, 0], actual_measurement_points[:, 1],
-                s=15, c='red', marker='x', alpha=0.5, linewidth=1.5,
+                s=8, c='red', marker='x', alpha=0.1, linewidth=1,
                 label=f'Actual Measurement Points (n={len(actual_measurement_points)})')
 
     plt.legend(loc='upper right', framealpha=0.9)

@@ -9,7 +9,7 @@ import gempy_viewer as gpv
 import numpy as np
 import geopandas as gpd
 
-from gempy_engine.modules.geophysics.magnetic_gradient import calculate_magnetic_gradient_tensor
+
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_comparison, plot_fw_geophysics
 
 
@@ -36,7 +36,7 @@ def test_simple_model_gravity(simple_geo_model, geophysical_dir):
 
     simple_geo_model.interpolation_options.mesh_extraction = False
     start_time = time.time()
-    sol: gp.data.Solutions = gp.compute_model(simple_geo_model)
+    sol: gp.data.Solutions = gp.compute_model(simple_geo_model, validate_serialization=False)
     elapsed_time = time.time() - start_time
 
     print(f"\n⏱️  Model computation time: {elapsed_time:.2f} seconds")

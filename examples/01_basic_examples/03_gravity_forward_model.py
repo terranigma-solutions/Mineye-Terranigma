@@ -67,6 +67,10 @@ The Tharsis plutonite intrusion (density ~2.9 g/cm³) intruded into sedimentary 
 # * ``align_forward_to_observed``: Aligns modeled gravity to observed data statistics
 # * ``normalize``: Data normalization and preprocessing functions
 
+import dotenv
+dotenv.load_dotenv()
+
+from mineye.GeoModel.helper_plotter import plot_model_and_gravity_sensors
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
@@ -89,7 +93,7 @@ from mineye.config import paths
 # -----------------------------------
 # The model covers the Tharsis mining district
 
-min_x = -709521
+min_x = -707_521  # * Cropping the corrupted area of the geotiff 
 max_x = -675558
 min_y = 4526832
 max_y = 4551949
@@ -138,7 +142,7 @@ simple_geo_model = gp.create_geomodel(
 gp.map_stack_to_surfaces(
     gempy_model=simple_geo_model,
     mapping_object={
-        "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
+            "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
     }
 )
 
@@ -191,9 +195,9 @@ print(f"Gravity range: {observed_gravity.min():.2f} to {observed_gravity.max():.
 # distribution is evaluated in detail.
 
 xy_ravel = np.column_stack([
-    np.array(gravity_data.geometry.x.values),
-    np.array(gravity_data.geometry.y.values),
-    np.full(len(gravity_data), 0)  # Set Z to surface elevation
+        np.array(gravity_data.geometry.x.values),
+        np.array(gravity_data.geometry.y.values),
+        np.full(len(gravity_data), 505)  # Set Z to surface elevation
 ])
 
 print(f"Using {len(xy_ravel)} actual measurement points")
@@ -222,7 +226,7 @@ gp.set_centered_grid(
     grid=simple_geo_model.grid,
     centers=xy_ravel,
     resolution=np.array([10, 10, 15]),
-    radius=np.array([5000, 5000, 5000])
+    radius=np.array([2000, 5000, 2000])
 )
 
 # %%
@@ -280,8 +284,8 @@ print(f"Gravity gradient tensor shape: {gravity_gradient.shape}")
 #    Density uncertainties significantly impact modeling results. Typical uncertainties
 #    are ±0.05-0.10 g/cm³, which should be considered in probabilistic inversions.
 
-density_plutonites = 2.9  # g/cm³
-density_sedimentary_host = 2.3  # g/cm³
+density_plutonites = 2.9 - 2.67  # g/cm³
+density_sedimentary_host = 2.3 - 2.67 # g/cm³
 
 simple_geo_model.geophysics_input = gp.data.GeophysicsInput(
     tz=gravity_gradient,
@@ -318,7 +322,20 @@ print(f"Density contrast: {density_plutonites - density_sedimentary_host:.1f} g/
 #
 # The ``mesh_extraction=False`` flag skips 3D mesh generation (not needed for gravity).
 
-simple_geo_model.interpolation_options.mesh_extraction = False
+simple_geo_model.interpolation_options.mesh_extraction = True
+
+# topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
+gp.set_topography_from_file(
+    grid=simple_geo_model.grid,
+    filepath=paths.get_topography_path(),
+    crop_to_extent=[
+            simple_geo_model.grid.extent[0],
+            simple_geo_model.grid.extent[2],
+            simple_geo_model.grid.extent[1],
+            simple_geo_model.grid.extent[3]
+    ]
+)
+
 sol = gp.compute_model(simple_geo_model)
 
 print("✓ Forward gravity model computed successfully")
@@ -387,13 +404,13 @@ print(f"  Mean: {grav.mean():.2f} μGal")
 
 if isinstance(grav, torch.Tensor):
     grav = grav.detach().numpy()
-    
+
 residuals = observed_gravity_ugal - grav
 
 print(f"\nGravity residuals:")
 print(f"  Mean: {residuals.mean():.2f} μGal")
 print(f"  Std: {residuals.std():.2f} μGal")
-print(f"  RMS: {np.sqrt(np.mean(residuals**2)):.2f} μGal")
+print(f"  RMS: {np.sqrt(np.mean(residuals ** 2)):.2f} μGal")
 
 # %%
 # Visualize the Model
@@ -419,7 +436,11 @@ pv.global_theme.font.label_size = 10
 pv.global_theme.font.title_size = 12
 
 gpv.plot_2d(simple_geo_model)
-gpv.plot_3d(simple_geo_model, ve=5, image=True)
+
+
+
+
+plot_model_and_gravity_sensors(simple_geo_model, xy_ravel, grav)
 
 # %%
 # Visualize Gravity Results
@@ -437,8 +458,14 @@ gpv.plot_3d(simple_geo_model, ve=5, image=True)
 
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_fw_geophysics, plot_comparison
 
-plot_fw_geophysics(grav, gravity_data, xy_ravel)
-plot_comparison(observed_gravity, grav, xy_ravel)
+plot_fw_geophysics(
+    fw_values=grav,
+    observed_data=gravity_data,
+    xy_ravel=xy_ravel,
+    label=r'Forward Model Gravity ($\mu$gal)',
+    title='Forward Model Gravity Results'
+)
+plot_comparison(observed_gravity, grav, xy_ravel, unit_label=r'$\mu$Gal')
 
 # %%
 # Visualize Forward Model Results
@@ -591,7 +618,7 @@ ax.plot(lims, lims, 'r--', alpha=0.75, linewidth=2, label='1:1 line')
 
 # Calculate statistics
 correlation = np.corrcoef(observed_ugal, grav_forward)[0, 1]
-rmse = np.sqrt(np.mean(residuals**2))
+rmse = np.sqrt(np.mean(residuals ** 2))
 
 ax.set_xlabel('Observed (µGal)', fontsize=12)
 ax.set_ylabel('Forward Model (µGal)', fontsize=12)
@@ -600,7 +627,7 @@ ax.grid(True, alpha=0.3)
 ax.legend()
 
 # Add statistics text box
-textstr = f'R = {correlation:.3f}\nR² = {correlation**2:.3f}\nRMSE = {rmse:.2f} µGal'
+textstr = f'R = {correlation:.3f}\nR² = {correlation ** 2:.3f}\nRMSE = {rmse:.2f} µGal'
 ax.text(0.05, 0.95, textstr, transform=ax.transAxes,
         verticalalignment='top',
         bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8),
@@ -613,9 +640,9 @@ plt.show()
 # Print Summary Statistics
 # -------------------------
 
-print("\n" + "="*50)
+print("\n" + "=" * 50)
 print("GRAVITY COMPARISON STATISTICS")
-print("="*50)
+print("=" * 50)
 print(f"Number of measurements: {len(observed_ugal)}")
 print(f"\nObserved gravity:")
 print(f"  Mean: {observed_ugal.mean():.2f} µGal")
@@ -630,8 +657,8 @@ print(f"  Mean: {residuals.mean():.2f} µGal")
 print(f"  Std:  {residuals.std():.2f} µGal")
 print(f"  RMSE: {rmse:.2f} µGal")
 print(f"  MAE:  {np.abs(residuals).mean():.2f} µGal")
-print(f"\nCorrelation: {correlation:.4f} (R² = {correlation**2:.4f})")
-print("="*50)
+print(f"\nCorrelation: {correlation:.4f} (R² = {correlation ** 2:.4f})")
+print("=" * 50)
 
 # %%
 # Summary and Interpretation

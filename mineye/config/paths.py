@@ -45,7 +45,7 @@ def get_topography_dir():
 def get_tmp_dir():
     """Get the temporary directory for model inputs."""
     geomodel_dir = get_geomodel_dir()
-    tmp_dir = os.path.join(geomodel_dir, 'Simple-Models', 'Simpel-Model-Inputs')
+    tmp_dir = os.path.join(geomodel_dir, 'Simple-Models')
     os.makedirs(tmp_dir, exist_ok=True)
     return tmp_dir
 
@@ -105,7 +105,7 @@ def get_orientations_path(base_dir=None):
     """
     if base_dir is not None:
         # Legacy compatibility: base_dir points to project root
-        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Simple-Models', 'Simpel-Model-Inputs')
+        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Simple-Models')
     else:
         tmp_dir = get_tmp_dir()
     return os.path.join(tmp_dir, 'orientations_mod.csv')
@@ -119,7 +119,7 @@ def get_points_path(base_dir=None):
     """
     if base_dir is not None:
         # Legacy compatibility: base_dir points to project root
-        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Simple-Models', 'Simpel-Model-Inputs')
+        tmp_dir = os.path.join(base_dir, 'examples', 'Data', 'Model_Input_Data', 'Simple-Models')
     else:
         tmp_dir = get_tmp_dir()
     return os.path.join(tmp_dir, 'points_mod.csv')
