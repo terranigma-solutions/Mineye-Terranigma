@@ -200,8 +200,7 @@ plot_gempy(
     gempy_plot=p2d,
     contour_colors=[FORMATION_COLORS['Tournaisian Plutonites']]
 )
-
-# sphinx_gallery_thumbnail_number = 1
+# sphinx_gallery_thumbnail_number = 2
 
 print("✓ Visualization complete")
 

@@ -147,7 +147,7 @@ print(f"Original Z-coordinate: {original_z:.2f}")
 model_priors = {
     r'$\mu_{top}$': dist.Normal(
         loc=original_z,
-        scale=torch.tensor(0.001, dtype=torch.float64)
+        scale=torch.tensor(0.002, dtype=torch.float64)
     )
 }
 
@@ -216,7 +216,7 @@ p2d = gpv.plot_2d(
 # Overlay sampled models
 plot_gempy(
     geo_model=geo_model,
-    n_samples=20,
+    n_samples=50,
     samples=(prior_inference_data.prior[r'$\mu_{top}$'].values[0, :]),
     update_model_fn=update_model_for_plotting,
     gempy_plot=p2d,
@@ -237,4 +237,4 @@ print(f"  Min: {samples.min():.4f}")
 print(f"  Max: {samples.max():.4f}")
 print(f"  Original: {original_z:.4f}")
 
-# sphinx_gallery_thumbnail_number = 1
+# sphinx_gallery_thumbnail_number = 2

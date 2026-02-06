@@ -186,7 +186,7 @@ for element in stratigraphic_geo_model.structural_frame.structural_elements:
 gp.map_stack_to_surfaces(
     gempy_model=stratigraphic_geo_model,
     mapping_object={
-        "Strat_Series1": ("Visean Shales", "Mid Devonian Siliciclastics", "Famennian Siliciclastics")
+            "Strat_Series1": ("Visean Shales", "Mid Devonian Siliciclastics", "Famennian Siliciclastics")
     }
 )
 
@@ -202,10 +202,10 @@ gp.set_topography_from_file(
     grid=stratigraphic_geo_model.grid,
     filepath=topography_path,
     crop_to_extent=[
-        stratigraphic_geo_model.grid.extent[0],
-        stratigraphic_geo_model.grid.extent[1],
-        stratigraphic_geo_model.grid.extent[2],
-        stratigraphic_geo_model.grid.extent[3]
+            stratigraphic_geo_model.grid.extent[0],
+            stratigraphic_geo_model.grid.extent[1],
+            stratigraphic_geo_model.grid.extent[2],
+            stratigraphic_geo_model.grid.extent[3]
     ]
 )
 
@@ -240,7 +240,7 @@ plutonite_geo_model = gp.create_geomodel(
 gp.map_stack_to_surfaces(
     gempy_model=plutonite_geo_model,
     mapping_object={
-        "Plutonite_Series": ["Tournaisian Plutonites"]
+            "Plutonite_Series": ["Tournaisian Plutonites"]
     }
 )
 
@@ -251,7 +251,6 @@ for element in plutonite_geo_model.structural_frame.structural_elements:
 
 # Compute the plutonite model
 gp.compute_model(plutonite_geo_model)
-
 
 # %%
 # Merge Models
@@ -299,10 +298,10 @@ lith_block_modified = lith_block_reshaped.flatten()
 # * ID 6: Tournaisian Plutonites (merged from separate model)
 
 FORMATION_ID_MAP = {
-    1: 'Visean Shales',
-    2: 'Mid Devonian Siliciclastics',
-    3: 'Famennian Siliciclastics',
-    6: 'Tournaisian Plutonites',
+        1: 'Visean Shales',
+        2: 'Mid Devonian Siliciclastics',
+        3: 'Famennian Siliciclastics',
+        6: 'Tournaisian Plutonites',
 }
 
 # Get topography points for masking (X, Y, Z)
@@ -319,49 +318,20 @@ helper_plotter.plot_combined_model(
 )
 
 # %%
-# **3D Cut-Away View**
-#
-# To better visualize the internal relationship where the plutonite cuts the sedimentary
-# layers, we can create a "cut-away" view. This removes a portion of the model to
-# reveal the internal 3D structure.
-
-import pyvista as pv
-
-# Create a PyVista structured grid from the regular grid
-x = np.linspace(extent[0], extent[1], resolution[0])
-y = np.linspace(extent[2], extent[3], resolution[1])
-z = np.linspace(extent[4], extent[5], resolution[2])
-grid = pv.RectilinearGrid(x, y, z)
-
-# Add lithology data to the grid
-grid.cell_data['Lithology'] = lith_block_modified
-
-# Create a clip box to remove the front-right quadrant
-clip_box = [
-    (extent[0] + extent[1]) / 2, extent[1],  # X range
-    (extent[2] + extent[3]) / 2, extent[3],  # Y range
-    extent[4], extent[5]                     # Z range
-]
-clipped_grid = grid.clip_box(clip_box, invert=True)
-
-# Map colors to the lithology IDs
-color_list = [FORMATION_COLORS[FORMATION_ID_MAP[i]] for i in sorted(FORMATION_ID_MAP.keys())]
-cmap = pv.LookupTable()
-cmap.n_values = len(color_list)
-for i, color in enumerate(color_list):
-    cmap.set_table_value(i, color)
-
-# Plot the clipped model
-plotter = pv.Plotter(window_size=[1024, 768])
-plotter.add_mesh(clipped_grid, scalars='Lithology', cmap=cmap, show_scalar_bar=False)
-plotter.add_text("3D Cut-Away View: Plutonite Intrusion", font_size=12)
-plotter.view_isometric()
-plotter.show()
+gpv.plot_3d(
+    model=stratigraphic_geo_model,
+    ve=5,
+    image=False,
+    kwargs_pyvista_bounds={
+            'show_xlabels': False,
+            'show_ylabels': False,
+            'show_zlabels': False
+    }
+)
 
 # %%
 # Summary and Next Steps
 # ----------------------
-
 # **Key Takeaways**:
 #
 # * Complex geological relationships can be modeled by combining multiple GemPy models

@@ -686,7 +686,7 @@ print("=" * 50)
 # %%
 # Summary and Interpretation
 # ---------------------------
-
+#
 # **Model Limitations**:
 #
 # Forward models are simplifications of reality and have inherent limitations:
@@ -720,4 +720,4 @@ print("=" * 50)
 #    * :doc:`../examples_probabilistic/04_gravity_inversion` - Bayesian gravity inversion
 #    * :doc:`../examples_probabilistic/05_magnetics_inversion` - Joint geophysical inversion
 #
-# sphinx_gallery_thumbnail_number = 3
+# sphinx_gallery_thumbnail_number = 2

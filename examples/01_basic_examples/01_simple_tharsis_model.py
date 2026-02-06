@@ -168,10 +168,9 @@ simple_geo_model = gp.create_geomodel(
 gp.map_stack_to_surfaces(
     gempy_model=simple_geo_model,
     mapping_object={
-        "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
+            "Tournaisian_Plutonites": ["Tournaisian Plutonites"],
     }
 )
-
 
 # %%
 # Compute Model with Topography
@@ -197,10 +196,10 @@ gp.set_topography_from_file(
     grid=simple_geo_model.grid,
     filepath=topography_path,
     crop_to_extent=[
-        simple_geo_model.grid.extent[0], 
-        simple_geo_model.grid.extent[2],
-        simple_geo_model.grid.extent[1],
-        simple_geo_model.grid.extent[3]
+            simple_geo_model.grid.extent[0],
+            simple_geo_model.grid.extent[2],
+            simple_geo_model.grid.extent[1],
+            simple_geo_model.grid.extent[3]
     ]
 )
 
@@ -243,7 +242,13 @@ gpv.plot_2d(simple_geo_model, direction='y', cell_number='mid', show_data=True)
 
 import gempy_viewer as gpv
 
-gpv.plot_3d(simple_geo_model, ve=5, image=False)
+gpv.plot_3d(simple_geo_model, ve=5, image=False,
+            kwargs_pyvista_bounds={
+                    'show_xlabels': False,
+                    'show_ylabels': False,
+                    'show_zlabels': False
+            }
+            )
 
 # %%
 # Summary and Next Steps
@@ -277,4 +282,3 @@ gpv.plot_3d(simple_geo_model, ve=5, image=False)
 #    * `PyVista for 3D Visualization <https://docs.pyvista.org>`_
 #
 # sphinx_gallery_thumbnail_number = 2
-
