@@ -541,6 +541,29 @@ print(f"  Global mean noise prior: ~5000.0 µGal")
 print(f"  Each station's noise will be inferred from data")
 
 # %%
+# **Inspecting the Likelihood Function Source Code**
+#
+# To fully understand what the likelihood function does internally, we can inspect
+# its source code. This is particularly useful because the likelihood is the most
+# variable component across different inversions - it defines how model predictions
+# connect to observations and what noise model is assumed.
+#
+# The source code reveals:
+#
+# - How simulated geophysics is aligned to observations
+# - What Pyro distributions are used for the noise model
+# - Which parameters are sampled (inferred) vs fixed
+# - The hierarchical structure (hyperpriors → station-level parameters → observations)
+
+import inspect
+
+print("\n" + "=" * 70)
+print("LIKELIHOOD FUNCTION SOURCE CODE")
+print("=" * 70)
+print(inspect.getsource(generate_multigravity_likelihood_hierarchical_per_station))
+print("=" * 70)
+
+# %%
 # Step 8: Create Probabilistic Model
 # -----------------------------------
 #
