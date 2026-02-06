@@ -103,6 +103,7 @@ These examples cover feature extraction, preprocessing, and model comparison.
 
     examples_segmentation/index
 
+----
 
 Key Features
 ============
@@ -125,7 +126,6 @@ Key Features
        * **Forward Modeling**: Gravity and magnetic field computations
        * **Uncertainty Quantification**: Probabilistic geological interpretations
 
-----
 
 ----
 
