@@ -184,20 +184,39 @@ plt.show()
 # -------------------------------------
 # We use the No-U-Turn Sampler (NUTS) to sample from the posterior distribution.
 
-print("Running NUTS inference...")
-inference_data = gpp.run_nuts_inference(
-    prob_model=prob_model,
-    geo_model=simple_geo_model,
-    y_obs_list=labels_enmap_tensor,
-    config=NUTSConfig(
-        num_samples=200,
-        warmup_steps=200,
-        target_accept_prob=0.65,
-        max_tree_depth=5
-    ),
-    plot_trace=True,
-    run_posterior_predictive=True
-)
+RUN_SIMULATION = False
+if RUN_SIMULATION:
+    print("Running NUTS inference...")
+    inference_data = gpp.run_nuts_inference(
+        prob_model=prob_model,
+        geo_model=simple_geo_model,
+        y_obs_list=labels_enmap_tensor,
+        config=NUTSConfig(
+            num_samples=200,
+            warmup_steps=200,
+            target_accept_prob=0.65,
+            max_tree_depth=5
+        ),
+        plot_trace=True,
+        run_posterior_predictive=True
+    )
+else:
+    from pathlib import Path
+    import inspect
+
+    # Get the directory of the current file
+    current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
+    data_path = current_dir / "arviz_data_enmap_feb2026.nc"
+
+    if not data_path.exists():
+        raise FileNotFoundError(
+            f"Data file not found at {data_path}. "
+            f"Please run the simulation first with RUN_SIMULATION=True"
+        )
+
+    # Read the data file
+    data = az.from_netcdf(str(data_path))
+    print(f" Loaded inference results from {data_path}")
 
 # %%
 # Step 6: Posterior Analysis

@@ -128,7 +128,7 @@ labels_path = os.path.join(base_dir, 'central_labels.npy')
 if not os.path.exists(xyz_path):
     # Fallback to dummy data if real data isn't found for the sphinx build
     print("Warning: Real EnMap data not found. Using dummy data for demonstration.")
-    xyz_enmap = np.array([[ -690000, 4540000, 500]])
+    xyz_enmap = np.array([[-690000, 4540000, 500]])
     labels_enmap = np.array([1])
 else:
     xyz_enmap = np.load(xyz_path)
@@ -158,14 +158,14 @@ norm_params = normalize(
 
 # Define Priors
 model_priors = {
-    'dips': dist.Normal(
-        loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10),
-        scale=torch.tensor(10, dtype=torch.float64)
-    ),
-    'density': dist.Normal(
-        loc=(torch.tensor([2.9 - 2.67, 2.3 - 2.67])),
-        scale=torch.tensor(0.15),
-    ).to_event(1)
+        'dips'   : dist.Normal(
+            loc=(torch.ones(geo_model.orientations_copy.xyz.shape[0]) * 10),
+            scale=torch.tensor(10, dtype=torch.float64)
+        ),
+        'density': dist.Normal(
+            loc=(torch.tensor([2.9 - 2.67, 2.3 - 2.67])),
+            scale=torch.tensor(0.15),
+        ).to_event(1)
 }
 
 # Define Joint Likelihood
@@ -202,20 +202,52 @@ check_likelihood_balance(
 # 6. Run Joint Inference (NUTS)
 # ----------------------------
 
-print("\nRunning Joint NUTS Inference...")
-# Reduced samples for tutorial speed; increase for production
-data = gpp.run_nuts_inference(
-    prob_model=prob_model,
-    geo_model=geo_model,
-    y_obs_list=joint_obs,
-    config=NUTSConfig(
-        num_samples=200,
-        warmup_steps=200,
-        target_accept_prob=0.8
-    ),
-    plot_trace=True,
-    run_posterior_predictive=True
-)
+
+RUN_SIMULATION = False
+
+if RUN_SIMULATION:
+
+    print("Running joint prior predictive...")
+    prior_data = gpp.run_predictive(
+        prob_model=prob_model,
+        geo_model=simple_geo_model,
+        y_obs_list=joint_obs,
+        n_samples=200,
+        plot_trace=True
+    )
+    
+    print("\nRunning Joint NUTS Inference...")
+    # Reduced samples for tutorial speed; increase for production
+    data = gpp.run_nuts_inference(
+        prob_model=prob_model,
+        geo_model=geo_model,
+        y_obs_list=joint_obs,
+        config=NUTSConfig(
+            num_samples=200,
+            warmup_steps=200,
+            target_accept_prob=0.8
+        ),
+        plot_trace=True,
+        run_posterior_predictive=True
+    )
+
+else:
+    from pathlib import Path
+    import inspect
+
+    # Get the directory of the current file
+    current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
+    data_path = current_dir / "arviz_data_joint_feb2026.nc"
+
+    if not data_path.exists():
+        raise FileNotFoundError(
+            f"Data file not found at {data_path}. "
+            f"Please run the simulation first with RUN_SIMULATION=True"
+        )
+
+    # Read the data file
+    data = az.from_netcdf(str(data_path))
+    print(f" Loaded inference results from {data_path}")
 
 # %%
 # 7. Analyze Results
