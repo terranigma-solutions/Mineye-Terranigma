@@ -61,10 +61,10 @@ improve realism.
 The gravity signal is computed using a discretized volumetric representation of the model domain. The forward simulation
 can be mathematically expressed as:
 
-$$ \mathbf{d}_{sim} = \mathbf{G} oldsymbol{ho} $$
+$$ \mathbf{d}_{sim} = \mathbf{G}\boldsymbol{\rho} $$
 
 where $\mathbf{d}_{sim}$ represents the simulated gravity anomalies, $\mathbf{G}$ is the sensitivity matrix (or forward
-operator) accounting for the geometry of the discretized cells, and $oldsymbol{ ho}$ is the density contrast
+operator) accounting for the geometry of the discretized cells, and $\boldsymbol{\rho}$ is the density contrast
 distribution derived from the implicit geological model. This approach provides the flexibility to handle complex
 geometries while maintaining computational efficiency on regional-scale datasets and irregular observation grids. The
 forward model is tightly integrated into the probabilistic framework via a likelihood function, comparing simulated
@@ -94,7 +94,7 @@ classification results, **soft probabilistic representations** are used instead 
 probabilities mapped onto the geological model domain define a categorical likelihood, ensuring that classification
 uncertainty is coherently propagated from EO data processing into the resulting geological models.
 
-In the implemented EnMap workflow, this mapping is performed through a differentiable ordinal-probability formulation:
+In the implemented EnMAP workflow, this mapping is performed through a differentiable ordinal-probability formulation:
 continuous GemPy scalar fields at EO observation points are transformed into class probabilities using sigmoid
 transitions across geological boundaries. A temperature parameter controls transition sharpness (from soft transitions
 to near-discrete boundaries), preserving differentiability required by NUTS while still representing classification
@@ -119,9 +119,8 @@ $$ P(\mathbf{m} | \mathbf{d}_{obs}) \propto P(\mathbf{d}_{obs} | \mathbf{m}) P(\
 
 where $\mathbf{m}$ represents the geological model parameters (e.g., interface positions, densities), $\mathbf{d}_{obs}$
 represents the observed geophysical or EO data, $P(\mathbf{m})$ is the prior distribution, and $P(\mathbf{d}_{obs} |
-\mathbf{m})$ is the likelihood function. For potential field geophysics (gravity and magnetics), the likelihood is
-defined as a Multivariate Normal distribution governed by a covariance matrix $\mathbf{\Sigma}$ that captures
-measurement noise and model spatial correlation:
+\mathbf{m})$ is the likelihood function. For potential field geophysics (gravity and magnetics), this can be written in
+generic form as a multivariate Gaussian likelihood:
 
 $$ P(\mathbf{d}_{obs} | \mathbf{m}) = \mathcal{N}(\mathbf{d}_{sim}(\mathbf{m}), \mathbf{\Sigma}) $$
 
@@ -194,6 +193,9 @@ From an implementation perspective, the gravity workflow also includes alignment
 levels (regional-residual handling via reference alignment) and hierarchical station-noise estimation, both of which
 improve numerical stability and robustness against heterogeneous data quality.
 
+Key geological takeaway: gravity primarily constrains deep and regional-scale geometry, while residual ambiguity remains
+where multiple deep configurations can explain similar anomaly patterns.
+
 *[Figure suggestion: Prior vs posterior gravity response maps at station locations. Panels show observed gravity, posterior mean forward gravity, residuals (observed minus predicted), and correlation plot with 1:1 line.]*
 *[Figure suggestion: Posterior geological uncertainty summary with probability density fields and information entropy map; low entropy highlights well-constrained structures, high entropy highlights ambiguous zones.]*
 
@@ -212,31 +214,37 @@ The probabilistic magnetic inversion mirrors the gravity workflow with hierarchi
 posterior predictive residual diagnostics, enabling direct identification of magnetically inconsistent stations and
 improved confidence assessment of susceptibility-driven interpretations.
 
-## 4.3 EnMap EO-derived Constraints
+Key geological takeaway: magnetic inversion adds sharper constraints on susceptibility-driven and relatively shallower
+lithological boundaries, complementing the broader depth sensitivity of gravity.
+
+## 4.3 EnMAP EO-derived Constraints
 
 To evaluate the integration of surface data, a Bayesian inversion was performed using hyperspectral data from the EnMAP
 satellite. Probabilistic categorical constraints were derived from the imagery using a Bayesian segmentation workflow
 (e.g., BaySeg), which included spectral preprocessing, masking, and clustering into lithological classes with soft
 membership probabilities.
 
-**Outcomes:** The likelihood evaluated the agreement between the model-predicted surface lithologies and the EnMap-
+**Outcomes:** The likelihood evaluated the agreement between the model-predicted surface lithologies and the EnMAP-
 derived class probabilities. The results demonstrated that EO constraints provide highly valuable, high-resolution
 information regarding surface geology. This substantially improved the spatial consistency of the geological model near
 the surface and reduced structural ambiguity where subsurface data was sparse. Naturally, the influence of the EO
 constraints decreased with depth.
 
-The EnMap inversion examples further show that using EO observations on custom surface grids and differentiable ordinal
+The EnMAP inversion examples further show that using EO observations on custom surface grids and differentiable ordinal
 likelihoods allows direct gradient-based assimilation of classification information without collapsing uncertainty into
 hard labels.
+
+Key geological takeaway: EO constraints are most powerful for anchoring near-surface contacts and lithological
+organization, but their direct control decreases with depth.
 
 ## 4.4 Joint Inversion Outcomes
 
 *(Note: The Joint interpretation capitalizes on the combined framework detailed in Section 3.2)*
 
 To maximize the reduction of uncertainty, a Joint Inversion was conducted combining both the Gravity observations and
-the EnMap EO-derived categorical constraints within a single unified likelihood function.
+the EnMAP EO-derived categorical constraints within a single unified likelihood function.
 
-**Outcomes:** The joint interpretation capitalized on the complementary strengths of both datasets. The EnMap
+**Outcomes:** The joint interpretation capitalized on the complementary strengths of both datasets. The EnMAP
 hyperspectral constraints anchored the near-surface lithological boundaries with high confidence, preventing the
 potential field inversion from introducing geologically unreasonable structures at the surface. Simultaneously, the
 gravity data constrained the deeper volumetric density distributions and interface geometries where the EO data lacked
@@ -246,5 +254,12 @@ reducing the non-uniqueness and overall spatial uncertainty compared to utilizin
 Operationally, this combined workflow benefits from explicit likelihood-balance checks and shared-parameter inference
 across multi-grid observations, which improves confidence that both deep geophysical structure and surface EO evidence
 are jointly honored in the posterior ensemble.
+
+Key geological takeaway: joint inversion delivers the most balanced structural interpretation by combining shallow
+surface control from EnMAP with deeper volumetric constraints from gravity.
+
+Current limitations: uncertainty remains higher where observation coverage is sparse, potential-field non-uniqueness is
+not fully eliminated at depth, and results remain conditional on the assumed structural model parameterization and prior
+ranges.
 
 *[Figure suggestion: Joint inversion summary panel showing EO class probability map at surface, gravity fit improvement, and posterior entropy reduction relative to single-data inversions.]*
