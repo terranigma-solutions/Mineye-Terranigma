@@ -1,203 +1,211 @@
-General Platform modernization: GemPy
+# 1. Probabilistic Framework Modernization
+
+## 1.1 Migration to PyTorch & Probabilistic API
+
+As part of Task 2.2, the probabilistic geomodelling framework of GemPy was comprehensively modernized to support
+scalable Bayesian inference and the integration of Earth Observation (EO)-derived constraints. This modernization was
+necessary to align the probabilistic modelling capabilities with the new GemPy v3 engine and to enable robust,
+extensible workflows for data fusion in geological modelling.
 
-As part of Task 2.2, the probabilistic geomodelling framework of GemPy was comprehensively modernized to support scalable Bayesian inference and the integration of Earth Observation (EO)-derived constraints. This modernization was necessary to align the probabilistic modelling capabilities with the new GemPy v3 engine and to enable robust, extensible workflows for data fusion in geological modelling.
+A complete refactoring of the probabilistic framework was carried out, most notably the migration from the legacy Theano
+backend to the modern tensor-based PyTorch framework. This transition significantly improved performance, flexibility,
+and long-term maintainability of the codebase. Deprecated dependencies were removed, and the overall structure of the
+package was reorganized to support future extensions and integration into larger processing environments, including EO
+processing pipelines and the LiquidEarth/IPOP platform.
 
-A complete refactoring of the probabilistic framework was carried out, including the migration from the legacy Theano backend to the modern tensor-based PyTorch framework. This transition significantly improved performance, flexibility, and long-term maintainability of the codebase. Deprecated dependencies were removed, and the overall structure of the package was reorganized to support future extensions and integration into larger processing environments .
+To enable efficient and user-friendly probabilistic geomodelling, a high-level API was designed to simplify the setup,
+execution, and analysis of Bayesian workflows. The API abstracts the underlying complexity of probabilistic inference,
+allowing users to define models, priors, and likelihoods in a consistent and structured manner while maintaining full
+flexibility for advanced use cases.
 
-A central outcome of this effort is the introduction of a unified data model, enabling consistent handling of heterogeneous data sources. This includes geological inputs such as interface points and orientations, EO-derived constraints, and geophysical observations. The unified representation forms the basis for joint probabilistic modelling and inversion workflows.
+A central outcome of this effort is the introduction of a unified data model, enabling consistent handling of
+heterogeneous data sources. Core model elements such as scalar fields, geological surfaces, and observation datasets are
+now handled through unified data structures. This ensures consistency across workflows and facilitates the integration
+of geological inputs (interface points, orientations), geophysical observations, and EO-derived constraints within a
+single probabilistic framework.
+
+## 1.2 Performance & Numerical Stability
+
+A systematic analysis of the previous probabilistic implementation identified several sources of numerical instability
+and performance limitations, primarily the use of non-vectorized operations and inconsistent parameter handling.
 
-In parallel, a modular probabilistic API was developed to standardize the definition and execution of Bayesian workflows. This API enables users to define prior distributions and likelihood functions, execute inference procedures, and access posterior diagnostics, including analysis and visualization of uncertainty. The framework was further extended with new functionality for posterior evaluation and monitoring during inference.
+To address these limitations, critical components of the framework were refactored and implemented using fully
+vectorized PyTorch operations. This resulted in more stable and efficient execution of probabilistic inference
+workflows, particularly during the probabilistic learning phase and iterative Bayesian methods. Enhanced methods for
+scalar field-based segmentation of geological features (such as faults and layers) were introduced, which are critical
+for stable model convergence.
 
-Significant improvements were achieved in numerical stability, particularly in the probabilistic learning phase. This includes enhanced methods for scalar field-based segmentation of geological features such as faults and layers, which are critical for stable model convergence  . Additionally, automated test coverage was substantially expanded to ensure robustness and reproducibility of probabilistic workflows.
+Memory usage was further optimized through improved data handling strategies, enabling more efficient storage and
+processing of intermediate results. This is highly relevant for large-scale applications where memory constraints become
+a limiting factor. Furthermore, the migration to the PyTorch backend prepares the framework for native GPU acceleration,
+allowing computationally intensive operations to be executed on modern hardware architectures, providing a clear pathway
+for future performance gains in demanding MINEYE use cases.
 
-Finally, the modernized framework was prepared for integration into external systems and workflows, including EO processing pipelines and the LiquidEarth/IPOP platform. This ensures that the developed probabilistic methods can be deployed within the broader MINEYE ecosystem and used in end-to-end data fusion and modelling applications.
+# 2. Forward Modeling Operators
 
+Forward modelling operators establish a direct link between geological models and geophysical observables, forming the
+basis for probabilistic inversion. They translate the implicit geological representation into physically meaningful
+property fields, enabling the simulation of measurable geophysical responses. Within this work, forward models were
+implemented for potential field methods (gravity and magnetics), which can be computed efficiently from volumetric
+property distributions without solving partial differential equations. This efficiency makes them exceptionally well-
+suited for repeated forward evaluations required in probabilistic workflows.
 
+## 2.1 Gravity Formulation
 
-1.1.1 Probabilistic API and Data Structures
+A gravity forward modelling approach was implemented based on density contrasts between geological units. The implicit
+formulation allows a continuous representation of subsurface structures, which are subsequently translated into
+discretized volumetric density fields for geophysical computation. Lithological model outputs are converted into density
+distributions, supporting spatially varying densities within individual units to represent intra-unit heterogeneity and
+improve realism.
 
-To enable efficient and user-friendly probabilistic geomodelling, a high-level API was designed to simplify the setup, execution, and analysis of Bayesian workflows. The API abstracts the underlying complexity of probabilistic inference, allowing users to define models, priors, and likelihoods in a consistent and structured manner while maintaining full flexibility for advanced use cases.
+The gravity signal is computed using a discretized volumetric representation of the model domain. The forward simulation
+can be mathematically expressed as:
 
-A key component of this development is the standardization of internal data representations. Core model elements such as scalar fields, geological surfaces, and observation datasets are now handled through unified data structures. This ensures consistency across workflows and facilitates the integration of heterogeneous data sources within a single probabilistic framework.
+$$ \mathbf{d}_{sim} = \mathbf{G} oldsymbol{ho} $$
 
-In addition, dedicated interfaces were implemented to support the incorporation of external data into the modelling process. This includes mechanisms for adding EO-derived constraints as probabilistic inputs, enabling their direct use within likelihood formulations. Furthermore, flexible connectors were developed to link external datasets such as raster data products and segmentation outputs, allowing seamless integration of results from upstream EO processing workflows.
+where $\mathbf{d}_{sim}$ represents the simulated gravity anomalies, $\mathbf{G}$ is the sensitivity matrix (or forward
+operator) accounting for the geometry of the discretized cells, and $oldsymbol{ ho}$ is the density contrast
+distribution derived from the implicit geological model. This approach provides the flexibility to handle complex
+geometries while maintaining computational efficiency on regional-scale datasets and irregular observation grids. The
+forward model is tightly integrated into the probabilistic framework via a likelihood function, comparing simulated
+gravity anomalies directly to observed data.
 
-Finally, interoperability with the broader Python scientific and machine learning ecosystem was significantly improved. The API is designed to integrate naturally with common libraries for numerical computing, data handling, and machine learning, facilitating the development of hybrid workflows that combine probabilistic modelling with modern data-driven approaches.
+## 2.2 Magnetics (TMI) Formulation
 
+A forward modelling approach for magnetic data was implemented based on the distribution of magnetic susceptibility
+within geological units. Geological model outputs are mapped to susceptibility values to construct volumetric property
+models.
 
+Magnetic anomalies (such as Total Magnetic Intensity - TMI) are computed from this volumetric model, accounting
+primarily for induced magnetization driven by the ambient magnetic field. Where applicable, the formulation can be
+extended to include remanent magnetization for specific geological settings. Similar to gravity, the implementation
+supports multi-scale datasets and accommodates spatially heterogeneous distributions, optimized for efficient repeated
+evaluation.
 
-1.1.2 Numerical Stability and Performance Improvements
+## 2.3 Categorical Likelihoods & Ordinal Probabilities (EO-derived data)
 
-A systematic analysis of the previous probabilistic implementation identified several sources of numerical instability and performance limitations. Key issues included the use of non-vectorized operations and inconsistent parameter handling, both of which negatively affected convergence behaviour and computational efficiency.
+To integrate surface lithological information into the probabilistic geomodelling framework, categorical likelihood
+functions were developed. This approach allows for the direct incorporation of EO-derived classifications, such as
+lithological classes obtained from hyperspectral segmentation workflows, as constraints within the Bayesian inference.
 
-To address these limitations, critical components of the framework were refactored and implemented using fully vectorized operations. This resulted in more stable and efficient execution of probabilistic inference workflows, particularly in the context of iterative Bayesian methods. In parallel, parameter handling was standardized across the codebase, reducing ambiguity and ensuring consistent behaviour during model evaluation and sampling.
+The formulation distinguishes between categorical likelihoods for discrete class assignments and ordinal probabilities
+for ordered geological relationships (e.g., stratigraphic sequences). Crucially, to account for uncertainty in EO
+classification results, **soft probabilistic representations** are used instead of hard labels. Class membership
+probabilities mapped onto the geological model domain define a categorical likelihood, ensuring that classification
+uncertainty is coherently propagated from EO data processing into the resulting geological models.
 
-These improvements led to a significantly enhanced convergence behaviour in Bayesian inference workflows. Numerical stability during the sampling process was increased, reducing the likelihood of divergence and improving the reliability of posterior estimates.
+*(Note: Within MINEYE, workflows often derive these categorical constraints using Bayesian segmentation approaches like BaySeg. While BaySeg serves as a powerful demonstration for generating these soft probabilities from hyperspectral data, the implemented probabilistic API is fully agnostic and can incorporate any advanced, site-specific, or machine learning-driven lithological classifications.)*
 
-Memory usage was further optimized through improved data handling strategies, enabling more efficient storage and processing of intermediate results. This is particularly relevant for large-scale applications where memory constraints can become a limiting factor.
+# 3. Bayesian Inference Strategy
 
-The migration to the PyTorch backend also prepares the framework for GPU acceleration, allowing computationally intensive operations to be executed on modern hardware architectures. This provides a clear pathway for further performance gains in future developments.
+Bayesian formulations were developed to enable the simultaneous integration of geological, geophysical, and EO-derived
+information within a unified probabilistic framework. Instead of yielding a single deterministic model, this approach
+explicitly captures uncertainties in data and model assumptions, sampling posterior distributions to generate ensembles
+of plausible geological realizations.
 
-Overall, these enhancements substantially increase the robustness of the framework when applied to demanding use cases, which are central to the objectives of the MINEYE project 
+## 3.1 Inference and Sampling Methodology
 
-Forward Modeling implementations
+The inversion process is driven by combining prior geological knowledge with likelihood functions defined by the misfit
+between observed data and the simulated responses derived from the implicit geological model. The foundational Bayesian
+formulation is:
 
-Forward modelling operators were developed to establish a direct link between geological models and geophysical observables, forming the basis for probabilistic inversion. These operators translate the implicit geological representation into physically meaningful property fields, enabling the simulation of measurable geophysical responses.
+$$ P(\mathbf{m} | \mathbf{d}_{obs}) \propto P(\mathbf{d}_{obs} | \mathbf{m}) P(\mathbf{m}) $$
 
-Within this work, forward models were implemented for gravity and magnetic data, both belonging to the class of potential field methods. In this context, potential fields are governed by scalar potentials and can be computed efficiently from volumetric property distributions without the need to solve partial differential equations. This makes them particularly well-suited for probabilistic workflows that require repeated forward evaluations.
+where $\mathbf{m}$ represents the geological model parameters (e.g., interface positions, densities), $\mathbf{d}_{obs}$
+represents the observed geophysical or EO data, $P(\mathbf{m})$ is the prior distribution, and $P(\mathbf{d}_{obs} |
+\mathbf{m})$ is the likelihood function. For potential field geophysics (gravity and magnetics), the likelihood is
+defined as a Multivariate Normal distribution governed by a covariance matrix $\mathbf{\Sigma}$ that captures
+measurement noise and model spatial correlation:
 
-The geological scalar field representation is coupled to physical property distributions, such as density and magnetic susceptibility, allowing consistent propagation of geological information into geophysical space. The resulting forward responses are integrated into the probabilistic framework as likelihood components, enabling quantitative comparison between simulated and observed geophysical data.
+$$ P(\mathbf{d}_{obs} | \mathbf{m}) = \mathcal{N}(\mathbf{d}_{sim}(\mathbf{m}), \mathbf{\Sigma}) $$
 
-Other geophysical methods, such as electrical resistivity, electromagnetic, or seismic approaches, require the numerical solution of differential equations and are therefore significantly more computationally demanding. While these methods are in principle compatible with probabilistic inversion, their computational cost currently limits their applicability in large-scale Bayesian workflows.
+Inference is carried out using advanced Markov Chain Monte Carlo (MCMC) techniques. Specifically, the framework utilizes
+the **No-U-Turn Sampler (NUTS)** implemented via the **Pyro** probabilistic programming library. During the sampling
+process (typically involving ~1000 samples following an initial warmup phase), each iteration systematically updates the
+geological parameters, recomputes the implicit geological model, and evaluates the forward response against the combined
+likelihoods. This rigorous approach ensures the robust handling of measurement noise and data uncertainty, leading to
+progressively improved model realizations.
 
-Overall, the implemented forward models provide a robust and efficient foundation for inversion and joint inversion workflows, where multiple data sources can be combined to improve model accuracy and reduce uncertainty.
+## 3.2 Joint Inversion Framework
 
+A framework for Bayesian joint inversion was established to simultaneously evaluate multiple data types. A joint
+likelihood function is constructed by mathematically integrating the individual contributions from gravity data
+($\mathbf{d}_{grav}$), magnetic data ($\mathbf{d}_{mag}$), and EO-derived constraints ($\mathbf{d}_{EO}$). Assuming
+conditional independence between the different observation types given the geological model, the joint posterior is
+formulated as:
 
+$$ P(\mathbf{m} | \mathbf{d}_{grav}, \mathbf{d}_{mag}, \mathbf{d}_{EO}) \propto P(\mathbf{d}_{grav} | \mathbf{m}) P(\mathbf{d}_{mag} | \mathbf{m}) P(\mathbf{d}_{EO} | \mathbf{m}) P(\mathbf{m}) $$
 
-Forward Gravity Formulation
+By demanding that the updated geological parameters simultaneously satisfy all available data sources, the joint
+inversion significantly improves model constraints and reduces the inherent ambiguity associated with single-data
+inversions (e.g., the non-uniqueness of potential fields).
 
-A gravity forward modelling approach was implemented based on density contrasts between geological units represented within an implicit geological model. The implicit formulation allows continuous representation of subsurface structures, which are subsequently translated into volumetric density fields for geophysical computation.
+## 3.3 Uncertainty Estimation
 
-Lithological model outputs are converted into density distributions, including support for spatially varying densities within individual units. This enables the representation of intra-unit heterogeneity and improves the realism of simulated gravity responses.
+Uncertainty across the resulting ensemble of geological realizations is quantified using multiple complementary
+measures, including variance fields, information entropy maps, and ensemble-based statistics. These spatially resolved
+metrics allow for the identification of well-constrained regions strongly supported by data, versus zones of high
+uncertainty requiring alternative modelling assumptions or further data acquisition, thereby providing a foundation for
+risk-aware decision-making.
 
-The gravity signal is computed using a discretized volumetric representation of the model domain. This approach provides the flexibility to handle complex geometries while maintaining computational efficiency. The implementation is designed to operate on regional-scale datasets and supports irregular observation grids, reflecting typical acquisition conditions in gravity surveys.
+# 4. Application Case Study: Tharsis AOI 1
 
-The forward model is tightly integrated into the probabilistic framework through the likelihood function, where simulated gravity anomalies are compared to observed data. This enables direct incorporation of geophysical information into Bayesian inference workflows.
+To demonstrate the capabilities of the modernized framework, a series of Bayesian inversions were performed on the
+Tharsis AOI 1 region. The inversions build upon an initial GemPy structural model of the area, targeting key geometrical
+parameters (such as interface positions) and physical properties (e.g., density contrasts and magnetic
+susceptibilities). Prior distributions were defined based on the initial conceptual model and available petrophysical
+information.
 
-The formulation is optimized for repeated forward evaluations, making it suitable for probabilistic inversion schemes that require large numbers of model realizations during sampling.
+## 4.1 Gravity Data Constraints
 
+A Bayesian gravity inversion was performed using available regional gravity observations to constrain the large-scale
+structural model.
 
+**Outcomes:** The inversion demonstrated that gravity data provides meaningful constraints on large-scale density
+contrasts and deep interface geometries, despite limited direct subsurface information. Posterior analysis revealed a
+marked reduction of uncertainty in regions well-covered by the gravity data. However, as expected with potential field
+methods, ambiguity remained in areas where different deep geometric configurations produced similar surface gravity
+responses.
 
-Forward Magnetics Formulation
+*[Figure: initial model vs constrained model?]*
+*[Figure: constrained model, information entropy]*
 
-A forward modelling approach for magnetic data was implemented based on the distribution of magnetic susceptibility within geological units. Geological model outputs are mapped to susceptibility values, enabling the construction of volumetric property models from the implicit geological representation.
+## 4.2 Magnetic (TMI) Data Constraints
 
-Magnetic anomalies are computed from this volumetric model, accounting primarily for induced magnetization driven by the ambient magnetic field. Where applicable, the formulation can be extended to include remanent magnetization, allowing for more realistic representation of magnetic behaviour in specific geological settings.
+A subsequent inversion utilized Total Magnetic Intensity (TMI) data to further refine the subsurface interpretations,
+focusing on the estimation of susceptibility distributions and their structural boundaries.
 
-The forward model is integrated into the probabilistic framework as a likelihood term, enabling comparison between simulated and observed magnetic anomalies. This allows magnetic data to directly constrain geological model realizations within Bayesian inference workflows.
+**Outcomes:** The TMI data provided critical additional constraints, particularly in areas exhibiting significant
+susceptibility contrasts. Compared to the gravity inversion, the magnetic data offered higher sensitivity to specific
+lithological variations and shallower structural features. Improved constraints were observed in areas with a strong
+magnetic signal, effectively complementing the gravity-based results and highlighting regions requiring joint
+interpretation.
 
-The implementation supports multi-scale magnetic datasets and accommodates spatially heterogeneous susceptibility distributions. Similar to the gravity formulation, it is designed for efficient repeated evaluation, ensuring suitability for computationally intensive probabilistic inversion and sampling procedures.
+## 4.3 EnMap EO-derived Constraints
 
+To evaluate the integration of surface data, a Bayesian inversion was performed using hyperspectral data from the EnMAP
+satellite. Probabilistic categorical constraints were derived from the imagery using a Bayesian segmentation workflow
+(e.g., BaySeg), which included spectral preprocessing, masking, and clustering into lithological classes with soft
+membership probabilities.
 
+**Outcomes:** The likelihood evaluated the agreement between the model-predicted surface lithologies and the EnMap-
+derived class probabilities. The results demonstrated that EO constraints provide highly valuable, high-resolution
+information regarding surface geology. This substantially improved the spatial consistency of the geological model near
+the surface and reduced structural ambiguity where subsurface data was sparse. Naturally, the influence of the EO
+constraints decreased with depth.
 
-Bayesian Formulations
+## 4.4 Joint Inversion Outcomes
 
-Bayesian formulations were developed to enable the consistent integration of geological, geophysical, and EO-derived information within a unified probabilistic framework. This approach allows explicit representation and propagation of uncertainty, while incorporating multiple data sources as constraints through likelihood functions. The implemented formulations cover uncertainty estimation, individual inversion of gravity and magnetic data, integration of categorical EO-derived information, and joint inversion strategies. Together, these components provide a flexible foundation for data-driven geological modelling and uncertainty-aware interpretation within the MINEYE workflow.
+*(Note: The Joint interpretation capitalizes on the combined framework detailed in Section 3.2)*
 
-Uncertainty Estimation in Geological Models
+To maximize the reduction of uncertainty, a Joint Inversion was conducted combining both the Gravity observations and
+the EnMap EO-derived categorical constraints within a single unified likelihood function.
 
-Geological structures are represented as probabilistic entities within the modelling framework, allowing uncertainties in data and model assumptions to be explicitly captured. Instead of a single deterministic model, posterior distributions are sampled to generate ensembles of plausible geological realizations.
+**Outcomes:** The joint interpretation capitalized on the complementary strengths of both datasets. The EnMap
+hyperspectral constraints anchored the near-surface lithological boundaries with high confidence, preventing the
+potential field inversion from introducing geologically unreasonable structures at the surface. Simultaneously, the
+gravity data constrained the deeper volumetric density distributions and interface geometries where the EO data lacked
+penetration. This combined evidence approach resulted in a more robust characterization of the subsurface, significantly
+reducing the non-uniqueness and overall spatial uncertainty compared to utilizing either dataset in isolation.
 
-Uncertainty is quantified using multiple complementary measures, including variance fields, entropy maps, and ensemble-based statistics. These metrics provide spatially resolved insight into model confidence and variability across the domain.
-
-The analysis enables the identification of well-constrained regions, where data strongly supports the model, as well as zones of high uncertainty, which may require additional data acquisition or alternative modelling assumptions. Visualization tools were developed to support interpretation, including monitoring of posterior evolution during sampling and assessment of uncertainty propagation through the model.
-
-This probabilistic representation of geological models provides a foundation for risk-aware decision-making in exploration contexts, where uncertainty plays a critical role in planning and evaluation.
-
-
-
-Bayesian Gravity Inversion
-
-The gravity forward model was integrated into a Bayesian inference framework to enable inversion of geological models based on observed gravity data. A likelihood function is defined from the misfit between observed gravity anomalies and the simulated response derived from the geological model.
-
-Within this framework, posterior distributions of geological parameters are estimated, conditioned on the available gravity observations. This allows key model components, including layer geometries and density distributions, to be updated during inference.
-
-Measurement noise and data uncertainty are explicitly accounted for in the likelihood formulation, ensuring robust handling of real-world gravity datasets. The inversion proceeds iteratively, refining the geological model through repeated forward evaluations and comparison with observed data, leading to progressively improved model realizations.
-
-
-
-Bayesian Magnetic Inversion
-
-Magnetic forward modelling was incorporated into the Bayesian inference framework to enable inversion of geological models using magnetic observations. The likelihood function is defined based on the misfit between observed magnetic anomalies and the simulated response derived from the susceptibility model.
-
-The inversion process estimates posterior distributions of both susceptibility fields and geological structures, allowing magnetic data to directly constrain subsurface interpretations. Uncertainty in the observations is explicitly handled through noise modelling in the likelihood, while the inherent ambiguity of magnetic data is addressed through the probabilistic formulation.
-
-The framework supports the integration of multiple magnetic datasets, enabling joint use of data with different resolutions and acquisition characteristics. Compared to deterministic approaches, this leads to improved constraints on subsurface structures and provides a more comprehensive characterization of uncertainty in the resulting models.
-
-
-
-Categorical Likelihood and Ordinal Probabilities
-
-Likelihood functions were developed to incorporate categorical geological information into the probabilistic modelling framework. This enables the direct use of EO-derived classifications, such as lithological classes obtained from segmentation workflows, as constraints within Bayesian inference.
-
-The approach distinguishes between categorical likelihoods for discrete class assignments and ordinal probabilities for ordered geological relationships, such as stratigraphic sequences. EO segmentation outputs are mapped onto the geological model domain and translated into probabilistic constraints that inform the likelihood evaluation.
-
-To account for uncertainty in classification results, soft probabilistic representations are used instead of hard labels. This allows class membership probabilities to be propagated through the inference process, ensuring that uncertainty in EO-derived inputs is consistently reflected in the resulting geological models.
-
-The formulation enables the integration of a wide range of data sources, including remote sensing products and interpreted geological maps. In particular, uncertainty estimates derived from Bayesian segmentation methods such as BaySeg can be directly incorporated, allowing for coherent propagation of uncertainty from EO data processing into geological modelling.
-
-Bayesian Joint inversion
-
-A framework for Bayesian joint inversion was developed to enable the simultaneous integration of multiple data types within a unified probabilistic formulation. This includes the combination of gravity data, magnetic data, and EO-derived constraints within a single inversion workflow.
-
-A joint likelihood function is constructed by integrating the individual contributions from each observation type. This allows all available data sources to consistently inform the inference process, ensuring that geological model updates are driven by the combined evidence.
-
-The use of complementary datasets improves model constraints and reduces ambiguity compared to single-data inversions. While individual data types may be non-unique or ambiguous, their joint interpretation provides a more robust and consistent characterization of subsurface structures.
-
-The framework enables the consistent update of geological parameters across all data sources during inference, ensuring coherence between geological, geophysical, and EO-derived information. It provides the foundation for multi-physics inversion approaches and supports integrated workflows that combine EO data processing with geophysical modelling and inversion. 
-
-Bayesian Gravity Inversion
-
-A Bayesian gravity inversion was performed for Tharsis AOI 1 to constrain the geological model using available gravity observations. The inversion builds on the initial GemPy model and integrates the gravity forward formulation described in Section 1.3 as a likelihood component within the probabilistic framework.
-
-The inversion targets both geometrical parameters (e.g. interface positions) and physical properties (density contrasts between units). Prior distributions were defined based on the initial model and available petrophysical information, while the likelihood was formulated from the misfit between observed gravity data and simulated responses.
-
-Inference was carried out using a sampling-based approach, generating an ensemble of model realizations (~200-500 samples). Each iteration involves updating model parameters, recomputing the implicit geological model, and evaluating the forward gravity response. The resulting posterior distribution captures the range of geological configurations consistent with the observed data.
-
-The inversion demonstrates that gravity data provides meaningful constraints on large-scale density contrasts and interface geometries, despite the limited subsurface information available for this area. At the same time, ambiguity remains in regions where different model configurations produce similar gravity responses, reflecting the non-uniqueness of potential field inversion.
-
-Posterior analysis shows a reduction of uncertainty in regions well covered by gravity data, while poorly constrained areas remain sensitive to prior assumptions. Overall, the results highlight the value of integrating gravity data within a probabilistic framework and provide a basis for further refinement through joint inversion with additional data sources.
-
-[Figure: initial model vs constrained model?]
-[Figure: constrained model, information entropy]
-
-Bayesian Magnetic Inversion (TMI)
-
-A Bayesian magnetic inversion was carried out for Tharsis AOI 1 to further constrain the geological model using magnetic observations. The inversion builds on the initial GemPy model and incorporates the magnetic forward formulation as a likelihood component within the probabilistic framework.
-
-The inversion is based on Total Magnetic Intensity (TMI) data, which represents the measured magnetic field anomalies. The likelihood is defined through the misfit between observed TMI and the simulated magnetic response derived from the susceptibility model. The formulation primarily considers induced magnetization, consistent with the available data and modelling assumptions.
-
-The inversion focuses on the estimation of susceptibility distributions and their relationship to geological structures. Prior information is derived from the initial model and available petrophysical constraints. Inference was performed using a sampling-based approach, generating an ensemble of model realizations (~200-500 samples). Each iteration updates model parameters, recomputes the implicit geological model, and evaluates the corresponding magnetic response.
-
-The results indicate that TMI data provides additional constraints on subsurface structures, particularly in areas with significant susceptibility contrasts. Compared to gravity, magnetic data can offer higher sensitivity to lithological variations, although ambiguity remains due to non-uniqueness and trade-offs between geometry and property distributions.
-
-Posterior analysis shows improved constraint in areas with strong magnetic signal, while uncertainty persists in regions with weak or ambiguous responses. The inversion complements the gravity-based results and provides a basis for integrated interpretation within joint inversion workflows.
-
-Bayesian EnMap Inversion: Categorical Likelihood and Ordinal Probabilities
-
-A Bayesian inversion incorporating EO-derived constraints was performed for Tharsis AOI 1 using hyperspectral data from EnMAP. The objective is to integrate surface lithological information into the probabilistic geomodelling framework through categorical likelihoods.
-
-Categorical constraints were derived from hyperspectral imagery using a Bayesian segmentation approach based on BaySeg. The workflow includes spectral preprocessing (e.g. band selection and smoothing), masking of non-relevant pixels, and clustering of spectral signatures into lithological classes. The segmentation produces probabilistic class assignments rather than hard labels, allowing uncertainty in classification to be explicitly represented. These class probabilities are mapped onto the geological model domain and used to define a categorical likelihood, linking EO-derived surface information to subsurface model realizations.
-
-It should be noted that the implemented segmentation serves primarily as a demonstration of the workflow. The approach is not limited to BaySeg and can incorporate more advanced or site-specific lithological classification methods developed within MINEYE, including alternative machine learning or expert-driven interpretations.
-
-
-
-The inversion is performed by sampling model realizations (~200-500 samples), where each iteration updates geological parameters, recomputes the implicit model, and evaluates the agreement between model-derived lithologies and EO-based class probabilities. This allows EO-derived information to directly influence the posterior distribution of geological structures.
-
-The results demonstrate that EO constraints provide valuable information on surface geology, improving model consistency near the surface and helping to reduce ambiguity in areas with limited subsurface data. At the same time, the influence of EO data decreases with depth, highlighting the importance of combining EO constraints with geophysical data in joint inversion workflows.
-
-Overall, the approach illustrates how probabilistic EO-derived classifications can be integrated into geological modelling, enabling consistent propagation of uncertainty from remote sensing data into subsurface interpretations.
-
-
-
-Bayesian Joint Inversion: Gravity and EnMap
-
-A Bayesian inversion incorporating EO-derived constraints was performed for Tharsis AOI 1 using hyperspectral data from EnMAP. The objective is to integrate surface lithological information into the probabilistic geomodelling framework through categorical likelihoods.
-
-Categorical constraints were derived from hyperspectral imagery using a Bayesian segmentation workflow based on BaySeg. The processing includes extraction of relevant spectral bands from EnMAP data, filtering of noisy wavelength regions, and application of smoothing and normalization techniques. Additional masking steps are applied to remove vegetation, clouds, and water using quality layers, ensuring that only geologically meaningful pixels are considered. The resulting spectral dataset is segmented into lithological classes, producing probabilistic class memberships for each pixel. (Add: Sampling method?)
-
-These probabilistic classifications are spatially aligned with the geological model and mapped onto the model domain. Instead of using hard class assignments, soft probabilities are used to define a categorical likelihood, allowing uncertainty in the EO-derived segmentation to be propagated into the inversion. The likelihood evaluates the agreement between model-predicted lithologies at the surface and the EO-derived class probabilities.
-
-
-
-It should be noted that the BaySeg-based segmentation is used here as a demonstration of the workflow. The approach is designed to be flexible and can incorporate more advanced or site-specific lithological classifications developed within MINEYE, including alternative machine learning methods or expert-derived interpretations.
-
-The inversion is performed using a sampling-based approach (~200-500 realizations), where each iteration updates geological parameters, recomputes the implicit model, and evaluates consistency with the EO-derived constraints. The results show that EO data provides strong constraints on near-surface geology, improving model consistency in areas with limited subsurface information.
-
-At the same time, the influence of EO constraints decreases with depth, highlighting the importance of combining EO-derived information with geophysical data in joint inversion workflows. Overall, this approach demonstrates how probabilistic EO-derived classifications can be effectively integrated into geological modelling, enabling consistent uncertainty propagation from remote sensing data to subsurface interpretations.
-
-
-
-[FIGURE: Lith Segmentation, derived classes] 
-
+*[FIGURE: Lith Segmentation, derived classes]*
