@@ -94,6 +94,12 @@ classification results, **soft probabilistic representations** are used instead 
 probabilities mapped onto the geological model domain define a categorical likelihood, ensuring that classification
 uncertainty is coherently propagated from EO data processing into the resulting geological models.
 
+In the implemented EnMap workflow, this mapping is performed through a differentiable ordinal-probability formulation:
+continuous GemPy scalar fields at EO observation points are transformed into class probabilities using sigmoid
+transitions across geological boundaries. A temperature parameter controls transition sharpness (from soft transitions
+to near-discrete boundaries), preserving differentiability required by NUTS while still representing classification
+uncertainty near contacts.
+
 *(Note: Within MINEYE, workflows often derive these categorical constraints using Bayesian segmentation approaches like BaySeg. While BaySeg serves as a powerful demonstration for generating these soft probabilities from hyperspectral data, the implemented probabilistic API is fully agnostic and can incorporate any advanced, site-specific, or machine learning-driven lithological classifications.)*
 
 # 3. Bayesian Inference Strategy
@@ -126,6 +132,10 @@ geological parameters, recomputes the implicit geological model, and evaluates t
 likelihoods. This rigorous approach ensures the robust handling of measurement noise and data uncertainty, leading to
 progressively improved model realizations.
 
+To improve inference robustness and transparency, the workflow explicitly includes prior predictive checks (to verify
+that prior assumptions can plausibly reproduce the observed data domain) and posterior predictive checks (to assess fit
+quality, residual structure, and potential model misspecification after conditioning on observations).
+
 ## 3.2 Joint Inversion Framework
 
 A framework for Bayesian joint inversion was established to simultaneously evaluate multiple data types. A joint
@@ -140,6 +150,14 @@ By demanding that the updated geological parameters simultaneously satisfy all a
 inversion significantly improves model constraints and reduces the inherent ambiguity associated with single-data
 inversions (e.g., the non-uniqueness of potential fields).
 
+The practical implementation also incorporates a dedicated likelihood-balance diagnostic before full sampling to verify
+that no single dataset numerically dominates the joint posterior. This step is especially important when combining
+continuous potential-field signals with categorical EO constraints that have different scales and noise structures.
+
+At model level, the workflow supports multi-grid evaluation within one probabilistic run (e.g., centered grids for
+gravity responses and custom grids at EO pixel coordinates), allowing both data types to be enforced consistently on
+their native observation supports.
+
 ## 3.3 Uncertainty Estimation
 
 Uncertainty across the resulting ensemble of geological realizations is quantified using multiple complementary
@@ -147,6 +165,11 @@ measures, including variance fields, information entropy maps, and ensemble-base
 metrics allow for the identification of well-constrained regions strongly supported by data, versus zones of high
 uncertainty requiring alternative modelling assumptions or further data acquisition, thereby providing a foundation for
 risk-aware decision-making.
+
+For geophysical datasets, uncertainty treatment is further strengthened by hierarchical per-station noise modelling,
+where station-specific noise levels are inferred jointly with geological parameters. This enables automatic detection of
+stations with anomalously high inferred noise (potential outliers or locally unmodelled complexity), reducing their
+undue influence on posterior structure.
 
 # 4. Application Case Study: Tharsis AOI 1
 
@@ -167,8 +190,12 @@ marked reduction of uncertainty in regions well-covered by the gravity data. How
 methods, ambiguity remained in areas where different deep geometric configurations produced similar surface gravity
 responses.
 
-*[Figure: initial model vs constrained model?]*
-*[Figure: constrained model, information entropy]*
+From an implementation perspective, the gravity workflow also includes alignment of forward responses to observed anomaly
+levels (regional-residual handling via reference alignment) and hierarchical station-noise estimation, both of which
+improve numerical stability and robustness against heterogeneous data quality.
+
+*[Figure suggestion: Prior vs posterior gravity response maps at station locations. Panels show observed gravity, posterior mean forward gravity, residuals (observed minus predicted), and correlation plot with 1:1 line.]*
+*[Figure suggestion: Posterior geological uncertainty summary with probability density fields and information entropy map; low entropy highlights well-constrained structures, high entropy highlights ambiguous zones.]*
 
 ## 4.2 Magnetic (TMI) Data Constraints
 
@@ -180,6 +207,10 @@ susceptibility contrasts. Compared to the gravity inversion, the magnetic data o
 lithological variations and shallower structural features. Improved constraints were observed in areas with a strong
 magnetic signal, effectively complementing the gravity-based results and highlighting regions requiring joint
 interpretation.
+
+The probabilistic magnetic inversion mirrors the gravity workflow with hierarchical per-station noise treatment and
+posterior predictive residual diagnostics, enabling direct identification of magnetically inconsistent stations and
+improved confidence assessment of susceptibility-driven interpretations.
 
 ## 4.3 EnMap EO-derived Constraints
 
@@ -193,6 +224,10 @@ derived class probabilities. The results demonstrated that EO constraints provid
 information regarding surface geology. This substantially improved the spatial consistency of the geological model near
 the surface and reduced structural ambiguity where subsurface data was sparse. Naturally, the influence of the EO
 constraints decreased with depth.
+
+The EnMap inversion examples further show that using EO observations on custom surface grids and differentiable ordinal
+likelihoods allows direct gradient-based assimilation of classification information without collapsing uncertainty into
+hard labels.
 
 ## 4.4 Joint Inversion Outcomes
 
@@ -208,4 +243,8 @@ gravity data constrained the deeper volumetric density distributions and interfa
 penetration. This combined evidence approach resulted in a more robust characterization of the subsurface, significantly
 reducing the non-uniqueness and overall spatial uncertainty compared to utilizing either dataset in isolation.
 
-*[FIGURE: Lith Segmentation, derived classes]*
+Operationally, this combined workflow benefits from explicit likelihood-balance checks and shared-parameter inference
+across multi-grid observations, which improves confidence that both deep geophysical structure and surface EO evidence
+are jointly honored in the posterior ensemble.
+
+*[Figure suggestion: Joint inversion summary panel showing EO class probability map at surface, gravity fit improvement, and posterior entropy reduction relative to single-data inversions.]*
