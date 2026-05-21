@@ -143,12 +143,22 @@ geo_model = gp.create_geomodel(
     project_name=SoricomModelConfig.PROJECT_NAME,
     extent=SoricomModelConfig.EXTENT,
     refinement=SoricomModelConfig.REFINEMENT,
-    resolution=SoricomModelConfig.RESOLUTION,
+    # resolution=SoricomModelConfig.RESOLUTION,
     importer_helper=gp.data.ImporterHelper(
         path_to_orientations=orientations_path,
         path_to_surface_points=formation_points_path,
     )
 )
+
+geo_model.grid = geo_model.grid.init_octree_grid(
+    extent=SoricomModelConfig.EXTENT,
+    octree_levels=SoricomModelConfig.REFINEMENT,
+    base_resolution=np.array([2, 2, 4])
+)
+
+
+
+geo_model.interpolation_options.number_octree_levels_surface = 5
 
 # %%
 # Map Geological Units and Fault Series
@@ -261,7 +271,7 @@ gp.compute_model(geo_model)
 # * Offset relationships across faults
 # * Input data distribution
 
-gpv.plot_2d(geo_model, direction='y', cell_number='mid', show_data=True)
+gpv.plot_2d(geo_model, direction='y', show_topography=False, cell_number='mid', show_data=True)
 
 # %%
 # 3D Visualization
@@ -277,10 +287,7 @@ gpv.plot_2d(geo_model, direction='y', cell_number='mid', show_data=True)
 # * **Input data**: Surface points and orientations used for interpolation
 # * **Topography**: Surface elevation (disabled here for clarity)
 #
-# Note: Topography is hidden (``show_topography=False``) to better visualize
-# the subsurface fault structure.
-
-gpv.plot_3d(geo_model, image=False, show_topography=False)
+gpv.plot_3d(geo_model, image=False, show_topography=False, show_octree=False)
 
 # %%
 # Summary and Key Concepts

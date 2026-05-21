@@ -107,9 +107,9 @@ class SoricomModelConfig:
     PROJECT_NAME = 'soricom_model'
     # Updated extent to properly encompass all data points
     # Data ranges: X: 4441902-4442274, Y: 4588250-4588536, Z: 1558-1660
-    EXTENT = [4441850, 4442350, 4588200, 4588400, 1500, 1700]
+    EXTENT = [4_441_850, 4_442_350, 4_588_200, 4_588_400, 1_500, 1_700]
     RESOLUTION = [50, 50, 50]
-    REFINEMENT = 4
+    REFINEMENT = 5
     SURFACE_MAPPING = {
         "Fault_Series": ["Main_Fault"],
         "host_rock": ["host_rock"],
