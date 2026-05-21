@@ -1,3 +1,10 @@
+# Introduction
+Within the MINEYE project, probabilistic methods are developed to enable the integration of Earth Observation (EO) data into the construction and updating of 3D geological models. This requires a framework that is both robust and computationally efficient, while remaining flexible and accessible for practical application in exploration workflows.
+
+The methodological developments build upon the scientific open-source packages GemPy [1] and BaySeg [2]. GemPy provides the foundation for implicit geological modelling and probabilistic inversion, while BaySeg enables location aware Bayesian segmentation of arbitrary data in 2D and 3D. Although previous work has demonstrated the potential of probabilistic inversion using GemPy, these approaches have largely remained exploratory and limited in scalability and maturity.
+
+In this work, both frameworks were substantially modernized and extended to meet the requirements of MINEYE. This includes improvements in numerical stability, performance, data integration, and workflow automation. In addition, new formulations were developed to consistently incorporate EO-derived constraints, geophysical data, and uncertainty estimates into a unified probabilistic modelling framework. Together, these developments establish the basis for general, scalable application of probabilistic geomodelling and data fusion within the project.
+
 # 1. Probabilistic Framework Modernization
 
 ## 1.1 Migration to PyTorch & Probabilistic API
