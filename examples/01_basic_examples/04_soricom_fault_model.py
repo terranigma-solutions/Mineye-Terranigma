@@ -156,8 +156,6 @@ geo_model.grid = geo_model.grid.init_octree_grid(
     base_resolution=np.array([2, 2, 4])
 )
 
-
-
 geo_model.interpolation_options.number_octree_levels_surface = 5
 
 # %%
@@ -235,8 +233,15 @@ print(geo_model.structural_frame.fault_relations)
 topography_path = paths.get_soricom_dem_path()
 gp.set_topography_from_file(
     grid=geo_model.grid,
-    filepath=topography_path
+    filepath=topography_path,
+    crop_to_extent=[
+            geo_model.grid.extent[0],
+            geo_model.grid.extent[2],
+            geo_model.grid.extent[1],
+            geo_model.grid.extent[3]
+    ]
 )
+gpv.plot_3d(geo_model)
 
 # %%
 # Compute the Model

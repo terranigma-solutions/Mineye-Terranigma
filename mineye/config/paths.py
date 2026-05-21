@@ -252,4 +252,4 @@ def get_soricom_erosive_formation_points():
 def get_soricom_dem_path():
     """Get path to the Soricom DEM (Digital Elevation Model) TIFF file."""
     data_dir = get_data_dir()
-    return os.path.join(data_dir, 'Topographic_Data', 'soricom_dem.tif')
+    return os.path.join(data_dir, 'Topographic_Data', 'soricomDEM10m.tif')
