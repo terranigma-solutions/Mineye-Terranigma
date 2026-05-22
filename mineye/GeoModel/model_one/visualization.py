@@ -234,100 +234,427 @@ def plot_heat_map(group, heatmap_data):
 
 
 def generate_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, topography_path, output_filename="probability_fields_paper.png"):
-    import matplotlib.pyplot as plt
-    import gempy_viewer as gpv
-    from gempy_viewer.modules.plot_2d.visualization_2d import Plot2D
-    import numpy as np
     import os
+    from itertools import cycle
 
-    # Set up publication-style parameters
-    plt.rcParams.update({
-        'font.size': 11,
-        'axes.labelsize': 12,
-        'axes.titlesize': 13,
-        'xtick.labelsize': 10,
-        'ytick.labelsize': 10,
-        'figure.titlesize': 16,
-    })
+    from matplotlib.colors import BoundaryNorm, ListedColormap
+    from matplotlib.patches import Patch
 
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12), dpi=300, constrained_layout=True)
-    ax_baseline = axes[0, 0]
-    ax_prob0 = axes[0, 1]
-    ax_prob1 = axes[1, 0]
-    ax_entropy = axes[1, 1]
+    dense_grid = geo_model.grid.dense_grid
+    resolution = np.asarray(dense_grid.resolution, dtype=int)
+    extent = np.asarray(dense_grid.extent, dtype=float)
+    section_y_idx = int(resolution[1] // 2)
+    section_y = dense_grid.y_coord[section_y_idx]
+    section_extent = [extent[0], extent[1], extent[4], extent[5]]
 
-    # Helper function to plot onto a specific axis using gempy_viewer
-    def plot_to_ax(ax, override_grid=None, show_lith=True, is_entropy=False, title="", cmap='viridis'):
-        original_create_figure = Plot2D.create_figure
-        try:
-            def mock_create_figure(self, *args, **kwargs):
-                self.fig = fig
-                self.axes = [ax]
-                return fig, self.axes
-            Plot2D.create_figure = mock_create_figure
-            
-            kwargs_lith = {'cmap': cmap, 'norm': None} if override_grid is not None else None
-            
-            gpv.plot_2d(
-                geo_model,
-                override_regular_grid=override_grid,
-                show_data=True,
-                show_lith=show_lith,
-                show_topography=True,
-                ve=5,
-                show=False,
-                kwargs_lithology=kwargs_lith,
-                legend=False
+    def reshape_field(field: np.ndarray) -> np.ndarray:
+        field = np.asarray(field)
+        expected_size = int(np.prod(resolution))
+        if field.size != expected_size:
+            raise ValueError(
+                f"Cannot reshape field with {field.size} cells to dense grid resolution "
+                f"{tuple(resolution)} ({expected_size} cells)."
             )
-            
-            # Post-process axis to make it look clean
-            ax.set_title(title, pad=10, fontweight='bold')
+        return field.reshape(tuple(resolution), order="C")
+
+    def mid_y_section(field: np.ndarray) -> np.ndarray:
+        return reshape_field(field)[:, section_y_idx, :].T
+
+    def topography_profile() -> tuple[np.ndarray, np.ndarray] | None:
+        topography = getattr(geo_model.grid, "topography", None)
+        if topography is None or topography.values_2d.size == 0:
+            return None
+
+        topography_values = np.asarray(topography.values_2d)
+        topography_y = topography_values[0, :, 1]
+        topography_y_idx = int(np.argmin(np.abs(topography_y - section_y)))
+        return topography_values[:, topography_y_idx, 0], topography_values[:, topography_y_idx, 2]
+
+    elements = list(getattr(geo_model.structural_frame, "structural_elements", []))
+    default_colors = cycle(plt.get_cmap("tab20").colors)
+
+    def element_color(element):
+        color = getattr(element, "color", None)
+        return color if color is not None else next(default_colors)
+
+    element_styles = [
+        (
+            getattr(element, "name", f"Lithology {idx + 1}"),
+            element_color(element)
+        )
+        for idx, element in enumerate(elements)
+    ]
+
+    topo_profile = topography_profile()
+
+    lithology_ids = np.asarray(online_prob.unique_lithologies, dtype=int)
+    lithology_names = []
+    lithology_colors = []
+    for idx, lithology_id in enumerate(lithology_ids):
+        if idx < len(element_styles):
+            lithology_name, lithology_color = element_styles[idx]
+        else:
+            lithology_name, lithology_color = f"Lithology {lithology_id}", next(default_colors)
+        lithology_names.append(lithology_name)
+        lithology_colors.append(lithology_color)
+
+    baseline = np.round(np.asarray(geo_model.solutions.raw_arrays.lith_block)).astype(int)
+    baseline_section = mid_y_section(baseline)
+    baseline_index = np.full_like(baseline_section, fill_value=np.nan, dtype=float)
+    for idx, lithology_id in enumerate(lithology_ids):
+        baseline_index[baseline_section == lithology_id] = idx
+
+    with plt.rc_context({
+        "font.size": 10,
+        "axes.labelsize": 10,
+        "axes.titlesize": 12,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9,
+        "figure.titlesize": 15,
+        "savefig.dpi": 300,
+    }):
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
+        axes = axes.ravel()
+        fig.suptitle(
+            f"Probabilistic geological inversion summary — mid-Y section ({section_y:.0f} m)",
+            fontweight="bold"
+        )
+
+        lithology_cmap = ListedColormap(lithology_colors)
+        lithology_norm = BoundaryNorm(np.arange(len(lithology_ids) + 1) - 0.5, len(lithology_ids))
+        axes[0].imshow(
+            baseline_index,
+            origin="lower",
+            extent=section_extent,
+            aspect="auto",
+            cmap=lithology_cmap,
+            norm=lithology_norm,
+            interpolation="nearest"
+        )
+        axes[0].set_title("A) Baseline geological model", loc="left", fontweight="bold")
+        legend_handles = [
+            Patch(facecolor=color, edgecolor="black", label=name)
+            for name, color in zip(lithology_names, lithology_colors)
+        ]
+        axes[0].legend(
+            handles=legend_handles,
+            loc="lower left",
+            frameon=True,
+            facecolor="white",
+            framealpha=0.9,
+            fontsize=8
+        )
+
+        probability_axes = axes[1:3]
+        probability_titles = ["B", "C"]
+        for plot_idx, ax in enumerate(probability_axes):
+            if plot_idx >= online_prob.probability_field.shape[0]:
+                ax.axis("off")
+                continue
+            probability_section = mid_y_section(online_prob.probability_field[plot_idx])
+            image = ax.imshow(
+                probability_section,
+                origin="lower",
+                extent=section_extent,
+                aspect="auto",
+                cmap="viridis",
+                vmin=0,
+                vmax=1,
+                interpolation="bilinear"
+            )
+            lithology_label = lithology_names[plot_idx] if plot_idx < len(lithology_names) else f"Lithology {plot_idx}"
+            ax.contour(
+                probability_section,
+                levels=[0.5],
+                colors="white",
+                linewidths=1.0,
+                origin="lower",
+                extent=section_extent
+            )
+            ax.set_title(f"{probability_titles[plot_idx]}) Occurrence probability: {lithology_label}", loc="left", fontweight="bold")
+            colorbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.02)
+            colorbar.set_label("Probability")
+
+        entropy_section = mid_y_section(online_prob.entropy)
+        entropy_image = axes[3].imshow(
+            entropy_section,
+            origin="lower",
+            extent=section_extent,
+            aspect="auto",
+            cmap="magma",
+            vmin=0,
+            interpolation="bilinear"
+        )
+        axes[3].set_title("D) Information entropy (structural uncertainty)", loc="left", fontweight="bold")
+        entropy_colorbar = fig.colorbar(entropy_image, ax=axes[3], fraction=0.046, pad=0.02)
+        entropy_colorbar.set_label("Entropy (bits)")
+
+        for ax in axes:
+            if not ax.axison:
+                continue
+            if topo_profile is not None:
+                ax.plot(
+                    topo_profile[0],
+                    topo_profile[1],
+                    color="black",
+                    linewidth=1.0,
+                    label="Topography",
+                    zorder=5
+                )
             ax.set_xlabel("X coordinate (m)")
-            ax.set_ylabel("Z coordinate (m)")
-            ax.grid(True, linestyle=":", alpha=0.5)
-            
-            # Add a colorbar for continuous fields
-            if override_grid is not None:
-                if len(ax.images) > 0:
-                    mappable = ax.images[0]
-                    cbar = fig.colorbar(mappable, ax=ax, fraction=0.046, pad=0.04)
-                    cbar.set_label("Entropy (Uncertainty)" if is_entropy else "Probability", fontsize=11)
-                    if not is_entropy:
-                        cbar.mappable.set_clim(0, 1)
-        finally:
-            Plot2D.create_figure = original_create_figure
+            ax.set_ylabel("Elevation Z (m)")
+            ax.grid(color="white", linestyle=":", linewidth=0.4, alpha=0.45)
+            ax.set_xlim(extent[0], extent[1])
+            ax.set_ylim(extent[4], extent[5])
 
-    # Panel A: Geological Baseline Section
-    plot_to_ax(ax_baseline, title="A) Baseline Geological Cross-Section", show_lith=True)
-    
-    # Add a custom legend for geologic formations to Panel A to make it publication-ready
+        if not os.path.isabs(output_filename):
+            output_filename = os.path.join(os.getcwd(), output_filename)
+        fig.savefig(output_filename, bbox_inches="tight")
+        print(f"\n[SUCCESS] Generated paper-quality figure saved to: {output_filename}")
+        plt.close(fig)
+
+
+def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, output_filename="probability_fields_paper_pyvista.png"):
+    import os
+    from itertools import cycle
+
+    from matplotlib.colors import ListedColormap, to_hex
+    from matplotlib.patches import Patch
+
     try:
-        from matplotlib.patches import Patch
-        elements = geo_model.structural_frame.structural_elements
-        legend_elements = []
-        for element in elements:
-            name = element.name
-            color = element.color if hasattr(element, 'color') else 'gray'
-            legend_elements.append(Patch(facecolor=color, edgecolor='black', label=name, alpha=0.8))
-        ax_baseline.legend(handles=legend_elements, loc='lower left', frameon=True, facecolor='white', framealpha=0.9)
-    except Exception as e:
-        print(f"Could not add custom legend to baseline plot: {e}")
+        import pyvista as pv
+    except ImportError as exc:
+        print(f"[WARNING] Could not generate PyVista paper figure because PyVista is unavailable: {exc}")
+        return None
 
-    # Panel B: Probability of Lithology 0 (Plutonites)
-    plot_to_ax(ax_prob0, override_grid=online_prob.probability_field[0], title="B) Occurrence Probability: Plutonites", cmap='viridis')
+    dense_grid = geo_model.grid.dense_grid
+    resolution = np.asarray(dense_grid.resolution, dtype=int)
+    extent = np.asarray(dense_grid.extent, dtype=float)
+    expected_size = int(np.prod(resolution))
 
-    # Panel C: Probability of Lithology 1 (Sedimentary Host)
-    plot_to_ax(ax_prob1, override_grid=online_prob.probability_field[1], title="C) Occurrence Probability: Sedimentary Host", cmap='viridis')
+    def normalized_field(field: np.ndarray) -> np.ndarray:
+        field = np.asarray(field).reshape(-1)
+        if field.size != expected_size:
+            raise ValueError(
+                f"Cannot render field with {field.size} cells on dense grid "
+                f"{tuple(resolution)} ({expected_size} cells)."
+            )
+        return field
 
-    # Panel D: Information Entropy (Uncertainty)
-    plot_to_ax(ax_entropy, override_grid=online_prob.entropy, is_entropy=True, title="D) Information Entropy (Structural Uncertainty)", cmap='magma')
+    elements = list(getattr(geo_model.structural_frame, "structural_elements", []))
+    default_colors = cycle(plt.get_cmap("tab20").colors)
+    lithology_ids = np.asarray(online_prob.unique_lithologies, dtype=int)
+    lithology_names = []
+    lithology_colors = []
+    for idx, lithology_id in enumerate(lithology_ids):
+        element = elements[idx] if idx < len(elements) else None
+        lithology_names.append(getattr(element, "name", f"Lithology {lithology_id}"))
+        color = getattr(element, "color", None) if element is not None else None
+        lithology_colors.append(to_hex(color if color is not None else next(default_colors)))
 
-    # Save to file in project root
-    project_root = "/home/leguark/PycharmProjects/Mineye-Terranigma"
-    save_path = os.path.join(project_root, output_filename)
-    fig.savefig(save_path, dpi=300, bbox_inches='tight')
-    print(f"\n[SUCCESS] Generated paper-quality figure saved to: {save_path}")
-    plt.close(fig)
+    def make_grid(field: np.ndarray, name: str):
+        dimensions = tuple((resolution + 1).astype(int))
+        spacing = (
+            (extent[1] - extent[0]) / resolution[0],
+            (extent[3] - extent[2]) / resolution[1],
+            (extent[5] - extent[4]) / resolution[2],
+        )
+        grid = pv.ImageData(
+            dimensions=dimensions,
+            origin=(extent[0], extent[2], extent[4]),
+            spacing=spacing,
+        )
+        grid.cell_data[name] = normalized_field(field)
+        grid.set_active_scalars(name)
+        return grid
+
+    crop_y = extent[2] + 0.58 * (extent[3] - extent[2])
+
+    def crop_grid(grid):
+        return grid.clip_box(
+            bounds=(extent[0], extent[1], extent[2], crop_y, extent[4], extent[5]),
+            invert=False,
+            crinkle=True,
+        )
+
+    def add_topography(plotter):
+        topography = getattr(geo_model.grid, "topography", None)
+        if topography is None or topography.values_2d.size == 0:
+            return
+
+        topography_values = np.asarray(topography.values_2d)
+        yy, xx = np.meshgrid(topography.y, topography.x)
+        topo_grid = pv.StructuredGrid(yy, xx, topography_values[:, :, 2])
+        topo_surface = topo_grid.extract_surface()
+        plotter.add_mesh(
+            topo_surface,
+            color="white",
+            opacity=0.32,
+            smooth_shading=True,
+            show_scalar_bar=False,
+        )
+        contours = topo_surface.contour(scalars=topography_values[:, :, 2].reshape(-1))
+        if contours.n_points > 0:
+            plotter.add_mesh(contours, color="black", line_width=1.2, opacity=0.45)
+
+    def configure_camera(plotter):
+        x_mid = float((extent[0] + extent[1]) / 2)
+        y_mid = float((extent[2] + crop_y) / 2)
+        z_mid = float((extent[4] + extent[5]) / 2)
+        dx = float(extent[1] - extent[0])
+        dy = float(extent[3] - extent[2])
+        dz = float(extent[5] - extent[4])
+        horizontal_span = max(dx, dy)
+        plotter.camera_position = [
+            (x_mid + 1.15 * dx, y_mid - 1.15 * dy, z_mid + 1.35 * horizontal_span),
+            (x_mid, y_mid, z_mid),
+            (0, 0, 1),
+        ]
+        plotter.camera.parallel_projection = True
+        plotter.camera.parallel_scale = 0.66 * max(dx, dy, dz)
+        plotter.camera.zoom(1.08)
+
+    def positive_threshold(field):
+        field = normalized_field(field)
+        finite_values = field[np.isfinite(field)]
+        if finite_values.size == 0:
+            return None
+        max_value = float(np.nanmax(finite_values))
+        if max_value <= 0:
+            return None
+        return (np.nextafter(0.0, 1.0), max_value)
+
+    def render_panel(field, scalar_name, cmap, clim, opacity=0.88, threshold=None, categorical=False):
+        pv.OFF_SCREEN = True
+        plotter = pv.Plotter(off_screen=True, window_size=(1700, 1300))
+        plotter.set_background("white")
+        grid = crop_grid(make_grid(field, scalar_name))
+        if threshold is not None:
+            grid = grid.threshold(threshold, scalars=scalar_name)
+
+        scalar_bar_args = {
+            "title": scalar_name.replace("_", " ").title(),
+            "title_font_size": 18,
+            "label_font_size": 14,
+            "font_family": "arial",
+            "vertical": False,
+            "height": 0.055,
+            "width": 0.52,
+            "position_x": 0.24,
+            "position_y": 0.055,
+        }
+        plotter.add_mesh(
+            grid,
+            scalars=scalar_name,
+            cmap=cmap,
+            clim=clim,
+            opacity=opacity,
+            show_edges=False,
+            show_scalar_bar=not categorical,
+            scalar_bar_args=scalar_bar_args,
+        )
+        add_topography(plotter)
+        plotter.show_bounds(
+            bounds=(extent[0], extent[1], extent[2], extent[3], extent[4], extent[5]),
+            show_xlabels=False,
+            show_ylabels=False,
+            show_zlabels=False,
+            grid="front",
+            location="outer",
+            color="dimgray",
+        )
+        configure_camera(plotter)
+        image = plotter.screenshot(return_img=True, transparent_background=False)
+        plotter.close()
+        return image
+
+    baseline = np.round(normalized_field(geo_model.solutions.raw_arrays.lith_block)).astype(int)
+    baseline_index = np.full_like(baseline, fill_value=np.nan, dtype=float)
+    for idx, lithology_id in enumerate(lithology_ids):
+        baseline_index[baseline == lithology_id] = idx
+
+    panel_specs = [
+        (
+            "A) Baseline geological model",
+            baseline_index,
+            "lithology",
+            ListedColormap(lithology_colors),
+            (-0.5, len(lithology_ids) - 0.5),
+            0.72,
+            None,
+            True,
+        ),
+        (
+            f"B) Occurrence probability: {lithology_names[0] if lithology_names else 'Lithology 0'}",
+            online_prob.probability_field[0],
+            "probability",
+            "viridis",
+            (0, 1),
+            0.86,
+            positive_threshold(online_prob.probability_field[0]),
+            False,
+        ),
+        (
+            f"C) Occurrence probability: {lithology_names[1] if len(lithology_names) > 1 else 'Lithology 1'}",
+            online_prob.probability_field[1] if online_prob.probability_field.shape[0] > 1 else online_prob.probability_field[0],
+            "probability",
+            "viridis",
+            (0, 1),
+            0.86,
+            positive_threshold(online_prob.probability_field[1] if online_prob.probability_field.shape[0] > 1 else online_prob.probability_field[0]),
+            False,
+        ),
+        (
+            "D) Information entropy (structural uncertainty)",
+            online_prob.entropy,
+            "entropy",
+            "magma",
+            (0, float(np.nanmax(online_prob.entropy))),
+            0.92,
+            positive_threshold(online_prob.entropy),
+            False,
+        ),
+    ]
+
+    try:
+        rendered_panels = [render_panel(*spec[1:]) for spec in panel_specs]
+    except Exception as exc:
+        print(f"[WARNING] Could not generate PyVista paper figure: {exc}")
+        return None
+
+    with plt.rc_context({
+        "font.size": 10,
+        "axes.titlesize": 12,
+        "figure.titlesize": 15,
+        "savefig.dpi": 300,
+    }):
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
+        axes = axes.ravel()
+        fig.suptitle("Probabilistic geological inversion summary — cropped 3D PyVista view", fontweight="bold")
+        for ax, (title, *_), image in zip(axes, panel_specs, rendered_panels):
+            ax.imshow(image)
+            ax.set_title(title, loc="left", fontweight="bold")
+            ax.axis("off")
+        legend_handles = [
+            Patch(facecolor=color, edgecolor="black", label=name)
+            for name, color in zip(lithology_names, lithology_colors)
+        ]
+        if legend_handles:
+            axes[0].legend(
+                handles=legend_handles,
+                loc="lower left",
+                frameon=True,
+                facecolor="white",
+                framealpha=0.9,
+                fontsize=8,
+            )
+
+        if not os.path.isabs(output_filename):
+            output_filename = os.path.join(os.getcwd(), output_filename)
+        fig.savefig(output_filename, bbox_inches="tight")
+        print(f"\n[SUCCESS] Generated PyVista paper-quality figure saved to: {output_filename}")
+        plt.close(fig)
+        return output_filename
 
 
 def probability_fields_for(geo_model, inference_data, topography_path):
@@ -357,6 +684,7 @@ def probability_fields_for(geo_model, inference_data, topography_path):
 
     # 1. Generate the paper-quality, multi-panel summary figure
     generate_paper_quality_figure(geo_model, online_prob, topography_path)
+    generate_pyvista_paper_quality_figure(geo_model, online_prob)
 
     # 2. Original legacy plots (for compatibility/visual feedback)
     if True:
