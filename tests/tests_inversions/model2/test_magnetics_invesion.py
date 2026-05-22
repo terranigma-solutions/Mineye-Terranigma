@@ -198,14 +198,14 @@ class TestMagneticInversion:
     def _setup_magnetic_geomodel(magnetic_data):
         geo_model = _create_soricom_geomodel()
 
-        # Reproject to Soricom UTM if needed (the magnetic data is in EPSG:3857)
-        if magnetic_data.crs is not None and magnetic_data.crs.to_string() != 'EPSG:3857':
-            magnetic_data = magnetic_data.to_crs('EPSG:3857')
+        # Reproject from Web Mercator (EPSG:3857) to Soricom UTM (EPSG:32634)
+        if magnetic_data.crs is not None and magnetic_data.crs.to_string() == 'EPSG:3857':
+            magnetic_data = magnetic_data.to_crs('EPSG:32634')
 
         xy_ravel = np.column_stack([
             np.array(magnetic_data.geometry.x.values),
             np.array(magnetic_data.geometry.y.values),
-            np.full(len(magnetic_data), 500),
+            np.full(len(magnetic_data), 1600),
         ])
 
         gp.set_centered_grid(
