@@ -31,8 +31,9 @@ This model uses:
 * **Topographic integration**: DEM for accurate surface representation
 
 .. note::
-   The coordinate system uses local UTM coordinates with elevations in meters
-   above sea level.
+   The coordinate system uses EPSG:32634 (WGS 84 UTM zone 34N) with elevations in meters
+   above sea level. Data was originally in EPSG:2462 (SIRGAS 2000 UTM 24S) and
+   transformed to match the DEM CRS.
 """
 
 # %%
@@ -84,12 +85,13 @@ from mineye.config.example_parameters import SoricomModelConfig
 #
 # **Model Extent**: The bounding box defines the 3D volume:
 #
-# * **X range**: ~500m (local easting)
-# * **Y range**: ~200m (local northing)
-# * **Z range**: ~200m (from 1500m to 1700m elevation)
+# * **X range**: ~480m (easting in EPSG:32634)
+# * **Y range**: ~370m (northing in EPSG:32634)
+# * **Z range**: ~230m (from 1494m to 1726m elevation)
 #
 # The vertical extent captures the chromite deposit and surrounding host rock,
-# including the fault structure that offsets the units.
+# including the fault structure that offsets the units. Coordinates are in
+# EPSG:32634 (WGS 84 UTM zone 34N), matching the DEM.
 
 print("=" * 60)
 print("Soricom Fault Model Configuration")
@@ -276,7 +278,7 @@ gp.compute_model(geo_model)
 # * Offset relationships across faults
 # * Input data distribution
 
-gpv.plot_2d(geo_model, direction='y', show_topography=False, cell_number='mid', show_data=True)
+gpv.plot_2d(geo_model, direction='y', show_topography=True, cell_number='mid', show_data=True)
 
 # %%
 # 3D Visualization
@@ -292,7 +294,7 @@ gpv.plot_2d(geo_model, direction='y', show_topography=False, cell_number='mid', 
 # * **Input data**: Surface points and orientations used for interpolation
 # * **Topography**: Surface elevation (disabled here for clarity)
 #
-gpv.plot_3d(geo_model, image=False, show_topography=False, show_octree=False)
+gpv.plot_3d(geo_model, image=False, show_topography=True, show_octree=False)
 
 # %%
 # Summary and Key Concepts
