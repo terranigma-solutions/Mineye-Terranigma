@@ -105,6 +105,26 @@ def test_read_magnetic_raster(data_dir, geophysical_dir):
     rng = np.random.default_rng(42)
     idx = rng.choice(len(lon), size=n_sample, replace=False)
 
+    # --- Read borehole locations from formation points ---
+    borehole_path = os.path.join(data_dir, 'Soricom_Data', 'formation_points_with_fault.csv')
+    if os.path.exists(borehole_path):
+        bh_df = pd.read_csv(borehole_path)
+        # Borehole collars = host_rock entries (each is a unique collar location)
+        collars = bh_df[bh_df['formation'] == 'host_rock'][['X', 'Y', 'Z']].drop_duplicates().values
+        # Chromite lense intersection midpoints
+        lenses = bh_df[bh_df['formation'] == 'chromite lense'][['X', 'Y', 'Z']].values
+        # Fault point
+        fault_pt = bh_df[bh_df['formation'] == 'Main_Fault'][['X', 'Y', 'Z']].values
+        print(f"\nBorehole collars (host_rock): {len(collars)} points")
+        print(f"  X range: {collars[:,0].min():.1f} – {collars[:,0].max():.1f}")
+        print(f"  Y range: {collars[:,1].min():.1f} – {collars[:,1].max():.1f}")
+        print(f"  Z range: {collars[:,2].min():.1f} – {collars[:,2].max():.1f}")
+        print(f"Chromite lenses: {len(lenses)} intersections")
+        print(f"Fault point: {fault_pt[0] if len(fault_pt) > 0 else 'none'}")
+    else:
+        collars, lenses, fault_pt = None, None, None
+        print(f"\nBorehole data not found at: {borehole_path}")
+
     # --- Plot ---
     fig, axes = plt.subplots(2, 3, figsize=(24, 14))
 
@@ -147,7 +167,7 @@ def test_read_magnetic_raster(data_dir, geophysical_dir):
     ax2.set_title('Raster Value Distribution')
     ax2.legend()
 
-    # 4) Magnetic data on top of DEM
+    # 4) Magnetic data on top of DEM with boreholes
     ax3 = axes[1, 0]
     ax3.imshow(
         dem_masked,
@@ -160,9 +180,20 @@ def test_read_magnetic_raster(data_dir, geophysical_dir):
         lon[idx], lat[idx], c=valid_vals[idx], cmap='RdYlBu_r',
         s=2, alpha=0.6,
     )
+    # Overlay borehole locations
+    if collars is not None:
+        ax3.scatter(collars[:, 0], collars[:, 1], marker='v', c='black',
+                     s=60, label='BH collar', zorder=5, edgecolors='white', linewidth=0.5)
+    if lenses is not None and len(lenses) > 0:
+        ax3.scatter(lenses[:, 0], lenses[:, 1], marker='o', c='gold',
+                     s=40, label='chromite lense', zorder=5, edgecolors='black', linewidth=0.5)
+    if fault_pt is not None and len(fault_pt) > 0:
+        ax3.scatter(fault_pt[:, 0], fault_pt[:, 1], marker='*', c='red',
+                     s=120, label='Main_Fault', zorder=6, edgecolors='black', linewidth=0.5)
+    ax3.legend(fontsize=7, loc='lower left')
     cbar3 = fig.colorbar(sc3, ax=ax3, shrink=0.78)
     cbar3.set_label('Magnetic TMI (nT)')
-    ax3.set_title('Magnetics over Soricom DEM')
+    ax3.set_title('Magnetics over Soricom DEM + Boreholes')
     ax3.set_xlabel('Easting (EPSG:32634)')
     ax3.set_ylabel('Northing (EPSG:32634)')
     ax3.set_aspect('equal')
