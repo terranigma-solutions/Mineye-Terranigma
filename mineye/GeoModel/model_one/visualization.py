@@ -453,23 +453,39 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
         field[field <= 0] = np.nan
         return field
 
-    def configure_camera(plotter):
+    def configure_camera():
+        # Clipped extent: only show up to crop_y in Y direction
         x_mid = float((extent[0] + extent[1]) / 2)
         y_mid = float((extent[2] + crop_y) / 2)
         z_mid = float((extent[4] + extent[5]) / 2)
+        
         dx = float(extent[1] - extent[0])
-        dy = float(extent[3] - extent[2])
         dz = float(extent[5] - extent[4])
-        horizontal_span = max(dx, dy)
-        plotter.camera_position = [
-                (x_mid + 1.15 * dx, y_mid - 1.15 * dy, z_mid + 1.35 * horizontal_span),
-                (x_mid, y_mid, z_mid),
-                (0, 0, 1),
+        
+        # Use the largest horizontal/vertical span to scale the camera distance
+        span = max(dx, dz) * 0.001
+        
+        camera_position = [
+            # 1. Position:
+            # Offset X by -0.7 to expose the side (isometric feel)
+            # Pull Y back by -1.5 to maintain the primary view toward positive Y
+            # Lift Z up by +0.8 to look down from above
+            (
+                x_mid - 0.7 * span,  
+                y_mid - 1.5 * span,  
+                z_mid + 0.8 * span   
+            ),
+            
+            # 2. Focal Point: Centered on the model
+            (x_mid, y_mid, z_mid),
+            
+            # 3. View Up: Z-axis is up
+            (0, 0, 1),
         ]
-        plotter.camera.parallel_projection = True
-        plotter.camera.parallel_scale = 0.66 * max(dx, dy, dz)
-        plotter.camera.zoom(2.08)
-
+        
+        return {
+            "position": camera_position,
+        }
     def apply_scalar_colormap(plotter, cmap, clim):
         if cmap is None:
             return
@@ -482,7 +498,7 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
         except Exception as exc:
             print(f"[WARNING] Could not apply PyVista colormap '{cmap}': {exc}")
 
-    def render_panel(field, scalar_name, clim, opacity=0.88, mask_zero=False, cmap=None, show_lith=False):
+    def render_panel(field, scalar_name, clim, opacity=0.95, mask_zero=False, cmap=None, show_lith=False):
         scalar_bar_args = {
                 "title": scalar_name.replace("_", " ").title(),
                 "title_font_size": 18,
@@ -494,6 +510,7 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                 "position_x": 0.24,
                 "position_y": 0.055,
         }
+        camera_args = configure_camera()
 
         if show_lith:
             p3d = gpv.plot_3d(
@@ -511,7 +528,8 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                         'show_xlabels': False,
                         'show_ylabels': False,
                         'show_zlabels': False,
-                }
+                },
+                kwargs_pyvista_camera= camera_args,
             )
         else:
             scalar_field = positive_field(field) if mask_zero else normalized_field(field)
@@ -537,7 +555,10 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                     image=True,
                     show=False,
                     ve=4,
-                    threshold_kwargs={'value': [0.2, 0.9], 'invert': False},
+                    threshold_kwargs={'value': [0.05, 10], 'invert': False},
+                    kwargs_plot_topography={
+                            "opacity": 0.,
+                    },
                     kwargs_plot_structured_grid={
                             "clim": clim,
                             "opacity": opacity,
@@ -548,7 +569,8 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                             'show_xlabels': False,
                             'show_ylabels': False,
                             'show_zlabels': False,
-                    }
+                    },
+                    kwargs_pyvista_camera= camera_args,
                 )
             finally:
                 drawer_structured_grid_3d.plot_structured_grid = original_plot_structured_grid
@@ -556,7 +578,32 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
 
         plotter = p3d.p
         apply_scalar_colormap(p3d, cmap, clim)
-        configure_camera(plotter)
+
+        # Clip the structured grid vertically parallel to Y (across the C-direction)
+        if p3d.regular_grid_mesh is not None:
+            clip_bounds = [float(extent[0]), float(extent[1]),
+                           float(extent[2]), float(crop_y),
+                           float(extent[4]), float(extent[5])]
+            try:
+                clipped_mesh = p3d.regular_grid_mesh.clip_box(bounds=clip_bounds, invert=False)
+                if show_lith:
+                    new_actor = plotter.add_mesh(
+                        clipped_mesh, show_scalar_bar=False,
+                        interpolate_before_map=True, opacity=opacity
+                    )
+                else:
+                    new_actor = plotter.add_mesh(
+                        clipped_mesh, cmap=cmap, show_scalar_bar=True,
+                        interpolate_before_map=True, opacity=opacity,
+                        clim=clim, nan_opacity=0.0,
+                        scalar_bar_args=scalar_bar_args,
+                    )
+                plotter.remove_actor(p3d.regular_grid_actor)
+                p3d.regular_grid_actor = new_actor
+                p3d.regular_grid_mesh = clipped_mesh
+            except Exception as clip_exc:
+                print(f"[WARNING] Could not clip grid: {clip_exc}")
+
         image = plotter.screenshot(return_img=True, transparent_background=False)
         plotter.close()
         return image
@@ -625,19 +672,6 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
             ax.imshow(image)
             ax.set_title(title, loc="left", fontweight="bold")
             ax.axis("off")
-        legend_handles = [
-                Patch(facecolor=color, edgecolor="black", label=name)
-                for name, color in zip(lithology_names, lithology_colors)
-        ]
-        if legend_handles:
-            axes[0].legend(
-                handles=legend_handles,
-                loc="lower left",
-                frameon=True,
-                facecolor="white",
-                framealpha=0.9,
-                fontsize=8,
-            )
 
         if not os.path.isabs(output_filename):
             output_filename = os.path.join(os.getcwd(), output_filename)
@@ -648,29 +682,8 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
 
 
 def probability_fields_for(geo_model, inference_data, topography_path):
-    online_prob = compute_probability_density_fields(
-        geo_model,
-        inference_data,
-        n_samples=5
-    )
     import gempy_viewer as gpv
-    import gempy as gp
-    import os
-
-    # Set up topography early so that both 2D and 3D plots use it
-    simple_geo_model = geo_model
-    gp.set_topography_from_file(
-        grid=simple_geo_model.grid,
-        filepath=topography_path,
-        crop_to_extent=[
-                simple_geo_model.grid.extent[0],
-                simple_geo_model.grid.extent[2],
-                simple_geo_model.grid.extent[1],
-                simple_geo_model.grid.extent[3]
-        ]
-    )
-
-    gp.compute_model(geo_model)
+    online_prob = setup_probability_fields(geo_model, inference_data, topography_path)
 
     # 1. Generate the paper-quality, multi-panel summary figure
     generate_paper_quality_figure(geo_model, online_prob, topography_path)
@@ -729,4 +742,29 @@ def probability_fields_for(geo_model, inference_data, topography_path):
         }
     )
 
+    return online_prob
+
+
+def setup_probability_fields(geo_model, inference_data, topography_path):
+    online_prob = compute_probability_density_fields(
+        geo_model,
+        inference_data,
+        n_samples=5
+    )
+    import gempy as gp
+
+    # Set up topography early so that both 2D and 3D plots use it
+    simple_geo_model = geo_model
+    gp.set_topography_from_file(
+        grid=simple_geo_model.grid,
+        filepath=topography_path,
+        crop_to_extent=[
+                simple_geo_model.grid.extent[0],
+                simple_geo_model.grid.extent[2],
+                simple_geo_model.grid.extent[1],
+                simple_geo_model.grid.extent[3]
+        ]
+    )
+
+    gp.compute_model(geo_model)
     return online_prob
