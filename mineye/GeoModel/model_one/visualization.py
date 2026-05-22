@@ -468,12 +468,21 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
         ]
         plotter.camera.parallel_projection = True
         plotter.camera.parallel_scale = 0.66 * max(dx, dy, dz)
-        plotter.camera.zoom(1.08)
+        plotter.camera.zoom(2.08)
 
-    def render_panel(field, scalar_name, clim, opacity=0.88, mask_zero=False, categorical=False):
-        scalar_field = positive_field(field) if mask_zero else normalized_field(field)
-        original_scalar_field = np.asarray(geo_model.solutions.raw_arrays.scalar_field_matrix[0]).copy()
-        geo_model.solutions.raw_arrays.scalar_field_matrix[0] = scalar_field
+    def apply_scalar_colormap(plotter, cmap, clim):
+        if cmap is None:
+            return
+        try:
+            import pyvista as pv
+
+            lookup_table = pv.LookupTable(cmap=cmap, scalar_range=clim)
+            lookup_table.nan_opacity = 0.0
+            plotter.regular_grid_actor.mapper.lookup_table = lookup_table
+        except Exception as exc:
+            print(f"[WARNING] Could not apply PyVista colormap '{cmap}': {exc}")
+
+    def render_panel(field, scalar_name, clim, opacity=0.88, mask_zero=False, cmap=None, show_lith=False):
         scalar_bar_args = {
                 "title": scalar_name.replace("_", " ").title(),
                 "title_font_size": 18,
@@ -485,22 +494,18 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                 "position_x": 0.24,
                 "position_y": 0.055,
         }
-        try:
+
+        if show_lith:
             p3d = gpv.plot_3d(
                 model=geo_model,
-                active_scalar_field="sf_0",
-                show_scalar=True,
-                show_lith=False,
+                show_scalar=False,
+                show_lith=True,
                 show_topography=True,
                 image=True,
                 show=False,
                 ve=4,
-                threshold_kwargs={'value': [0.2, 0.9], 'invert': False},
                 kwargs_plot_structured_grid={
-                        "clim": clim,
                         "opacity": opacity,
-                        "nan_opacity": 0.0,
-                        "scalar_bar_args": scalar_bar_args,
                 },
                 kwargs_pyvista_bounds={
                         'show_xlabels': False,
@@ -508,30 +513,65 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                         'show_zlabels': False,
                 }
             )
-        finally:
-            geo_model.solutions.raw_arrays.scalar_field_matrix[0] = original_scalar_field
+        else:
+            scalar_field = positive_field(field) if mask_zero else normalized_field(field)
+            original_scalar_field = np.asarray(geo_model.solutions.raw_arrays.scalar_field_matrix[0]).copy()
+            geo_model.solutions.raw_arrays.scalar_field_matrix[0] = scalar_field
+            from gempy_viewer.modules.plot_3d import drawer_structured_grid_3d
+
+            original_plot_structured_grid = drawer_structured_grid_3d.plot_structured_grid
+
+            def plot_structured_grid_with_cmap(*args, **kwargs):
+                if cmap is not None:
+                    kwargs["cmap"] = cmap
+                return original_plot_structured_grid(*args, **kwargs)
+
+            drawer_structured_grid_3d.plot_structured_grid = plot_structured_grid_with_cmap
+            try:
+                p3d = gpv.plot_3d(
+                    model=geo_model,
+                    active_scalar_field="sf_0",
+                    show_scalar=True,
+                    show_lith=False,
+                    show_topography=True,
+                    image=True,
+                    show=False,
+                    ve=4,
+                    threshold_kwargs={'value': [0.2, 0.9], 'invert': False},
+                    kwargs_plot_structured_grid={
+                            "clim": clim,
+                            "opacity": opacity,
+                            "nan_opacity": 0.0,
+                            "scalar_bar_args": scalar_bar_args,
+                    },
+                    kwargs_pyvista_bounds={
+                            'show_xlabels': False,
+                            'show_ylabels': False,
+                            'show_zlabels': False,
+                    }
+                )
+            finally:
+                drawer_structured_grid_3d.plot_structured_grid = original_plot_structured_grid
+                geo_model.solutions.raw_arrays.scalar_field_matrix[0] = original_scalar_field
 
         plotter = p3d.p
+        apply_scalar_colormap(p3d, cmap, clim)
         configure_camera(plotter)
         image = plotter.screenshot(return_img=True, transparent_background=False)
         plotter.close()
         return image
-
-    baseline = np.round(normalized_field(geo_model.solutions.raw_arrays.lith_block)).astype(int)
-    baseline_index = np.full_like(baseline, fill_value=np.nan, dtype=float)
-    for idx, lithology_id in enumerate(lithology_ids):
-        baseline_index[baseline == lithology_id] = idx
 
     second_probability = online_prob.probability_field[1] if online_prob.probability_field.shape[0] > 1 else online_prob.probability_field[0]
     entropy_max = float(np.nanmax(online_prob.entropy)) if np.isfinite(online_prob.entropy).any() else 1.0
     panel_specs = [
             (
                     "A) Baseline geological model",
-                    baseline_index,
+                    None,
                     "lithology",
                     (-0.5, len(lithology_ids) - 0.5),
                     0.72,
                     False,
+                    None,
                     True,
             ),
             (
@@ -541,6 +581,7 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                     (0, 1),
                     0.86,
                     True,
+                    "viridis",
                     False,
             ),
             (
@@ -550,6 +591,7 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                     (0, 1),
                     0.86,
                     True,
+                    "viridis",
                     False,
             ),
             (
@@ -559,6 +601,7 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                     (0, entropy_max),
                     0.92,
                     True,
+                    "magma",
                     False,
             ),
     ]
