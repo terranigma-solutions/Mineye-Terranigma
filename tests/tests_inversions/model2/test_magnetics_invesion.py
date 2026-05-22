@@ -1,13 +1,13 @@
 """Test magnetic inversion using the Soricom fault structural model.
 
 Uses the Soricom fault model from ``examples/01_basic_examples/04_soricom_fault_model.py``
-and the cleaned magnetic point data from ``cleaned_magnetic_data.geojson``.
+and magnetic point observations extracted from the B1B2 merged raster
+(see ``test_extract_magnetic_points.py`` for extraction).
 """
 
 import os
 
 import arviz as az
-import geopandas as gpd
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
@@ -46,7 +46,6 @@ def _create_soricom_geomodel():
     geo_model.grid = geo_model.grid.init_octree_grid(
         extent=SoricomModelConfig.EXTENT,
         octree_levels=SoricomModelConfig.REFINEMENT,
-        base_resolution=np.array([2, 2, 4]),
     )
     geo_model.interpolation_options.number_octree_levels_surface = 5
 
@@ -151,7 +150,7 @@ class TestMagneticInversion:
                 validate_args=True,
             ),
             self.prior_key_susceptibility: dist.Normal(
-                loc=torch.tensor([0.05, 0.001], dtype=torch.float64),
+                loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=torch.float64),
                 scale=torch.tensor(0.01, dtype=torch.float64),
             ).to_event(1),
         }
@@ -187,26 +186,23 @@ class TestMagneticInversion:
 
     @staticmethod
     def _read_magnetics(geophysical_dir):
-        magnetic_data = gpd.read_file(
-            os.path.join(geophysical_dir, 'cleaned_magnetic_data.geojson'),
-        )
-        sampled_magnetic = magnetic_data.sample(n=20, random_state=42)
-        observed_magnetics = sampled_magnetic['MAG'].values
-        return sampled_magnetic, observed_magnetics
+        import os as _os
+        xyz_path = _os.path.join(_os.path.dirname(__file__), 'soricom_magnetic_xyz.npy')
+        mag_path = _os.path.join(_os.path.dirname(__file__), 'soricom_magnetic_values.npy')
+        xyz = np.load(xyz_path)
+        mag = np.load(mag_path)
+        # Subsample 20 points for inversion (random subset)
+        rng = np.random.default_rng(42)
+        idx = rng.choice(len(xyz), size=min(20, len(xyz)), replace=False)
+        sampled_xyz = xyz[idx]
+        observed_magnetics = mag[idx]
+        return sampled_xyz, observed_magnetics
 
     @staticmethod
-    def _setup_magnetic_geomodel(magnetic_data):
+    def _setup_magnetic_geomodel(magnetic_xyz):
         geo_model = _create_soricom_geomodel()
 
-        # Reproject from Web Mercator (EPSG:3857) to Soricom UTM (EPSG:32634)
-        if magnetic_data.crs is not None and magnetic_data.crs.to_string() == 'EPSG:3857':
-            magnetic_data = magnetic_data.to_crs('EPSG:32634')
-
-        xy_ravel = np.column_stack([
-            np.array(magnetic_data.geometry.x.values),
-            np.array(magnetic_data.geometry.y.values),
-            np.full(len(magnetic_data), 1600),
-        ])
+        xy_ravel = magnetic_xyz  # Already [X, Y, Z] in EPSG:32634
 
         gp.set_centered_grid(
             grid=geo_model.grid,
@@ -218,9 +214,9 @@ class TestMagneticInversion:
         gradient_tensor_dict = calculate_magnetic_gradient_tensor(
             centered_grid=geo_model.grid.centered_grid,
             igrf_params={
-                "inclination": 60.79,
-                "declination": 1.26,
-                "intensity": 47258.4,
+                "inclination": 57.0,
+                "declination": 4.0,
+                "intensity": 47500.0,
             },
             compute_tmi=True,
             units_nT=True,
@@ -229,7 +225,7 @@ class TestMagneticInversion:
         geo_model.geophysics_input = gp.data.GeophysicsInput(
             magnetics_input=MagneticsInput(
                 mag_kernel=gradient_tensor_dict['tmi_kernel'],
-                susceptibilities=np.array([0.05, 0.001]),
+                susceptibilities=np.array([0.0, 0.05, 0.001, 0.001]),
                 igrf_params={
                     "inclination": gradient_tensor_dict['inclination'],
                     "declination": gradient_tensor_dict['declination'],
@@ -252,6 +248,11 @@ class TestMagneticInversion:
     @staticmethod
     def _baseline_magnetics(geo_model):
         sol = gp.compute_model(geo_model)
+        if sol.magnetics is None:
+            raise RuntimeError(
+                "Magnetics forward model returned None — check susceptibility "
+                "array length matches number of surfaces + basement"
+            )
         return sol.magnetics.detach().cpu().numpy() if hasattr(sol.magnetics, 'detach') else sol.magnetics
 
     @staticmethod
