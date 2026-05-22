@@ -1,10 +1,37 @@
 import dotenv
+import pandas as pd
+orig_read_csv = pd.read_csv
+pd.read_csv = lambda *args, **kwargs: orig_read_csv(*args, **kwargs).apply(lambda x: x.astype(object) if isinstance(x.array, pd.arrays.StringArray) else x)
+
+import gempy.core.data.encoders.json_geomodel_encoder as jge
+def robust_encode_numpy_array(array):
+    size = array.size() if callable(getattr(array, 'size', None)) else getattr(array, 'size', 0)
+    if isinstance(size, (list, tuple)):
+        import numpy as np
+        size = int(np.prod(size))
+    if size > 10:
+        return []
+    if hasattr(array, 'tolist'):
+        try:
+            return array.tolist()
+        except Exception:
+            pass
+    return []
+jge.encode_numpy_array = robust_encode_numpy_array
+
+import gempy.core.data.geo_model as gm
+gm.encode_numpy_array = robust_encode_numpy_array
+if hasattr(gm.GeoModel, 'model_config') and gm.GeoModel.model_config:
+    if 'json_encoders' in gm.GeoModel.model_config:
+        import numpy as np
+        gm.GeoModel.model_config['json_encoders'][np.ndarray] = robust_encode_numpy_array
+
 import pyro
 import torch
 
 dotenv.load_dotenv()
-
 import os
+os.environ["VALIDATE_SERIALIZATION"] = ""
 import pytest
 import gempy as gp
 

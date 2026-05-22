@@ -190,12 +190,13 @@ def _update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: float,
         dip=sample_value,
     )
 
+
 def plot_probability_heatmap(data, group='prior', slice_idx=None):
     # Get the data array from ArviZ InferenceData
     # Standard Shape: (chain, draw, n_points, n_classes)
     # Example: (1, 50, 57, 3)
     probs_da = data[group]['probs_pred']
-    
+
     if slice_idx is not None:
         probs_da = probs_da.isel(Joint_Obs_1_dim_0=slice_idx)
 
@@ -209,7 +210,6 @@ def plot_probability_heatmap(data, group='prior', slice_idx=None):
     heatmap_data = mean_probs.T
 
     plot_heat_map(group, heatmap_data)
-
 
 
 def plot_heat_map(group, heatmap_data):
@@ -233,15 +233,132 @@ def plot_heat_map(group, heatmap_data):
     plt.show()
 
 
+def generate_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, topography_path, output_filename="probability_fields_paper.png"):
+    import matplotlib.pyplot as plt
+    import gempy_viewer as gpv
+    from gempy_viewer.modules.plot_2d.visualization_2d import Plot2D
+    import numpy as np
+    import os
+
+    # Set up publication-style parameters
+    plt.rcParams.update({
+        'font.size': 11,
+        'axes.labelsize': 12,
+        'axes.titlesize': 13,
+        'xtick.labelsize': 10,
+        'ytick.labelsize': 10,
+        'figure.titlesize': 16,
+    })
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12), dpi=300, constrained_layout=True)
+    ax_baseline = axes[0, 0]
+    ax_prob0 = axes[0, 1]
+    ax_prob1 = axes[1, 0]
+    ax_entropy = axes[1, 1]
+
+    # Helper function to plot onto a specific axis using gempy_viewer
+    def plot_to_ax(ax, override_grid=None, show_lith=True, is_entropy=False, title="", cmap='viridis'):
+        original_create_figure = Plot2D.create_figure
+        try:
+            def mock_create_figure(self, *args, **kwargs):
+                self.fig = fig
+                self.axes = [ax]
+                return fig, self.axes
+            Plot2D.create_figure = mock_create_figure
+            
+            kwargs_lith = {'cmap': cmap, 'norm': None} if override_grid is not None else None
+            
+            gpv.plot_2d(
+                geo_model,
+                override_regular_grid=override_grid,
+                show_data=True,
+                show_lith=show_lith,
+                show_topography=True,
+                ve=5,
+                show=False,
+                kwargs_lithology=kwargs_lith,
+                legend=False
+            )
+            
+            # Post-process axis to make it look clean
+            ax.set_title(title, pad=10, fontweight='bold')
+            ax.set_xlabel("X coordinate (m)")
+            ax.set_ylabel("Z coordinate (m)")
+            ax.grid(True, linestyle=":", alpha=0.5)
+            
+            # Add a colorbar for continuous fields
+            if override_grid is not None:
+                if len(ax.images) > 0:
+                    mappable = ax.images[0]
+                    cbar = fig.colorbar(mappable, ax=ax, fraction=0.046, pad=0.04)
+                    cbar.set_label("Entropy (Uncertainty)" if is_entropy else "Probability", fontsize=11)
+                    if not is_entropy:
+                        cbar.mappable.set_clim(0, 1)
+        finally:
+            Plot2D.create_figure = original_create_figure
+
+    # Panel A: Geological Baseline Section
+    plot_to_ax(ax_baseline, title="A) Baseline Geological Cross-Section", show_lith=True)
+    
+    # Add a custom legend for geologic formations to Panel A to make it publication-ready
+    try:
+        from matplotlib.patches import Patch
+        elements = geo_model.structural_frame.structural_elements
+        legend_elements = []
+        for element in elements:
+            name = element.name
+            color = element.color if hasattr(element, 'color') else 'gray'
+            legend_elements.append(Patch(facecolor=color, edgecolor='black', label=name, alpha=0.8))
+        ax_baseline.legend(handles=legend_elements, loc='lower left', frameon=True, facecolor='white', framealpha=0.9)
+    except Exception as e:
+        print(f"Could not add custom legend to baseline plot: {e}")
+
+    # Panel B: Probability of Lithology 0 (Plutonites)
+    plot_to_ax(ax_prob0, override_grid=online_prob.probability_field[0], title="B) Occurrence Probability: Plutonites", cmap='viridis')
+
+    # Panel C: Probability of Lithology 1 (Sedimentary Host)
+    plot_to_ax(ax_prob1, override_grid=online_prob.probability_field[1], title="C) Occurrence Probability: Sedimentary Host", cmap='viridis')
+
+    # Panel D: Information Entropy (Uncertainty)
+    plot_to_ax(ax_entropy, override_grid=online_prob.entropy, is_entropy=True, title="D) Information Entropy (Structural Uncertainty)", cmap='magma')
+
+    # Save to file in project root
+    project_root = "/home/leguark/PycharmProjects/Mineye-Terranigma"
+    save_path = os.path.join(project_root, output_filename)
+    fig.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"\n[SUCCESS] Generated paper-quality figure saved to: {save_path}")
+    plt.close(fig)
+
 
 def probability_fields_for(geo_model, inference_data, topography_path):
     online_prob = compute_probability_density_fields(
         geo_model,
         inference_data,
-        n_samples=20
+        n_samples=5
     )
     import gempy_viewer as gpv
+    import gempy as gp
+    import os
 
+    # Set up topography early so that both 2D and 3D plots use it
+    simple_geo_model = geo_model
+    gp.set_topography_from_file(
+        grid=simple_geo_model.grid,
+        filepath=topography_path,
+        crop_to_extent=[
+                simple_geo_model.grid.extent[0],
+                simple_geo_model.grid.extent[2],
+                simple_geo_model.grid.extent[1],
+                simple_geo_model.grid.extent[3]
+        ]
+    )
+
+    gp.compute_model(geo_model)
+
+    # 1. Generate the paper-quality, multi-panel summary figure
+    generate_paper_quality_figure(geo_model, online_prob, topography_path)
+
+    # 2. Original legacy plots (for compatibility/visual feedback)
     if True:
         gpv.plot_2d(
             geo_model,
@@ -276,22 +393,6 @@ def probability_fields_for(geo_model, inference_data, topography_path):
             }
         )
 
-    import gempy as gp
-    import os
-    simple_geo_model = geo_model
-    gp.set_topography_from_file(
-        grid=simple_geo_model.grid,
-        filepath=topography_path,
-        crop_to_extent=[
-                simple_geo_model.grid.extent[0],
-                simple_geo_model.grid.extent[2],
-                simple_geo_model.grid.extent[1],
-                simple_geo_model.grid.extent[3]
-        ]
-    )
-
-    gp.compute_model(geo_model)
-
     # * We inject the entropy field into the model
     geo_model.solutions.raw_arrays.scalar_field_matrix[0] = online_prob.entropy
     p3d = gpv.plot_3d(
@@ -300,7 +401,7 @@ def probability_fields_for(geo_model, inference_data, topography_path):
         show_scalar=True,
         show_lith=False,
         show_topography=True,
-        image=False,
+        image=True,
         ve=4,
         threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
         kwargs_pyvista_bounds={
@@ -309,5 +410,8 @@ def probability_fields_for(geo_model, inference_data, topography_path):
                 'show_zlabels': False,
         }
     )
+    
+    # This is a pyvista renderer
+    p3d.p
+    
     return online_prob
-
