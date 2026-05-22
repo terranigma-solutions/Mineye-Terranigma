@@ -278,11 +278,11 @@ def generate_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, topo
         return color if color is not None else next(default_colors)
 
     element_styles = [
-        (
-            getattr(element, "name", f"Lithology {idx + 1}"),
-            element_color(element)
-        )
-        for idx, element in enumerate(elements)
+            (
+                    getattr(element, "name", f"Lithology {idx + 1}"),
+                    element_color(element)
+            )
+            for idx, element in enumerate(elements)
     ]
 
     topo_profile = topography_profile()
@@ -305,13 +305,13 @@ def generate_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, topo
         baseline_index[baseline_section == lithology_id] = idx
 
     with plt.rc_context({
-        "font.size": 10,
-        "axes.labelsize": 10,
-        "axes.titlesize": 12,
-        "xtick.labelsize": 9,
-        "ytick.labelsize": 9,
-        "figure.titlesize": 15,
-        "savefig.dpi": 300,
+            "font.size"       : 10,
+            "axes.labelsize"  : 10,
+            "axes.titlesize"  : 12,
+            "xtick.labelsize" : 9,
+            "ytick.labelsize" : 9,
+            "figure.titlesize": 15,
+            "savefig.dpi"     : 300,
     }):
         fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
         axes = axes.ravel()
@@ -333,8 +333,8 @@ def generate_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, topo
         )
         axes[0].set_title("A) Baseline geological model", loc="left", fontweight="bold")
         legend_handles = [
-            Patch(facecolor=color, edgecolor="black", label=name)
-            for name, color in zip(lithology_names, lithology_colors)
+                Patch(facecolor=color, edgecolor="black", label=name)
+                for name, color in zip(lithology_names, lithology_colors)
         ]
         axes[0].legend(
             handles=legend_handles,
@@ -414,88 +414,12 @@ def generate_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, topo
         plt.close(fig)
 
 
-def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, output_filename="probability_fields_paper_pyvista.png"):
+def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob,
+                                          output_filename="probability_fields_paper_pyvista.png"):
     import os
-    from itertools import cycle
 
     from matplotlib.colors import ListedColormap, to_hex
     from matplotlib.patches import Patch
-
-    try:
-        import pyvista as pv
-    except ImportError as exc:
-        print(f"[WARNING] Could not generate PyVista paper figure because PyVista is unavailable: {exc}")
-        return None
-
-    dense_grid = geo_model.grid.dense_grid
-    resolution = np.asarray(dense_grid.resolution, dtype=int)
-    extent = np.asarray(dense_grid.extent, dtype=float)
-    expected_size = int(np.prod(resolution))
-
-    def normalized_field(field: np.ndarray) -> np.ndarray:
-        field = np.asarray(field).reshape(-1)
-        if field.size != expected_size:
-            raise ValueError(
-                f"Cannot render field with {field.size} cells on dense grid "
-                f"{tuple(resolution)} ({expected_size} cells)."
-            )
-        return field
-
-    elements = list(getattr(geo_model.structural_frame, "structural_elements", []))
-    default_colors = cycle(plt.get_cmap("tab20").colors)
-    lithology_ids = np.asarray(online_prob.unique_lithologies, dtype=int)
-    lithology_names = []
-    lithology_colors = []
-    for idx, lithology_id in enumerate(lithology_ids):
-        element = elements[idx] if idx < len(elements) else None
-        lithology_names.append(getattr(element, "name", f"Lithology {lithology_id}"))
-        color = getattr(element, "color", None) if element is not None else None
-        lithology_colors.append(to_hex(color if color is not None else next(default_colors)))
-
-    def make_grid(field: np.ndarray, name: str):
-        dimensions = tuple((resolution + 1).astype(int))
-        spacing = (
-            (extent[1] - extent[0]) / resolution[0],
-            (extent[3] - extent[2]) / resolution[1],
-            (extent[5] - extent[4]) / resolution[2],
-        )
-        grid = pv.ImageData(
-            dimensions=dimensions,
-            origin=(extent[0], extent[2], extent[4]),
-            spacing=spacing,
-        )
-        grid.cell_data[name] = normalized_field(field)
-        grid.set_active_scalars(name)
-        return grid
-
-    crop_y = extent[2] + 0.58 * (extent[3] - extent[2])
-
-    def crop_grid(grid):
-        return grid.clip_box(
-            bounds=(extent[0], extent[1], extent[2], crop_y, extent[4], extent[5]),
-            invert=False,
-            crinkle=True,
-        )
-
-    def add_topography(plotter):
-        topography = getattr(geo_model.grid, "topography", None)
-        if topography is None or topography.values_2d.size == 0:
-            return
-
-        topography_values = np.asarray(topography.values_2d)
-        yy, xx = np.meshgrid(topography.y, topography.x)
-        topo_grid = pv.StructuredGrid(yy, xx, topography_values[:, :, 2])
-        topo_surface = topo_grid.extract_surface()
-        plotter.add_mesh(
-            topo_surface,
-            color="white",
-            opacity=0.32,
-            smooth_shading=True,
-            show_scalar_bar=False,
-        )
-        contours = topo_surface.contour(scalars=topography_values[:, :, 2].reshape(-1))
-        if contours.n_points > 0:
-            plotter.add_mesh(contours, color="black", line_width=1.2, opacity=0.45)
 
     def configure_camera(plotter):
         x_mid = float((extent[0] + extent[1]) / 2)
@@ -506,114 +430,80 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
         dz = float(extent[5] - extent[4])
         horizontal_span = max(dx, dy)
         plotter.camera_position = [
-            (x_mid + 1.15 * dx, y_mid - 1.15 * dy, z_mid + 1.35 * horizontal_span),
-            (x_mid, y_mid, z_mid),
-            (0, 0, 1),
+                (x_mid + 1.15 * dx, y_mid - 1.15 * dy, z_mid + 1.35 * horizontal_span),
+                (x_mid, y_mid, z_mid),
+                (0, 0, 1),
         ]
         plotter.camera.parallel_projection = True
         plotter.camera.parallel_scale = 0.66 * max(dx, dy, dz)
         plotter.camera.zoom(1.08)
 
-    def positive_threshold(field):
-        field = normalized_field(field)
-        finite_values = field[np.isfinite(field)]
-        if finite_values.size == 0:
-            return None
-        max_value = float(np.nanmax(finite_values))
-        if max_value <= 0:
-            return None
-        return (np.nextafter(0.0, 1.0), max_value)
-
     def render_panel(field, scalar_name, cmap, clim, opacity=0.88, threshold=None, categorical=False):
-        pv.OFF_SCREEN = True
-        plotter = pv.Plotter(off_screen=True, window_size=(1700, 1300))
-        plotter.set_background("white")
-        grid = crop_grid(make_grid(field, scalar_name))
-        if threshold is not None:
-            grid = grid.threshold(threshold, scalars=scalar_name)
 
-        scalar_bar_args = {
-            "title": scalar_name.replace("_", " ").title(),
-            "title_font_size": 18,
-            "label_font_size": 14,
-            "font_family": "arial",
-            "vertical": False,
-            "height": 0.055,
-            "width": 0.52,
-            "position_x": 0.24,
-            "position_y": 0.055,
-        }
-        plotter.add_mesh(
-            grid,
-            scalars=scalar_name,
-            cmap=cmap,
-            clim=clim,
-            opacity=opacity,
-            show_edges=False,
-            show_scalar_bar=not categorical,
-            scalar_bar_args=scalar_bar_args,
+        geo_model.solutions.raw_arrays.scalar_field_matrix[0] = online_prob.entropy
+        p3d = gpv.plot_3d(
+            model=geo_model,
+            active_scalar_field="sf_0",
+            show_scalar=True,
+            show_lith=False,
+            show_topography=True,
+            image=True,
+            show=False,
+            ve=4,
+            threshold_kwargs={'value': [0.2, 0.9], 'invert': False},
+            kwargs_pyvista_bounds={
+                    'show_xlabels': False,
+                    'show_ylabels': False,
+                    'show_zlabels': False,
+            }
         )
-        add_topography(plotter)
-        plotter.show_bounds(
-            bounds=(extent[0], extent[1], extent[2], extent[3], extent[4], extent[5]),
-            show_xlabels=False,
-            show_ylabels=False,
-            show_zlabels=False,
-            grid="front",
-            location="outer",
-            color="dimgray",
-        )
+        plotter = p3d.p
         configure_camera(plotter)
         image = plotter.screenshot(return_img=True, transparent_background=False)
         plotter.close()
         return image
 
-    baseline = np.round(normalized_field(geo_model.solutions.raw_arrays.lith_block)).astype(int)
-    baseline_index = np.full_like(baseline, fill_value=np.nan, dtype=float)
-    for idx, lithology_id in enumerate(lithology_ids):
-        baseline_index[baseline == lithology_id] = idx
-
     panel_specs = [
-        (
-            "A) Baseline geological model",
-            baseline_index,
-            "lithology",
-            ListedColormap(lithology_colors),
-            (-0.5, len(lithology_ids) - 0.5),
-            0.72,
-            None,
-            True,
-        ),
-        (
-            f"B) Occurrence probability: {lithology_names[0] if lithology_names else 'Lithology 0'}",
-            online_prob.probability_field[0],
-            "probability",
-            "viridis",
-            (0, 1),
-            0.86,
-            positive_threshold(online_prob.probability_field[0]),
-            False,
-        ),
-        (
-            f"C) Occurrence probability: {lithology_names[1] if len(lithology_names) > 1 else 'Lithology 1'}",
-            online_prob.probability_field[1] if online_prob.probability_field.shape[0] > 1 else online_prob.probability_field[0],
-            "probability",
-            "viridis",
-            (0, 1),
-            0.86,
-            positive_threshold(online_prob.probability_field[1] if online_prob.probability_field.shape[0] > 1 else online_prob.probability_field[0]),
-            False,
-        ),
-        (
-            "D) Information entropy (structural uncertainty)",
-            online_prob.entropy,
-            "entropy",
-            "magma",
-            (0, float(np.nanmax(online_prob.entropy))),
-            0.92,
-            positive_threshold(online_prob.entropy),
-            False,
-        ),
+            (
+                    "A) Baseline geological model",
+                    baseline_index,
+                    "lithology",
+                    ListedColormap(lithology_colors),
+                    (-0.5, len(lithology_ids) - 0.5),
+                    0.72,
+                    None,
+                    True,
+            ),
+            (
+                    f"B) Occurrence probability: {lithology_names[0] if lithology_names else 'Lithology 0'}",
+                    online_prob.probability_field[0],
+                    "probability",
+                    "viridis",
+                    (0, 1),
+                    0.86,
+                    positive_threshold(online_prob.probability_field[0]),
+                    False,
+            ),
+            (
+                    f"C) Occurrence probability: {lithology_names[1] if len(lithology_names) > 1 else 'Lithology 1'}",
+                    online_prob.probability_field[1] if online_prob.probability_field.shape[0] > 1 else online_prob.probability_field[0],
+                    "probability",
+                    "viridis",
+                    (0, 1),
+                    0.86,
+                    positive_threshold(online_prob.probability_field[1] if online_prob.probability_field.shape[0] > 1 else online_prob.probability_field[0]),
+                    False,
+            ),
+            (
+                    "D) Information entropy (structural uncertainty)",
+                    online_prob.entropy,
+                    "entropy",
+                    "magma",
+                    (0, float(np.nanmax(online_prob.entropy))),
+                    0.92,
+                    positive_threshold(online_prob.entropy),
+                    False,
+            ),
     ]
 
     try:
@@ -623,10 +513,10 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
         return None
 
     with plt.rc_context({
-        "font.size": 10,
-        "axes.titlesize": 12,
-        "figure.titlesize": 15,
-        "savefig.dpi": 300,
+            "font.size"       : 10,
+            "axes.titlesize"  : 12,
+            "figure.titlesize": 15,
+            "savefig.dpi"     : 300,
     }):
         fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
         axes = axes.ravel()
@@ -636,8 +526,8 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
             ax.set_title(title, loc="left", fontweight="bold")
             ax.axis("off")
         legend_handles = [
-            Patch(facecolor=color, edgecolor="black", label=name)
-            for name, color in zip(lithology_names, lithology_colors)
+                Patch(facecolor=color, edgecolor="black", label=name)
+                for name, color in zip(lithology_names, lithology_colors)
         ]
         if legend_handles:
             axes[0].legend(
@@ -684,7 +574,6 @@ def probability_fields_for(geo_model, inference_data, topography_path):
 
     # 1. Generate the paper-quality, multi-panel summary figure
     generate_paper_quality_figure(geo_model, online_prob, topography_path)
-    generate_pyvista_paper_quality_figure(geo_model, online_prob)
 
     # 2. Original legacy plots (for compatibility/visual feedback)
     if True:
@@ -731,15 +620,12 @@ def probability_fields_for(geo_model, inference_data, topography_path):
         show_topography=True,
         image=True,
         ve=4,
-        threshold_kwargs={'value': [0.1, 0.9], 'invert': False},
+        threshold_kwargs={'value': [0.2, 0.9], 'invert': False},
         kwargs_pyvista_bounds={
                 'show_xlabels': False,
                 'show_ylabels': False,
                 'show_zlabels': False,
         }
     )
-    
-    # This is a pyvista renderer
-    p3d.p
-    
+
     return online_prob
