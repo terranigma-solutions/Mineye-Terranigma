@@ -46,7 +46,7 @@ def _create_soricom_geomodel():
         extent=SoricomModelConfig.EXTENT,
         octree_levels=SoricomModelConfig.REFINEMENT,
     )
-    geo_model.interpolation_options.number_octree_levels_surface = 5
+    geo_model.interpolation_options.number_octree_levels_surface = 2
 
     gp.map_stack_to_surfaces(
         gempy_model=geo_model,
@@ -75,8 +75,8 @@ class TestMagneticInversion:
             prob_model=prob_model,
             geo_model=geo_model,
             y_obs_list=magnetic_observations_tensor,
-            # n_samples=100,
-            n_samples=2,
+            n_samples=100,
+            # n_samples=2,
             plot_trace=True,
         )
 
@@ -187,8 +187,8 @@ class TestMagneticInversion:
     @staticmethod
     def _read_magnetics(geophysical_dir):
         import os as _os
-        xyz_path = _os.path.join(_os.path.dirname(__file__), 'soricom_magnetic_xyz.npy')
-        mag_path = _os.path.join(_os.path.dirname(__file__), 'soricom_magnetic_values.npy')
+        xyz_path = _os.path.join(_os.path.dirname(__file__), 'soricom_magnetic_xyz_adaptive.npy')
+        mag_path = _os.path.join(_os.path.dirname(__file__), 'soricom_magnetic_values_adaptive.npy')
         xyz = np.load(xyz_path)
         mag = np.load(mag_path)
         # Subsample 20 points for inversion (random subset)
