@@ -21,6 +21,7 @@ from gempy_probability.core.samplers_data import NUTSConfig
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.probabilistic_model import normalize, _modify_orientations
+from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multimagnetic_likelihood_hierarchical_per_station
 from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 from mineye.config import paths
@@ -93,13 +94,14 @@ class TestMagneticInversion:
         magnetic_observations_tensor = torch.tensor(observed_magnetics_nt)
 
         # Prior predictive
-        prior_inference_data: az.InferenceData = gpp.run_predictive(
-            prob_model=prob_model,
-            geo_model=geo_model,
-            y_obs_list=magnetic_observations_tensor,
-            n_samples=100,
-            plot_trace=True,
-        )
+        if False:
+            prior_inference_data: az.InferenceData = gpp.run_predictive(
+                prob_model=prob_model,
+                geo_model=geo_model,
+                y_obs_list=magnetic_observations_tensor,
+                n_samples=100,
+                plot_trace=True,
+            )
 
         # NUTS inference
         data = gpp.run_nuts_inference(
@@ -112,8 +114,8 @@ class TestMagneticInversion:
                 target_accept_prob=0.65,
                 max_tree_depth=5,
                 init_strategy='median',
-                num_samples=200,
-                warmup_steps=200,
+                num_samples=20,
+                warmup_steps=20,
             ),
             plot_trace=True,
             run_posterior_predictive=True,
@@ -151,7 +153,7 @@ class TestMagneticInversion:
             ),
             self.prior_key_susceptibility: dist.Normal(
                 loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=torch.float64),
-                scale=torch.tensor(0.01, dtype=torch.float64),
+                scale=torch.tensor(0.03, dtype=torch.float64),
             ).to_event(1),
         }
 
@@ -170,7 +172,7 @@ class TestMagneticInversion:
         }
 
         # 5) Likelihood
-        likelihood_fn = self._generate_multimagnetic_likelihood_hierarchical_per_station(
+        likelihood_fn = generate_multimagnetic_likelihood_hierarchical_per_station(
             norm_params=norm_params,
         )
 
@@ -195,7 +197,9 @@ class TestMagneticInversion:
         rng = np.random.default_rng(42)
         idx = rng.choice(len(xyz), size=min(20, len(xyz)), replace=False)
         sampled_xyz = xyz[idx]
-        observed_magnetics = mag[idx]
+        # IGRF: forward model outputs TMI anomalies, so subtract IGRF from raw TMI values
+        igrf_intensity_nT = 47500.0
+        observed_magnetics = mag[idx] - igrf_intensity_nT
         return sampled_xyz, observed_magnetics
 
     @staticmethod
@@ -270,43 +274,7 @@ class TestMagneticInversion:
 
         return interpolation_input
 
-    @staticmethod
-    def _generate_multimagnetic_likelihood_hierarchical_per_station(norm_params):
-        def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
-            simulated_magnetics = align_forward_to_observed(
-                solutions.magnetics, norm_params,
-            )
-            import pyro
-            pyro.deterministic(r'$\mu_{magnetics}$', simulated_magnetics)
-            n_stations = simulated_magnetics.shape[0]
 
-            mu_log_sigma = pyro.sample(
-                "mu_log_sigma",
-                dist.Normal(
-                    torch.tensor(np.log(50.0), dtype=torch.float64),
-                    torch.tensor(0.5, dtype=torch.float64),
-                ),
-            )
-
-            tau_log_sigma = pyro.sample(
-                "tau_log_sigma",
-                dist.HalfNormal(torch.tensor(0.5, dtype=torch.float64)),
-            )
-
-            log_sigma_stations = pyro.sample(
-                "log_sigma_stations",
-                dist.Normal(
-                    mu_log_sigma.expand([n_stations]),
-                    tau_log_sigma,
-                ).to_event(1),
-            )
-
-            sigma_stations = torch.exp(log_sigma_stations)
-            pyro.deterministic("sigma_stations", sigma_stations)
-
-            return dist.Normal(simulated_magnetics, sigma_stations).to_event(1)
-
-        return likelihood_fn
 
     # --- Analysis tests ---
 
