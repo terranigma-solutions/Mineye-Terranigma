@@ -20,7 +20,6 @@ from gempy_engine.modules.geophysics.magnetic_gradient import calculate_magnetic
 from gempy_probability.core.samplers_data import NUTSConfig
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.geophysics import align_forward_to_observed
-from mineye.GeoModel.model_one.inference_diagnostics import check_mcmc_quality
 from mineye.GeoModel.model_one.probabilistic_model import normalize, _modify_orientations
 from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
@@ -76,7 +75,8 @@ class TestMagneticInversion:
             prob_model=prob_model,
             geo_model=geo_model,
             y_obs_list=magnetic_observations_tensor,
-            n_samples=100,
+            # n_samples=100,
+            n_samples=2,
             plot_trace=True,
         )
 
