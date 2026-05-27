@@ -193,13 +193,72 @@ def parse_enmap_wavelengths(xml_path):
 # 2. Load ENMAP cube, metadata, QA masks
 # ============================================================
 
+def _resolve_enmap_product_path(path):
+    """Return the directory that contains the EnMAP product rasters."""
+    files = os.listdir(path)
+    has_spectral_image = any("SPECTRAL_IMAGE" in f.upper() and f.upper().endswith((".TIF", ".TIFF")) for f in files)
+    if has_spectral_image:
+        return path
+
+    subdirs = [f for f in files if os.path.isdir(os.path.join(path, f)) and not f.startswith("__MACOSX")]
+    candidates = []
+    for subdir in subdirs:
+        subdir_path = os.path.join(path, subdir)
+        try:
+            subdir_files = os.listdir(subdir_path)
+        except OSError:
+            continue
+        if any("SPECTRAL_IMAGE" in f.upper() and f.upper().endswith((".TIF", ".TIFF")) for f in subdir_files):
+            candidates.append(subdir_path)
+
+    if len(candidates) == 1:
+        print(f"[EnMap] Using nested product directory: {os.path.basename(candidates[0])}")
+        return candidates[0]
+
+    if len(candidates) > 1:
+        candidate_names = ", ".join(os.path.basename(c) for c in candidates)
+        raise FileNotFoundError(
+            f"Multiple nested EnMAP product directories with spectral images found in '{path}': {candidate_names}. "
+            "Please pass the exact product directory."
+        )
+
+    return path
+
+
+def _find_required_enmap_file(path, files, contains, extensions=None):
+    contains_u = contains.upper()
+    matches = []
+    for f in files:
+        fu = f.upper()
+        if contains_u not in fu:
+            continue
+        if extensions is not None and not fu.endswith(extensions):
+            continue
+        matches.append(f)
+
+    if len(matches) == 1:
+        return os.path.join(path, matches[0])
+
+    if len(matches) > 1:
+        match_names = ", ".join(sorted(matches))
+        raise FileNotFoundError(
+            f"Multiple EnMAP files matching '{contains}' found in '{path}': {match_names}. "
+            "Please remove duplicates or pass a more specific product directory."
+        )
+
+    available = ", ".join(sorted(files)) if len(files) > 0 else "<empty directory>"
+    raise FileNotFoundError(
+        f"Could not find required EnMAP file containing '{contains}' in '{path}'. Available files: {available}"
+    )
+
+
 def load_enmap_dataset(path):
     if rasterio is None:
         raise ImportError("rasterio is required for load_enmap_dataset(). Please install rasterio.")
+    path = _resolve_enmap_product_path(path)
     files = os.listdir(path)
 
-    cube_path = next(f for f in files if "SPECTRAL_IMAGE" in f and f.upper().endswith((".TIF", ".TIFF")))
-    cube_path = os.path.join(path, cube_path)
+    cube_path = _find_required_enmap_file(path, files, "SPECTRAL_IMAGE", (".TIF", ".TIFF"))
 
     with rasterio.open(cube_path) as src:
         cube = src.read()      # (bands, y, x)
@@ -219,8 +278,7 @@ def load_enmap_dataset(path):
     else:
         cube = cube.astype(np.float32)
 
-    xml_path = next(f for f in files if "METADATA.XML" in f.upper())
-    xml_path = os.path.join(path, xml_path)
+    xml_path = _find_required_enmap_file(path, files, "METADATA.XML")
     print(f"[EnMap] Metadata XML: {os.path.basename(xml_path)}")
 
     qa_masks = {}
