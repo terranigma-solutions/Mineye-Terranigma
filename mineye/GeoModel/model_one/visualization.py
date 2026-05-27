@@ -12,7 +12,10 @@ from gempy_probability.modules.plot.plot_posterior import default_blue, default_
 from gempy_probability.modules.fields import fields
 
 
-def generate_gravity_uncertainty_plots(gravity_samples_norm, observed_gravity_ugal, xy_ravel) -> tuple[str, Any]:
+def generate_gravity_uncertainty_plots(gravity_samples_norm, observed_gravity_ugal, xy_ravel,
+                                       unit_label: str = 'Aligned Gravity (μGal)',
+                                       response_label: str = 'Gravity',
+                                       title_prefix: str = 'Gravity') -> tuple[str, Any]:
     # Import visualization functions
     from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_map_interpolated
     from mineye.GeoModel.plotting.probabilistic_analysis import plot_gravity_uncertainty_profiles
@@ -21,8 +24,6 @@ def generate_gravity_uncertainty_plots(gravity_samples_norm, observed_gravity_ug
     # Convert PyTorch tensor to numpy if needed
     if hasattr(gravity_samples_norm, 'numpy'):
         gravity_samples_norm = gravity_samples_norm.numpy()
-
-    unit_label = 'Aligned Gravity (μGal)'
 
     print(f"\n{'=' * 60}")
     print(f"EXTRACTED NORMALIZED SAMPLES")
@@ -39,7 +40,9 @@ def generate_gravity_uncertainty_plots(gravity_samples_norm, observed_gravity_ug
         xy_coords=xy_ravel,
         observed_data=observed_gravity_ugal,
         confidence_level=0.95,
-        title="Gravity Uncertainty Propagation from Dip Uncertainty"
+        title=f"{title_prefix} Uncertainty Propagation from Dip Uncertainty",
+        unit_label=unit_label,
+        response_label=response_label,
     )
 
     # 2. Profile plots with confidence bands (with normalized data)
@@ -48,7 +51,9 @@ def generate_gravity_uncertainty_plots(gravity_samples_norm, observed_gravity_ug
         xy_coords=xy_ravel,
         observed_data=(observed_gravity_ugal),
         n_profiles=4,
-        confidence_level=0.95
+        confidence_level=0.95,
+        unit_label=unit_label,
+        response_label=response_label,
     )
 
     # 3. Interpolated uncertainty maps (smoother visualization with normalized data)
@@ -56,7 +61,9 @@ def generate_gravity_uncertainty_plots(gravity_samples_norm, observed_gravity_ug
         gravity_samples=gravity_samples_norm,
         xy_coords=xy_ravel,
         observed_data=(observed_gravity_ugal),
-        grid_resolution=100
+        grid_resolution=100,
+        unit_label=unit_label,
+        response_label=response_label,
     )
     return gravity_samples_norm, unit_label
 

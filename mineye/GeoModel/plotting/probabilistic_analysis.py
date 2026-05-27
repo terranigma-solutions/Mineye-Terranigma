@@ -131,7 +131,9 @@ def plot_fw_geophysics(fw_values, observed_data: DataFrame, xy_ravel: np.ndarray
 def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.ndarray,
                                   observed_data: np.ndarray = None,
                                   confidence_level: float = 0.95,
-                                  title: str = "Gravity Prediction with Uncertainty"):
+                                  title: str = "Gravity Prediction with Uncertainty",
+                                  unit_label: str = r'$\mu$Gal',
+                                  response_label: str = 'Gravity'):
     """
     Plot spatial distribution of gravity predictions with uncertainty.
 
@@ -190,7 +192,7 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
     else:
         # If error bars would be too large, show text warning instead
         ax1.text(0.02, 0.98,
-                 f'⚠ Large uncertainty\n(mean σ = {mean_std:.1f} μGal)\nSee Plot 2 for details',
+                 f'⚠ Large uncertainty\n(mean σ = {mean_std:.1f} {unit_label})\nSee Plot 2 for details',
                  transform=ax1.transAxes, fontsize=10, verticalalignment='top',
                  bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.7))
 
@@ -198,7 +200,7 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
     ax1.set_xlabel('X (m)', fontsize=12)
     ax1.set_ylabel('Y (m)', fontsize=12)
     cbar1 = plt.colorbar(scatter1, ax=ax1)
-    cbar1.set_label(r'Mean Gravity ($\mu$Gal)', fontsize=11)
+    cbar1.set_label(f'Mean {response_label} ({unit_label})', fontsize=11)
     ax1.grid(True, alpha=0.3)
 
     # ============ Plot 2: Uncertainty (standard deviation) ============
@@ -211,7 +213,7 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
     ax2.set_xlabel('X (m)', fontsize=12)
     ax2.set_ylabel('Y (m)', fontsize=12)
     cbar2 = plt.colorbar(scatter2, ax=ax2)
-    cbar2.set_label(r'Standard Deviation ($\mu$Gal)', fontsize=11)
+    cbar2.set_label(f'Standard Deviation ({unit_label})', fontsize=11)
     ax2.grid(True, alpha=0.3)
 
     # ============ Plot 3: Coefficient of Variation (relative uncertainty) ============
@@ -249,14 +251,14 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
         rmse = np.sqrt(np.mean(residuals ** 2))
         correlation = np.corrcoef(observed_data, mean_gravity)[0, 1]
 
-        ax4.set_xlabel('Observed Gravity (μGal)', fontsize=12)
-        ax4.set_ylabel('Predicted Gravity (μGal)', fontsize=12)
+        ax4.set_xlabel(f'Observed {response_label} ({unit_label})', fontsize=12)
+        ax4.set_ylabel(f'Predicted {response_label} ({unit_label})', fontsize=12)
         ax4.set_title('Observed vs Predicted with Uncertainty', fontsize=14, fontweight='bold')
         ax4.legend(fontsize=10)
         ax4.grid(True, alpha=0.3)
 
         # Add metrics text box
-        textstr = f'R = {correlation:.3f}\nRMSE = {rmse:.2f} μGal'
+        textstr = f'R = {correlation:.3f}\nRMSE = {rmse:.2f} {unit_label}'
         ax4.text(0.05, 0.95, textstr, transform=ax4.transAxes, fontsize=11,
                  verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     else:
@@ -269,7 +271,7 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
                                       showmeans=True, showmedians=True)
 
         ax4.set_xlabel('Device Index', fontsize=12)
-        ax4.set_ylabel('Gravity (μGal)', fontsize=12)
+        ax4.set_ylabel(f'{response_label} ({unit_label})', fontsize=12)
         ax4.set_title(f'Distribution of Predictions (first {n_devices} devices)', fontsize=14, fontweight='bold')
         ax4.set_xticks(positions)
         ax4.grid(True, alpha=0.3, axis='y')
@@ -281,13 +283,13 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
     print("\n" + "=" * 60)
     print("UNCERTAINTY SUMMARY STATISTICS")
     print("=" * 60)
-    print(f"Mean gravity:        {np.mean(mean_gravity):.2f} ± {np.std(mean_gravity):.2f} μGal")
-    print(f"Mean uncertainty:    {np.mean(std_gravity):.2f} μGal")
-    print(f"Max uncertainty:     {np.max(std_gravity):.2f} μGal")
-    print(f"Min uncertainty:     {np.min(std_gravity):.2f} μGal")
+    print(f"Mean gravity:        {np.mean(mean_gravity):.2f} ± {np.std(mean_gravity):.2f} {unit_label}")
+    print(f"Mean uncertainty:    {np.mean(std_gravity):.2f} {unit_label}")
+    print(f"Max uncertainty:     {np.max(std_gravity):.2f} {unit_label}")
+    print(f"Min uncertainty:     {np.min(std_gravity):.2f} {unit_label}")
     print(f"Mean CV:             {np.mean(cv):.2f}%")
     if observed_data is not None:
-        print(f"RMSE:                {rmse:.2f} μGal")
+        print(f"RMSE:                {rmse:.2f} {unit_label}")
         print(f"Correlation (R):     {correlation:.3f}")
     print("=" * 60 + "\n")
 
@@ -295,7 +297,9 @@ def plot_gravity_with_uncertainty(gravity_samples: np.ndarray, xy_coords: np.nda
 def plot_gravity_uncertainty_profiles(gravity_samples: np.ndarray, xy_coords: np.ndarray,
                                       observed_data: np.ndarray = None,
                                       n_profiles: int = 4,
-                                      confidence_level: float = 0.95):
+                                      confidence_level: float = 0.95,
+                                      unit_label: str = r'$\mu$Gal',
+                                      response_label: str = 'Gravity'):
     """
     Plot line profiles showing gravity with confidence bands.
 
@@ -364,7 +368,7 @@ def plot_gravity_uncertainty_profiles(gravity_samples: np.ndarray, xy_coords: np
                        zorder=5, label='Observed', edgecolors='black', linewidth=0.5)
 
         ax.set_xlabel(xlabel, fontsize=11)
-        ax.set_ylabel('Gravity (μGal)', fontsize=11)
+        ax.set_ylabel(f'{response_label} ({unit_label})', fontsize=11)
         ax.set_title(f'Profile along {direction}', fontsize=12, fontweight='bold')
         ax.legend(fontsize=9, loc='best')
         ax.grid(True, alpha=0.3)
@@ -375,7 +379,9 @@ def plot_gravity_uncertainty_profiles(gravity_samples: np.ndarray, xy_coords: np
 
 def plot_gravity_uncertainty_map_interpolated(gravity_samples: np.ndarray, xy_coords: np.ndarray,
                                               observed_data: np.ndarray = None,
-                                              grid_resolution: int = 100):
+                                              grid_resolution: int = 100,
+                                              unit_label: str = r'$\mu$Gal',
+                                              response_label: str = 'Gravity'):
     """
     Create interpolated uncertainty maps for smoother visualization.
 
@@ -418,7 +424,7 @@ def plot_gravity_uncertainty_map_interpolated(gravity_samples: np.ndarray, xy_co
     ax1.set_xlabel('X (m)', fontsize=11)
     ax1.set_ylabel('Y (m)', fontsize=11)
     cbar1 = plt.colorbar(im1, ax=ax1)
-    cbar1.set_label(r'Gravity ($\mu$Gal)', fontsize=10)
+    cbar1.set_label(f'{response_label} ({unit_label})', fontsize=10)
     ax1.legend(fontsize=9)
 
     # Plot 2: Uncertainty map (interpolated)
@@ -430,7 +436,7 @@ def plot_gravity_uncertainty_map_interpolated(gravity_samples: np.ndarray, xy_co
     ax2.set_xlabel('X (m)', fontsize=11)
     ax2.set_ylabel('Y (m)', fontsize=11)
     cbar2 = plt.colorbar(im2, ax=ax2)
-    cbar2.set_label(r'Std. Dev. ($\mu$Gal)', fontsize=10)
+    cbar2.set_label(f'Std. Dev. ({unit_label})', fontsize=10)
     ax2.legend(fontsize=9)
 
     plt.show()

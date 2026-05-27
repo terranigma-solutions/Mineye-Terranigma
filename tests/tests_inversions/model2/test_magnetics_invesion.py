@@ -27,7 +27,7 @@ from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comp
 from mineye.config import paths
 from mineye.config.example_parameters import SoricomModelConfig
 
-nc_path = "arviz_data_magnetic_soricom.nc"
+nc_path = "../../../examples/02_probabilistic_modeling/arviz_data_magnetic_soricom.nc"
 
 
 def _create_soricom_geomodel():
