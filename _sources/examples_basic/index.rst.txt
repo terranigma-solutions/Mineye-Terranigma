@@ -45,6 +45,10 @@ Getting Help
 * Visit the project repository for issues and discussions
 
 
+.. raw:: html
+
+  <div id='sg-tag-list' class='sphx-glr-tag-list'></div>
+
 
 .. raw:: html
 
@@ -61,7 +65,7 @@ Getting Help
   .. image:: /examples_basic/images/thumb/sphx_glr_01_simple_tharsis_model_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py`
+  :doc:`/examples_basic/01_simple_tharsis_model`
 
 .. raw:: html
 
@@ -78,7 +82,7 @@ Getting Help
   .. image:: /examples_basic/images/thumb/sphx_glr_02_complex_tharsis_model_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_basic_02_complex_tharsis_model.py`
+  :doc:`/examples_basic/02_complex_tharsis_model`
 
 .. raw:: html
 
@@ -95,11 +99,28 @@ Getting Help
   .. image:: /examples_basic/images/thumb/sphx_glr_03_gravity_forward_model_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_basic_03_gravity_forward_model.py`
+  :doc:`/examples_basic/03_gravity_forward_model`
 
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Forward Gravity Modeling - Tharsis Region</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example creates a 3D geological model featuring fault structures for the Soricom chromite deposit using GemPy.">
+
+.. only:: html
+
+  .. image:: /examples_basic/images/thumb/sphx_glr_04_soricom_fault_model_thumb.png
+    :alt:
+
+  :doc:`/examples_basic/04_soricom_fault_model`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Geological Model with Faults - Soricom Chromite Deposit</div>
     </div>
 
 
@@ -116,6 +137,7 @@ Getting Help
    /examples_basic/01_simple_tharsis_model
    /examples_basic/02_complex_tharsis_model
    /examples_basic/03_gravity_forward_model
+   /examples_basic/04_soricom_fault_model
 
 
 

@@ -194,9 +194,9 @@ Get Data Paths
 
  .. code-block:: none
 
-    Orientations: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/orientations_mod.csv
-    Points: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/points_mod.csv
-    Geophysical data: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/General_Input_Data/Geophysical_Cleaned_Data
+    Orientations: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/orientations_mod.csv
+    Points: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/points_mod.csv
+    Geophysical data: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/General_Input_Data/Geophysical_Cleaned_Data
 
 
 
@@ -430,9 +430,10 @@ Compute and Visualize Initial Model
  .. code-block:: none
 
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
+    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+      return func(*args, **kwargs)
 
-    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fed00e1e300>
+    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fd9a4b3d7c0>
 
 
 
@@ -464,12 +465,12 @@ Compute and Visualize Initial Model
 
  .. code-block:: none
 
-    /home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
-    ../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
     From version 0.50, passing this as a positional argument will result in a TypeError.
       gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
 
-    <gempy_viewer.modules.plot_3d.vista.GemPyToVista object at 0x7fed7c6ada70>
+    <gempy_viewer.modules.plot_3d.vista.GemPyToVista object at 0x7fd990026990>
 
 
 
@@ -906,8 +907,10 @@ This function creates a 2D cross-section visualization showing:
 
     Active grids: GridTypes.OCTREE|NONE
     Setting Backend To: AvailableBackends.PYTORCH
+    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+      return func(*args, **kwargs)
     Setting Backend To: AvailableBackends.PYTORCH
-    /home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: 'linewidth', 'contour_colors'
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: 'linewidth', 'contour_colors'
       contour_set = ax.contour(
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
@@ -929,7 +932,7 @@ This function creates a 2D cross-section visualization showing:
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
 
-    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fecf8274c80>
+    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fd98c9373f0>
 
 
 
@@ -1053,7 +1056,7 @@ To run the inference yourself, set RUN_SIMULATION = True below.
 
  .. code-block:: none
 
-     Loaded inference results from /home/leguark/PycharmProjects/Mineye-Terranigma/examples/02_probabilistic_modeling/arviz_data_magnetic_feb2026.nc
+     Loaded inference results from /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/arviz_data_magnetic_feb2026.nc
 
 
 
@@ -1295,8 +1298,10 @@ Geological Model Uncertainty Visualization
 
     Active grids: GridTypes.OCTREE|NONE
     Setting Backend To: AvailableBackends.PYTORCH
+    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+      return func(*args, **kwargs)
     Setting Backend To: AvailableBackends.PYTORCH
-    /home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: 'linewidth', 'contour_colors'
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: 'linewidth', 'contour_colors'
       contour_set = ax.contour(
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
@@ -1338,7 +1343,7 @@ Geological Model Uncertainty Visualization
     Setting Backend To: AvailableBackends.PYTORCH
     Setting Backend To: AvailableBackends.PYTORCH
 
-    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fecf2f2cad0>
+    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fda22488130>
 
 
 
@@ -1459,12 +1464,12 @@ Uncertainty Quantification: Prior
     ============================================================
     UNCERTAINTY SUMMARY STATISTICS
     ============================================================
-    Mean gravity:        43282.82 ± 31.28 μGal
-    Mean uncertainty:    45.28 μGal
-    Max uncertainty:     49.52 μGal
-    Min uncertainty:     39.20 μGal
+    Mean gravity:        43282.82 ± 31.28 Aligned Gravity (μGal)
+    Mean uncertainty:    45.28 Aligned Gravity (μGal)
+    Max uncertainty:     49.52 Aligned Gravity (μGal)
+    Min uncertainty:     39.20 Aligned Gravity (μGal)
     Mean CV:             0.10%
-    RMSE:                39.22 μGal
+    RMSE:                39.22 Aligned Gravity (μGal)
     Correlation (R):     0.239
     ============================================================
 
@@ -1534,12 +1539,12 @@ Uncertainty Quantification: Posterior
     ============================================================
     UNCERTAINTY SUMMARY STATISTICS
     ============================================================
-    Mean gravity:        43286.47 ± 22.85 μGal
-    Mean uncertainty:    10.89 μGal
-    Max uncertainty:     15.50 μGal
-    Min uncertainty:     7.71 μGal
+    Mean gravity:        43286.47 ± 22.85 Aligned Gravity (μGal)
+    Mean uncertainty:    10.89 Aligned Gravity (μGal)
+    Max uncertainty:     15.50 Aligned Gravity (μGal)
+    Min uncertainty:     7.71 Aligned Gravity (μGal)
     Mean CV:             0.03%
-    RMSE:                28.94 μGal
+    RMSE:                28.94 Aligned Gravity (μGal)
     Correlation (R):     0.489
     ============================================================
 
@@ -1652,7 +1657,7 @@ probability density fields and information entropy.
     *
 
       .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_019.png
-         :alt: Cell Number: mid Direction: y
+         :alt: 05 magnetics inversion
          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_019.png
          :class: sphx-glr-multi-img
 
@@ -1691,21 +1696,84 @@ probability density fields and information entropy.
          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_024.png
          :class: sphx-glr-multi-img
 
-.. rst-class:: sphx-glr-horizontal
-
-
     *
 
       .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_025.png
-          :alt: 05 magnetics inversion
-          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_025.png
-          :class: sphx-glr-multi-img
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_025.png
+         :class: sphx-glr-multi-img
+
+.. rst-class:: sphx-glr-horizontal
+
 
     *
 
       .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_026.png
           :alt: 05 magnetics inversion
           :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_026.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_027.png
+          :alt: 05 magnetics inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_027.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_028.png
+          :alt: 05 magnetics inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_028.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_029.png
+          :alt: 05 magnetics inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_029.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_030.png
+          :alt: 05 magnetics inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_030.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_031.png
+          :alt: 05 magnetics inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_031.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_032.png
+          :alt: 05 magnetics inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_032.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_033.png
+          :alt: 05 magnetics inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_033.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_034.png
+          :alt: 05 magnetics inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_034.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_035.png
+          :alt: 05 magnetics inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_05_magnetics_inversion_035.png
           :class: sphx-glr-multi-img
 
 
@@ -1717,104 +1785,120 @@ probability density fields and information entropy.
     Computing prior probability fields...
     Active grids: GridTypes.DENSE|NONE
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Active grids: GridTypes.DENSE|TOPOGRAPHY|NONE
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    /home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
-    ../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+
+    [SUCCESS] Generated paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper.png
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+    [SUCCESS] Generated PyVista paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper_pyvista.png
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
     From version 0.50, passing this as a positional argument will result in a TypeError.
       gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
 
     Computing posterior probability fields...
     Active grids: GridTypes.DENSE|NONE
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Active grids: GridTypes.DENSE|TOPOGRAPHY|NONE
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    /home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
-    ../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+
+    [SUCCESS] Generated paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper.png
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+    [SUCCESS] Generated PyVista paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper_pyvista.png
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
     From version 0.50, passing this as a positional argument will result in a TypeError.
       gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
 
@@ -1874,7 +1958,7 @@ Please refer to :ref:`sphx_glr_02_probabilistic_modeling_04_gravity_inversion.py
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (1 minutes 33.291 seconds)
+   **Total running time of the script:** (7 minutes 22.465 seconds)
 
 
 .. _sphx_glr_download_examples_probabilistic_05_magnetics_inversion.py:

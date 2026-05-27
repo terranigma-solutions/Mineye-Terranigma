@@ -65,22 +65,7 @@ The Tharsis plutonite intrusion (density ~2.9 g/cm³) intruded into sedimentary 
 5. Compute forward gravity response
 6. Compare with observations and analyze residuals
 
-.. GENERATED FROM PYTHON SOURCE LINES 49-53
-
-.. code-block:: Python
-
-    import dotenv
-
-    from mineye.GeoModel.helper_plotter import plot_model_and_gravity_sensors
-
-
-
-
-
-
-
-
-.. GENERATED FROM PYTHON SOURCE LINES 54-72
+.. GENERATED FROM PYTHON SOURCE LINES 51-69
 
 Import Libraries
 ----------------
@@ -101,13 +86,15 @@ Import Libraries
 * ``align_forward_to_observed``: Aligns modeled gravity to observed data statistics
 * ``normalize``: Data normalization and preprocessing functions
 
-.. GENERATED FROM PYTHON SOURCE LINES 72-88
+.. GENERATED FROM PYTHON SOURCE LINES 69-87
 
 .. code-block:: Python
 
 
+    import dotenv
     dotenv.load_dotenv()
 
+    from mineye.GeoModel.helper_plotter import plot_model_and_gravity_sensors
     import numpy as np
     import torch
     from matplotlib import pyplot as plt
@@ -125,14 +112,20 @@ Import Libraries
 
 
 
+.. rst-class:: sphx-glr-script-out
+
+ .. code-block:: none
+
+    Setting Backend To: AvailableBackends.PYTORCH
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 89-90
+
+.. GENERATED FROM PYTHON SOURCE LINES 88-89
 
 Import paths configuration
 
-.. GENERATED FROM PYTHON SOURCE LINES 90-92
+.. GENERATED FROM PYTHON SOURCE LINES 89-91
 
 .. code-block:: Python
 
@@ -145,13 +138,13 @@ Import paths configuration
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 93-96
+.. GENERATED FROM PYTHON SOURCE LINES 92-95
 
 Define Model Extent and Resolution
 -----------------------------------
 The model covers the Tharsis mining district
 
-.. GENERATED FROM PYTHON SOURCE LINES 96-109
+.. GENERATED FROM PYTHON SOURCE LINES 95-108
 
 .. code-block:: Python
 
@@ -175,13 +168,13 @@ The model covers the Tharsis mining district
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 110-113
+.. GENERATED FROM PYTHON SOURCE LINES 109-112
 
 Get Data Paths
 --------------
 Load paths to structural and geophysical data
 
-.. GENERATED FROM PYTHON SOURCE LINES 113-122
+.. GENERATED FROM PYTHON SOURCE LINES 112-121
 
 .. code-block:: Python
 
@@ -202,20 +195,20 @@ Load paths to structural and geophysical data
 
  .. code-block:: none
 
-    Orientations: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/orientations_mod.csv
-    Points: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/points_mod.csv
-    Gravity data: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/General_Input_Data/Geophysical_Cleaned_Data/cleaned_gravity_data.geojson
+    Orientations: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/orientations_mod.csv
+    Points: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/points_mod.csv
+    Gravity data: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/General_Input_Data/Geophysical_Cleaned_Data/cleaned_gravity_data.geojson
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 123-126
+.. GENERATED FROM PYTHON SOURCE LINES 122-125
 
 Create GemPy Geological Model
 ------------------------------
 Build the model structure with imported structural data
 
-.. GENERATED FROM PYTHON SOURCE LINES 126-138
+.. GENERATED FROM PYTHON SOURCE LINES 125-137
 
 .. code-block:: Python
 
@@ -238,13 +231,13 @@ Build the model structure with imported structural data
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 139-142
+.. GENERATED FROM PYTHON SOURCE LINES 138-141
 
 Map Geological Units
 --------------------
 Define the stratigraphic stack
 
-.. GENERATED FROM PYTHON SOURCE LINES 142-150
+.. GENERATED FROM PYTHON SOURCE LINES 141-149
 
 .. code-block:: Python
 
@@ -294,7 +287,7 @@ Define the stratigraphic stack
     <br />
     <br />
 
-.. GENERATED FROM PYTHON SOURCE LINES 151-174
+.. GENERATED FROM PYTHON SOURCE LINES 150-173
 
 Load Gravity Observations
 --------------------------
@@ -320,7 +313,7 @@ subsurface density variations, making it ideal for geological interpretation.
 * Systematic errors from incomplete corrections
 * Regional trends vs. local anomalies
 
-.. GENERATED FROM PYTHON SOURCE LINES 174-181
+.. GENERATED FROM PYTHON SOURCE LINES 173-180
 
 .. code-block:: Python
 
@@ -345,7 +338,7 @@ subsurface density variations, making it ideal for geological interpretation.
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 182-197
+.. GENERATED FROM PYTHON SOURCE LINES 181-196
 
 Set Up Gravity Measurement Locations
 -------------------------------------
@@ -363,7 +356,7 @@ around each measurement point. This approach:
 Each measurement location becomes the center of a local grid where the density
 distribution is evaluated in detail.
 
-.. GENERATED FROM PYTHON SOURCE LINES 197-206
+.. GENERATED FROM PYTHON SOURCE LINES 196-205
 
 .. code-block:: Python
 
@@ -389,7 +382,7 @@ distribution is evaluated in detail.
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 207-246
+.. GENERATED FROM PYTHON SOURCE LINES 206-245
 
 Configure Centered Grid for Gravity Computation
 ------------------------------------------------
@@ -431,7 +424,7 @@ station where GemPy will evaluate the density distribution.
 In this example, a 5 km radius ([5000, 5000, 5000]) is chosen to encompass the
 entire Tharsis plutonite intrusion, ensuring its full gravitational signature is captured.
 
-.. GENERATED FROM PYTHON SOURCE LINES 246-254
+.. GENERATED FROM PYTHON SOURCE LINES 245-253
 
 .. code-block:: Python
 
@@ -440,7 +433,7 @@ entire Tharsis plutonite intrusion, ensuring its full gravitational signature is
         grid=simple_geo_model.grid,
         centers=xy_ravel,
         resolution=np.array([10, 10, 15]),
-        radius=np.array([5000, 5000, 5000])
+        radius=np.array([2000, 5000, 2000])
     )
 
 
@@ -712,29 +705,29 @@ entire Tharsis plutonite intrusion, ensuring its full gravitational signature is
            [-6.93430253e+05,  4.54254364e+06,  5.00000000e+02],
            [-7.01585545e+05,  4.53598599e+06,  5.00000000e+02],
            [-6.98010147e+05,  4.53061768e+06,  5.00000000e+02],
-           [-7.00367868e+05,  4.54428712e+06,  5.00000000e+02]]), resolution=array([10, 10, 15]), radius=array([5000, 5000, 5000]), kernel_grid_centers=array([[-5000.        , -5000.        ,  -300.        ],
-           [-5000.        , -5000.        ,  -360.        ],
-           [-5000.        , -5000.        ,  -383.36972966],
+           [-7.00367868e+05,  4.54428712e+06,  5.00000000e+02]]), resolution=array([10, 10, 15]), radius=array([2000, 5000, 2000]), kernel_grid_centers=array([[-2000.        , -5000.        ,  -120.        ],
+           [-2000.        , -5000.        ,  -144.        ],
+           [-2000.        , -5000.        ,  -153.34789186],
            ...,
-           [ 5000.        ,  5000.        , -3407.68480754],
-           [ 5000.        ,  5000.        , -4618.11403801],
-           [ 5000.        ,  5000.        , -6300.        ]], shape=(1936, 3)), left_voxel_edges=array([[1709.43058496, 1709.43058496,  -30.        ],
-           [1709.43058496, 1709.43058496,  -30.        ],
-           [1709.43058496, 1709.43058496,  -11.68486483],
+           [ 2000.        ,  5000.        , -1363.07392302],
+           [ 2000.        ,  5000.        , -1847.2456152 ],
+           [ 2000.        ,  5000.        , -2520.        ]], shape=(1936, 3)), left_voxel_edges=array([[ 683.77223398, 1709.43058496,  -12.        ],
+           [ 683.77223398, 1709.43058496,  -12.        ],
+           [ 683.77223398, 1709.43058496,   -4.67394593],
            ...,
-           [1709.43058496, 1709.43058496, -435.56428767],
-           [1709.43058496, 1709.43058496, -605.21461523],
-           [1709.43058496, 1709.43058496, -840.942981  ]], shape=(1936, 3)), right_voxel_edges=array([[1709.43058496, 1709.43058496,  -30.        ],
-           [1709.43058496, 1709.43058496,  -11.68486483],
-           [1709.43058496, 1709.43058496,  -16.23606704],
+           [ 683.77223398, 1709.43058496, -174.22571507],
+           [ 683.77223398, 1709.43058496, -242.08584609],
+           [ 683.77223398, 1709.43058496, -336.3771924 ]], shape=(1936, 3)), right_voxel_edges=array([[ 683.77223398, 1709.43058496,  -12.        ],
+           [ 683.77223398, 1709.43058496,   -4.67394593],
+           [ 683.77223398, 1709.43058496,   -6.49442681],
            ...,
-           [1709.43058496, 1709.43058496, -605.21461523],
-           [1709.43058496, 1709.43058496, -840.942981  ],
-           [1709.43058496, 1709.43058496, -840.942981  ]], shape=(1936, 3)))
+           [ 683.77223398, 1709.43058496, -242.08584609],
+           [ 683.77223398, 1709.43058496, -336.3771924 ],
+           [ 683.77223398, 1709.43058496, -336.3771924 ]], shape=(1936, 3)))
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 255-275
+.. GENERATED FROM PYTHON SOURCE LINES 254-274
 
 Calculate Gravity Gradient
 ---------------------------
@@ -757,7 +750,7 @@ to the total gravity at the observation point, based on:
 
 These gradients are later multiplied by density values to get the final gravity response.
 
-.. GENERATED FROM PYTHON SOURCE LINES 275-279
+.. GENERATED FROM PYTHON SOURCE LINES 274-278
 
 .. code-block:: Python
 
@@ -778,7 +771,7 @@ These gradients are later multiplied by density values to get the final gravity 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 280-308
+.. GENERATED FROM PYTHON SOURCE LINES 279-307
 
 Set Density Values
 ------------------
@@ -809,13 +802,13 @@ These values are based on:
    Density uncertainties significantly impact modeling results. Typical uncertainties
    are ±0.05-0.10 g/cm³, which should be considered in probabilistic inversions.
 
-.. GENERATED FROM PYTHON SOURCE LINES 308-321
+.. GENERATED FROM PYTHON SOURCE LINES 307-320
 
 .. code-block:: Python
 
 
-    density_plutonites = 2.9  # g/cm³
-    density_sedimentary_host = 2.3  # g/cm³
+    density_plutonites = 2.9 - 2.67  # g/cm³
+    density_sedimentary_host = 2.3 - 2.67 # g/cm³
 
     simple_geo_model.geophysics_input = gp.data.GeophysicsInput(
         tz=gravity_gradient,
@@ -834,14 +827,14 @@ These values are based on:
 
  .. code-block:: none
 
-    Plutonite density: 2.9 g/cm³
-    Sedimentary host density: 2.3 g/cm³
+    Plutonite density: 0.22999999999999998 g/cm³
+    Sedimentary host density: -0.3700000000000001 g/cm³
     Density contrast: 0.6 g/cm³
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 322-346
+.. GENERATED FROM PYTHON SOURCE LINES 321-345
 
 Compute Forward Gravity Model
 ------------------------------
@@ -868,7 +861,7 @@ Run the interpolation and gravity computation
 
 The ``mesh_extraction=False`` flag skips 3D mesh generation (not needed for gravity).
 
-.. GENERATED FROM PYTHON SOURCE LINES 346-364
+.. GENERATED FROM PYTHON SOURCE LINES 345-363
 
 .. code-block:: Python
 
@@ -900,13 +893,18 @@ The ``mesh_extraction=False`` flag skips 3D mesh generation (not needed for grav
 
     Active grids: GridTypes.OCTREE|TOPOGRAPHY|CENTERED|NONE
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
+    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+    Please either pass the dim explicitly or simply use torch.linalg.cross.
+    The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:63.)
+      return func(*args, **kwargs)
+    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+      return func(*args, **kwargs)
     ✓ Forward gravity model computed successfully
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 365-384
+.. GENERATED FROM PYTHON SOURCE LINES 364-383
 
 Extract Gravity Results
 -----------------------
@@ -928,7 +926,7 @@ buffer to handle edge effects.
    This alignment is a practical necessity for forward modeling but should be
    carefully considered in inverse problems where we're trying to fit the data.
 
-.. GENERATED FROM PYTHON SOURCE LINES 384-399
+.. GENERATED FROM PYTHON SOURCE LINES 383-398
 
 .. code-block:: Python
 
@@ -956,17 +954,17 @@ buffer to handle edge effects.
  .. code-block:: none
 
     Computing align_to_reference alignment parameters...
-      Alignment params: {'method': 'align_to_reference', 'reference_mean': 25587.184615384616, 'reference_std': 8369.297471927344, 'baseline_forward_mean': -388.1267789929416, 'baseline_forward_std': 1.8054178450074378}
+      Alignment params: {'method': 'align_to_reference', 'reference_mean': 25587.184615384616, 'reference_std': 8369.297471927344, 'baseline_forward_mean': 25.53804167887109, 'baseline_forward_std': 2.90580102793957}
 
     Computed gravity values:
       Shape: torch.Size([260])
-      Range: -50607.12 to 29982.25 μGal
+      Range: -24345.14 to 34346.25 μGal
       Mean: 25587.18 μGal
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 400-425
+.. GENERATED FROM PYTHON SOURCE LINES 399-424
 
 Compare with Observations
 -------------------------
@@ -994,7 +992,7 @@ Residuals (observed - modeled) reveal how well the geological model explains the
   - Data quality issues
   - 3D effects not captured by 2D modeling
 
-.. GENERATED FROM PYTHON SOURCE LINES 425-436
+.. GENERATED FROM PYTHON SOURCE LINES 424-435
 
 .. code-block:: Python
 
@@ -1019,14 +1017,14 @@ Residuals (observed - modeled) reveal how well the geological model explains the
 
 
     Gravity residuals:
-      Mean: -0.00 μGal
-      Std: 10540.46 μGal
-      RMS: 10540.46 μGal
+      Mean: 0.00 μGal
+      Std: 10551.90 μGal
+      RMS: 10551.90 μGal
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 437-450
+.. GENERATED FROM PYTHON SOURCE LINES 436-449
 
 Visualize the Model
 -------------------
@@ -1042,7 +1040,7 @@ model itself to understand:
 * Topographic influences
 * Overall model plausibility
 
-.. GENERATED FROM PYTHON SOURCE LINES 450-466
+.. GENERATED FROM PYTHON SOURCE LINES 449-465
 
 .. code-block:: Python
 
@@ -1080,15 +1078,20 @@ model itself to understand:
 
  .. code-block:: none
 
-    /home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
-    ../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
     From version 0.50, passing this as a positional argument will result in a TypeError.
       gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 467-479
+.. GENERATED FROM PYTHON SOURCE LINES 466-478
 
 Visualize Gravity Results
 --------------------------
@@ -1103,7 +1106,7 @@ Spatial plots help identify:
 * Edge effects and boundary artifacts
 * Correlation between observed and modeled signatures
 
-.. GENERATED FROM PYTHON SOURCE LINES 479-491
+.. GENERATED FROM PYTHON SOURCE LINES 478-490
 
 .. code-block:: Python
 
@@ -1148,12 +1151,12 @@ Spatial plots help identify:
 
     === Observed vs Predicted Comparison ===
     Computing align_to_reference alignment parameters...
-      Alignment params: {'method': 'align_to_reference', 'reference_mean': 25587.184615384616, 'reference_std': 8369.297471927344, 'baseline_forward_mean': -25587.18461538464, 'baseline_forward_std': 8353.187163491928}
+      Alignment params: {'method': 'align_to_reference', 'reference_mean': 25587.184615384616, 'reference_std': 8369.297471927344, 'baseline_forward_mean': -25587.184615384613, 'baseline_forward_std': 8353.187163491926}
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 492-507
+.. GENERATED FROM PYTHON SOURCE LINES 491-506
 
 Visualize Forward Model Results
 --------------------------------
@@ -1171,7 +1174,7 @@ Key features to observe:
 The colormap (viridis_r) is reversed so higher values (positive anomalies) appear
 warmer, following common geophysical convention.
 
-.. GENERATED FROM PYTHON SOURCE LINES 507-532
+.. GENERATED FROM PYTHON SOURCE LINES 506-531
 
 .. code-block:: Python
 
@@ -1214,12 +1217,12 @@ warmer, following common geophysical convention.
  .. code-block:: none
 
     ✓ Forward model computed
-      Gravity range: [-50607.12, 29982.25] µGal
+      Gravity range: [-24345.14, 34346.25] µGal
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 533-561
+.. GENERATED FROM PYTHON SOURCE LINES 532-560
 
 Compare with Observed Gravity
 ------------------------------
@@ -1250,7 +1253,7 @@ This comprehensive view shows:
 * Random residuals indicate we're at the noise level
 * Large residuals in specific areas point to local geological features not captured
 
-.. GENERATED FROM PYTHON SOURCE LINES 561-605
+.. GENERATED FROM PYTHON SOURCE LINES 560-604
 
 .. code-block:: Python
 
@@ -1310,7 +1313,7 @@ This comprehensive view shows:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 606-630
+.. GENERATED FROM PYTHON SOURCE LINES 605-629
 
 Correlation Analysis
 --------------------
@@ -1337,7 +1340,7 @@ The scatter plot of observed vs. modeled gravity is a powerful diagnostic tool:
 This analysis helps determine if the geological model is a reasonable representation
 of the subsurface structure.
 
-.. GENERATED FROM PYTHON SOURCE LINES 630-663
+.. GENERATED FROM PYTHON SOURCE LINES 629-662
 
 .. code-block:: Python
 
@@ -1386,12 +1389,12 @@ of the subsurface structure.
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 664-666
+.. GENERATED FROM PYTHON SOURCE LINES 663-665
 
 Print Summary Statistics
 -------------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 666-687
+.. GENERATED FROM PYTHON SOURCE LINES 665-686
 
 .. code-block:: Python
 
@@ -1438,21 +1441,21 @@ Print Summary Statistics
     Forward model:
       Mean: 25587.18 µGal
       Std:  8353.19 µGal
-      Range: [-50607.12, 29982.25] µGal
+      Range: [-24345.14, 34346.25] µGal
 
     Residuals:
-      Mean: -0.00 µGal
-      Std:  10540.46 µGal
-      RMSE: 10540.46 µGal
-      MAE:  7355.18 µGal
+      Mean: 0.00 µGal
+      Std:  10551.90 µGal
+      RMSE: 10551.90 µGal
+      MAE:  8095.83 µGal
 
-    Correlation: 0.2054 (R² = 0.0422)
+    Correlation: 0.2037 (R² = 0.0415)
     ==================================================
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 688-725
+.. GENERATED FROM PYTHON SOURCE LINES 687-724
 
 Summary and Interpretation
 ---------------------------
@@ -1495,7 +1498,7 @@ sphinx_gallery_thumbnail_number = 2
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 2.562 seconds)
+   **Total running time of the script:** (0 minutes 18.651 seconds)
 
 
 .. _sphx_glr_download_examples_basic_03_gravity_forward_model.py:

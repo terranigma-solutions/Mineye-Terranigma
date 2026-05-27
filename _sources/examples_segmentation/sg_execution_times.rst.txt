@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:00.243** total execution time for 3 files **from examples_segmentation**:
+**08:10.418** total execution time for 3 files **from examples_segmentation**:
 
 .. container::
 
@@ -33,11 +33,11 @@ Computation times
      - Time
      - Mem (MB)
    * - :ref:`sphx_glr_examples_segmentation_01_enmap_lith_segmentation.py` (``01_enmap_lith_segmentation.py``)
-     - 00:00.243
-     - 0.0
-   * - :ref:`sphx_glr_examples_segmentation_02_enmap_data_extraction.py` (``02_enmap_data_extraction.py``)
-     - 00:00.000
+     - 08:05.982
      - 0.0
    * - :ref:`sphx_glr_examples_segmentation_03_enmap_gempy_comparison.py` (``03_enmap_gempy_comparison.py``)
-     - 00:00.000
+     - 00:04.199
+     - 0.0
+   * - :ref:`sphx_glr_examples_segmentation_02_enmap_data_extraction.py` (``02_enmap_data_extraction.py``)
+     - 00:00.237
      - 0.0

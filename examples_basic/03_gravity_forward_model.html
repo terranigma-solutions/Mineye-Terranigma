@@ -7,19 +7,21 @@
 
     <title>Forward Gravity Modeling - Tharsis Region &#8212; Mineye-Terranigma 0.1.0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
-    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=89af775e" />
-    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=0ca6144b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=fd6457a4" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
     <script src="../_static/documentation_options.js?v=01f34227"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <link rel="icon" href="../_static/favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Probabilistic Modeling Examples" href="../examples_probabilistic/index.html" />
+    <link rel="next" title="Geological Model with Faults - Soricom Chromite Deposit" href="04_soricom_fault_model.html" />
     <link rel="prev" title="Complex Geological Model - Tharsis Region" href="02_complex_tharsis_model.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -83,11 +85,6 @@ density variations in the subsurface. The gravity anomaly (Δg) at a point depen
 <li><p>Compute forward gravity response</p></li>
 <li><p>Compare with observations and analyze residuals</p></li>
 </ol>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">dotenv</span>
-
-<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.helper_plotter</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_model_and_gravity_sensors</span>
-</pre></div>
-</div>
 <section id="import-libraries">
 <h2>Import Libraries<a class="headerlink" href="#import-libraries" title="Link to this heading">¶</a></h2>
 <p><strong>Core Libraries</strong>:</p>
@@ -106,8 +103,10 @@ density variations in the subsurface. The gravity anomaly (Δg) at a point depen
 <li><p><code class="docutils literal notranslate"><span class="pre">align_forward_to_observed</span></code>: Aligns modeled gravity to observed data statistics</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">normalize</span></code>: Data normalization and preprocessing functions</p></li>
 </ul>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">dotenv</span><span class="o">.</span><span class="n">load_dotenv</span><span class="p">()</span>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">dotenv</span>
+<span class="n">dotenv</span><span class="o">.</span><span class="n">load_dotenv</span><span class="p">()</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.helper_plotter</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_model_and_gravity_sensors</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
@@ -120,6 +119,9 @@ density variations in the subsurface. The gravity anomaly (Δg) at a point depen
 
 <span class="c1"># Set random seed for reproducibility</span>
 <a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span></a></a></a></a></a></a></a></a><span class="p">(</span><span class="mi">1234</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
 </pre></div>
 </div>
 <p>Import paths configuration</p>
@@ -156,9 +158,9 @@ density variations in the subsurface. The gravity anomaly (Δg) at a point depen
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Gravity data: </span><span class="si">{</span><span class="n">gravity_data_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Orientations: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/orientations_mod.csv
-Points: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/points_mod.csv
-Gravity data: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/General_Input_Data/Geophysical_Cleaned_Data/cleaned_gravity_data.geojson
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Orientations: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/orientations_mod.csv
+Points: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/points_mod.csv
+Gravity data: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/General_Input_Data/Geophysical_Cleaned_Data/cleaned_gravity_data.geojson
 </pre></div>
 </div>
 </section>
@@ -312,7 +314,7 @@ entire Tharsis plutonite intrusion, ensuring its full gravitational signature is
     <span class="n">grid</span><span class="o">=</span><span class="n">simple_geo_model</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span>
     <span class="n">centers</span><span class="o">=</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xy_ravel</span></a></a></a></a></a></a></a></a><span class="p">,</span>
     <span class="n">resolution</span><span class="o">=</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">array</span></a></a></a></a></a></a></a></a><span class="p">([</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">15</span><span class="p">]),</span>
-    <span class="n">radius</span><span class="o">=</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">array</span></a></a></a></a></a></a></a></a><span class="p">([</span><span class="mi">5000</span><span class="p">,</span> <span class="mi">5000</span><span class="p">,</span> <span class="mi">5000</span><span class="p">])</span>
+    <span class="n">radius</span><span class="o">=</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">array</span></a></a></a></a></a></a></a></a><span class="p">([</span><span class="mi">2000</span><span class="p">,</span> <span class="mi">5000</span><span class="p">,</span> <span class="mi">2000</span><span class="p">])</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -577,25 +579,25 @@ CenteredGrid(centers=array([[-7.04570250e+05,  4.54824444e+06,  5.00000000e+02],
        [-6.93430253e+05,  4.54254364e+06,  5.00000000e+02],
        [-7.01585545e+05,  4.53598599e+06,  5.00000000e+02],
        [-6.98010147e+05,  4.53061768e+06,  5.00000000e+02],
-       [-7.00367868e+05,  4.54428712e+06,  5.00000000e+02]]), resolution=array([10, 10, 15]), radius=array([5000, 5000, 5000]), kernel_grid_centers=array([[-5000.        , -5000.        ,  -300.        ],
-       [-5000.        , -5000.        ,  -360.        ],
-       [-5000.        , -5000.        ,  -383.36972966],
+       [-7.00367868e+05,  4.54428712e+06,  5.00000000e+02]]), resolution=array([10, 10, 15]), radius=array([2000, 5000, 2000]), kernel_grid_centers=array([[-2000.        , -5000.        ,  -120.        ],
+       [-2000.        , -5000.        ,  -144.        ],
+       [-2000.        , -5000.        ,  -153.34789186],
        ...,
-       [ 5000.        ,  5000.        , -3407.68480754],
-       [ 5000.        ,  5000.        , -4618.11403801],
-       [ 5000.        ,  5000.        , -6300.        ]], shape=(1936, 3)), left_voxel_edges=array([[1709.43058496, 1709.43058496,  -30.        ],
-       [1709.43058496, 1709.43058496,  -30.        ],
-       [1709.43058496, 1709.43058496,  -11.68486483],
+       [ 2000.        ,  5000.        , -1363.07392302],
+       [ 2000.        ,  5000.        , -1847.2456152 ],
+       [ 2000.        ,  5000.        , -2520.        ]], shape=(1936, 3)), left_voxel_edges=array([[ 683.77223398, 1709.43058496,  -12.        ],
+       [ 683.77223398, 1709.43058496,  -12.        ],
+       [ 683.77223398, 1709.43058496,   -4.67394593],
        ...,
-       [1709.43058496, 1709.43058496, -435.56428767],
-       [1709.43058496, 1709.43058496, -605.21461523],
-       [1709.43058496, 1709.43058496, -840.942981  ]], shape=(1936, 3)), right_voxel_edges=array([[1709.43058496, 1709.43058496,  -30.        ],
-       [1709.43058496, 1709.43058496,  -11.68486483],
-       [1709.43058496, 1709.43058496,  -16.23606704],
+       [ 683.77223398, 1709.43058496, -174.22571507],
+       [ 683.77223398, 1709.43058496, -242.08584609],
+       [ 683.77223398, 1709.43058496, -336.3771924 ]], shape=(1936, 3)), right_voxel_edges=array([[ 683.77223398, 1709.43058496,  -12.        ],
+       [ 683.77223398, 1709.43058496,   -4.67394593],
+       [ 683.77223398, 1709.43058496,   -6.49442681],
        ...,
-       [1709.43058496, 1709.43058496, -605.21461523],
-       [1709.43058496, 1709.43058496, -840.942981  ],
-       [1709.43058496, 1709.43058496, -840.942981  ]], shape=(1936, 3)))
+       [ 683.77223398, 1709.43058496, -242.08584609],
+       [ 683.77223398, 1709.43058496, -336.3771924 ],
+       [ 683.77223398, 1709.43058496, -336.3771924 ]], shape=(1936, 3)))
 </pre></div>
 </div>
 </section>
@@ -653,8 +655,8 @@ to the total gravity at the observation point, based on:</p>
 <p>Density uncertainties significantly impact modeling results. Typical uncertainties
 are ±0.05-0.10 g/cm³, which should be considered in probabilistic inversions.</p>
 </div>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">density_plutonites</span> <span class="o">=</span> <span class="mf">2.9</span>  <span class="c1"># g/cm³</span>
-<span class="n">density_sedimentary_host</span> <span class="o">=</span> <span class="mf">2.3</span>  <span class="c1"># g/cm³</span>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">density_plutonites</span> <span class="o">=</span> <span class="mf">2.9</span> <span class="o">-</span> <span class="mf">2.67</span>  <span class="c1"># g/cm³</span>
+<span class="n">density_sedimentary_host</span> <span class="o">=</span> <span class="mf">2.3</span> <span class="o">-</span> <span class="mf">2.67</span> <span class="c1"># g/cm³</span>
 
 <span class="n">simple_geo_model</span><span class="o">.</span><span class="n">geophysics_input</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">GeophysicsInput</span><span class="p">(</span>
     <span class="n">tz</span><span class="o">=</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">gravity_gradient</span></a></a></a></a></a></a></a></a><span class="p">,</span>
@@ -666,8 +668,8 @@ are ±0.05-0.10 g/cm³, which should be considered in probabilistic inversions.<
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Density contrast: </span><span class="si">{</span><span class="n">density_plutonites</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">density_sedimentary_host</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> g/cm³&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Plutonite density: 2.9 g/cm³
-Sedimentary host density: 2.3 g/cm³
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Plutonite density: 0.22999999999999998 g/cm³
+Sedimentary host density: -0.3700000000000001 g/cm³
 Density contrast: 0.6 g/cm³
 </pre></div>
 </div>
@@ -714,7 +716,12 @@ Density contrast: 0.6 g/cm³
 </div>
 <div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Active grids: GridTypes.OCTREE|TOPOGRAPHY|CENTERED|NONE
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
+/home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:63.)
+  return func(*args, **kwargs)
+/home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  return func(*args, **kwargs)
 ✓ Forward gravity model computed successfully
 </pre></div>
 </div>
@@ -753,11 +760,11 @@ carefully considered in inverse problems where we’re trying to fit the data.</
 </pre></div>
 </div>
 <div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Computing align_to_reference alignment parameters...
-  Alignment params: {&#39;method&#39;: &#39;align_to_reference&#39;, &#39;reference_mean&#39;: 25587.184615384616, &#39;reference_std&#39;: 8369.297471927344, &#39;baseline_forward_mean&#39;: -388.1267789929416, &#39;baseline_forward_std&#39;: 1.8054178450074378}
+  Alignment params: {&#39;method&#39;: &#39;align_to_reference&#39;, &#39;reference_mean&#39;: 25587.184615384616, &#39;reference_std&#39;: 8369.297471927344, &#39;baseline_forward_mean&#39;: 25.53804167887109, &#39;baseline_forward_std&#39;: 2.90580102793957}
 
 Computed gravity values:
   Shape: torch.Size([260])
-  Range: -50607.12 to 29982.25 μGal
+  Range: -24345.14 to 34346.25 μGal
   Mean: 25587.18 μGal
 </pre></div>
 </div>
@@ -798,9 +805,9 @@ regional trends or model errors</p></li>
 </pre></div>
 </div>
 <div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Gravity residuals:
-  Mean: -0.00 μGal
-  Std: 10540.46 μGal
-  RMS: 10540.46 μGal
+  Mean: 0.00 μGal
+  Std: 10551.90 μGal
+  RMS: 10551.90 μGal
 </pre></div>
 </div>
 </section>
@@ -832,8 +839,13 @@ model itself to understand:</p>
 <span class="n">plot_model_and_gravity_sensors</span><span class="p">(</span><span class="n">simple_geo_model</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xy_ravel</span></a></a></a></a></a></a></a></a><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">grav</span></a></a></a></a></a></a></a></a><span class="p">)</span>
 </pre></div>
 </div>
-<img src="../_images/sphx_glr_03_gravity_forward_model_001.png" srcset="../_images/sphx_glr_03_gravity_forward_model_001.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-single-img"/><img src="../_images/sphx_glr_03_gravity_forward_model_002.png" srcset="../_images/sphx_glr_03_gravity_forward_model_002.png" alt="03 gravity forward model" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>/home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
-../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+<img src="../_images/sphx_glr_03_gravity_forward_model_001.png" srcset="../_images/sphx_glr_03_gravity_forward_model_001.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-single-img"/><img src="../_images/sphx_glr_03_gravity_forward_model_002.png" srcset="../_images/sphx_glr_03_gravity_forward_model_002.png" alt="03 gravity forward model" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
 From version 0.50, passing this as a positional argument will result in a TypeError.
   gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
 </pre></div>
@@ -870,7 +882,7 @@ From version 0.50, passing this as a positional argument will result in a TypeEr
 
 === Observed vs Predicted Comparison ===
 Computing align_to_reference alignment parameters...
-  Alignment params: {&#39;method&#39;: &#39;align_to_reference&#39;, &#39;reference_mean&#39;: 25587.184615384616, &#39;reference_std&#39;: 8369.297471927344, &#39;baseline_forward_mean&#39;: -25587.18461538464, &#39;baseline_forward_std&#39;: 8353.187163491928}
+  Alignment params: {&#39;method&#39;: &#39;align_to_reference&#39;, &#39;reference_mean&#39;: 25587.184615384616, &#39;reference_std&#39;: 8369.297471927344, &#39;baseline_forward_mean&#39;: -25587.184615384613, &#39;baseline_forward_std&#39;: 8353.187163491926}
 </pre></div>
 </div>
 </section>
@@ -913,7 +925,7 @@ warmer, following common geophysical convention.</p>
 </pre></div>
 </div>
 <img src="../_images/sphx_glr_03_gravity_forward_model_005.png" srcset="../_images/sphx_glr_03_gravity_forward_model_005.png" alt="Forward Gravity Model" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>✓ Forward model computed
-  Gravity range: [-50607.12, 29982.25] µGal
+  Gravity range: [-24345.14, 34346.25] µGal
 </pre></div>
 </div>
 </section>
@@ -1079,15 +1091,15 @@ Observed gravity:
 Forward model:
   Mean: 25587.18 µGal
   Std:  8353.19 µGal
-  Range: [-50607.12, 29982.25] µGal
+  Range: [-24345.14, 34346.25] µGal
 
 Residuals:
-  Mean: -0.00 µGal
-  Std:  10540.46 µGal
-  RMSE: 10540.46 µGal
-  MAE:  7355.18 µGal
+  Mean: 0.00 µGal
+  Std:  10551.90 µGal
+  RMSE: 10551.90 µGal
+  MAE:  8095.83 µGal
 
-Correlation: 0.2054 (R² = 0.0422)
+Correlation: 0.2037 (R² = 0.0415)
 ==================================================
 </pre></div>
 </div>
@@ -1129,7 +1141,7 @@ and inversion. Geoscientific Model Development, 12(1), 1-32.</p></li>
 </ul>
 </div>
 <p>sphinx_gallery_thumbnail_number = 2</p>
-<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 2.562 seconds)</p>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 18.651 seconds)</p>
 <div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-examples-basic-03-gravity-forward-model-py">
 <div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
 <p><a class="reference download internal" download="" href="../_downloads/e4e940e60f22892c08fe2968ee8a26bc/03_gravity_forward_model.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">03_gravity_forward_model.ipynb</span></code></a></p>
@@ -1166,7 +1178,16 @@ and inversion. Geoscientific Model Development, 12(1), 1-32.</p></li>
 
 
 
-<h3>Navigation</h3>
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 </ul>
@@ -1196,21 +1217,11 @@ and inversion. Geoscientific Model Development, 12(1), 1-32.</p></li>
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="index.html">Basic Examples</a><ul>
       <li>Previous: <a href="02_complex_tharsis_model.html" title="previous chapter">Complex Geological Model - Tharsis Region</a></li>
-      <li>Next: <a href="../examples_probabilistic/index.html" title="next chapter">Probabilistic Modeling Examples</a></li>
+      <li>Next: <a href="04_soricom_fault_model.html" title="next chapter">Geological Model with Faults - Soricom Chromite Deposit</a></li>
   </ul></li>
   </ul></li>
 </ul>
 </div>
-<search id="searchbox" style="display: none" role="search">
-  <h3 id="searchlabel">Quick search</h3>
-    <div class="searchformwrapper">
-    <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</search>
-<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -1227,8 +1238,8 @@ and inversion. Geoscientific Model Development, 12(1), 1-32.</p></li>
       &#169;2024-2026, Terranigma Solutions GmbH.
       
       |
-      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
-      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
       
       |
       <a href="../_sources/examples_basic/03_gravity_forward_model.rst.txt"

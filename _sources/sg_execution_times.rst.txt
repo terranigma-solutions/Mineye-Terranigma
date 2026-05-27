@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:00.243** total execution time for 12 files **from all galleries**:
+**02:17.545** total execution time for 14 files **from all galleries**:
 
 .. container::
 
@@ -32,8 +32,8 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_examples_segmentation_01_enmap_lith_segmentation.py` (``../../examples/03_segmentation/01_enmap_lith_segmentation.py``)
-     - 00:00.243
+   * - :ref:`sphx_glr_examples_probabilistic_08_soricom_magnetic_inversion.py` (``../../examples/02_probabilistic_modeling/08_soricom_magnetic_inversion.py``)
+     - 02:17.545
      - 0.0
    * - :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py` (``../../examples/01_basic_examples/01_simple_tharsis_model.py``)
      - 00:00.000
@@ -42,6 +42,9 @@ Computation times
      - 00:00.000
      - 0.0
    * - :ref:`sphx_glr_examples_basic_03_gravity_forward_model.py` (``../../examples/01_basic_examples/03_gravity_forward_model.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_basic_04_soricom_fault_model.py` (``../../examples/01_basic_examples/04_soricom_fault_model.py``)
      - 00:00.000
      - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_02_error_propagation.py` (``../../examples/02_probabilistic_modeling/02_error_propagation.py``)
@@ -60,6 +63,9 @@ Computation times
      - 00:00.000
      - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_07_joint_inversion.py` (``../../examples/02_probabilistic_modeling/07_joint_inversion.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_segmentation_01_enmap_lith_segmentation.py` (``../../examples/03_segmentation/01_enmap_lith_segmentation.py``)
      - 00:00.000
      - 0.0
    * - :ref:`sphx_glr_examples_segmentation_02_enmap_data_extraction.py` (``../../examples/03_segmentation/02_enmap_data_extraction.py``)

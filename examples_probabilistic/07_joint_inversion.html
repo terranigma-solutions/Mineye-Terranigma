@@ -7,19 +7,21 @@
 
     <title>Bayesian Joint Inversion: Gravity and EnMap &#8212; Mineye-Terranigma 0.1.0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
-    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=89af775e" />
-    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=d2d258e8" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=0ca6144b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=fd6457a4" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
     <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
     <script src="../_static/documentation_options.js?v=01f34227"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <link rel="icon" href="../_static/favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Hyperspectral Segmentation" href="../examples_segmentation/index.html" />
+    <link rel="next" title="Bayesian Magnetic Inversion: Soricom Chromite Lens" href="08_soricom_magnetic_inversion.html" />
     <link rel="prev" title="Bayesian EnMap Inversion: Categorical Likelihood and Ordinal Probabilities" href="06_enmap_inversion.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -40,7 +42,7 @@
             
   <div class="sphx-glr-download-link-note admonition note">
 <p class="admonition-title">Note</p>
-<p><a class="reference internal" href="#sphx-glr-download-examples-probabilistic-07-joint-inversion-py"><span class="std std-ref">Go to the end</span></a>
+<p><a class="reference internal" href="../examples_probabilistic_v1/07_joint_inversion.html#sphx-glr-download-examples-probabilistic-07-joint-inversion-py"><span class="std std-ref">Go to the end</span></a>
 to download the full example code.</p>
 </div>
 <section class="sphx-glr-example-title" id="bayesian-joint-inversion-gravity-and-enmap">
@@ -133,10 +135,7 @@ statistically “drown out” the other.</p></li>
 <span class="n">seed</span> <span class="o">=</span> <span class="mi">42</span>
 <span class="n">pyro</span><span class="o">.</span><span class="n">set_rng_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
-<a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span></a></a><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
-</pre></div>
-</div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+<a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/random/generated/numpy.random.seed.html#numpy.random.seed" title="numpy.random.seed" class="sphx-glr-backref-module-numpy-random sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span></a></a></a></a></a><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 </pre></div>
 </div>
 <section id="setup-model-extent-and-load-data">
@@ -204,13 +203,13 @@ Higher refinement leads to more accurate results but increases computation time.
 <p>Gravity data measures small variations in the Earth’s gravitational field caused by
 density differences in the subsurface.</p>
 <p><strong>Units</strong>: μGal (microgal)</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gravity_data</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a> <span class="o">=</span> <span class="n">read_gravity</span><span class="p">(</span><span class="n">geophysical_dir</span><span class="p">)</span>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gravity_data</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a></a></a></a> <span class="o">=</span> <span class="n">read_gravity</span><span class="p">(</span><span class="n">geophysical_dir</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Gravity observations:&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Number of measurements: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Range: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> μGal&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> μGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Number of measurements: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a></a></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Range: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a></a></a></a><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a></a></a></a><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> μGal&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a></a></a></a><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> μGal&quot;</span><span class="p">)</span>
 
-<span class="n">geo_model</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xy_ravel</span></a></a> <span class="o">=</span> <span class="n">setup_geomodel</span><span class="p">(</span><span class="n">gravity_data</span><span class="p">,</span> <span class="n">simple_geo_model</span><span class="p">)</span>
+<span class="n">geo_model</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xy_ravel</span></a></a></a></a></a> <span class="o">=</span> <span class="n">setup_geomodel</span><span class="p">(</span><span class="n">gravity_data</span><span class="p">,</span> <span class="n">simple_geo_model</span><span class="p">)</span>
 <span class="n">geo_model</span><span class="o">.</span><span class="n">interpolation_options</span><span class="o">.</span><span class="n">sigmoid_slope</span> <span class="o">=</span> <span class="mi">100</span>
 </pre></div>
 </div>
@@ -245,19 +244,19 @@ In this context, we use it as a categorical surface classification of rock types
 <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">xyz_path</span><span class="p">):</span>
     <span class="c1"># Fallback to dummy data if real data isn&#39;t found for the sphinx build</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Warning: Real EnMap data not found. Using dummy data for demonstration.&quot;</span><span class="p">)</span>
-    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">array</span></a></a><span class="p">([[</span><span class="o">-</span><span class="mi">690000</span><span class="p">,</span> <span class="mi">4540000</span><span class="p">,</span> <span class="mi">500</span><span class="p">]])</span>
-    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">array</span></a></a><span class="p">([</span><span class="mi">1</span><span class="p">])</span>
+    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a></a></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">array</span></a></a></a></a></a><span class="p">([[</span><span class="o">-</span><span class="mi">690000</span><span class="p">,</span> <span class="mi">4540000</span><span class="p">,</span> <span class="mi">500</span><span class="p">]])</span>
+    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.array.html#numpy.array" title="numpy.array" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">array</span></a></a></a></a></a><span class="p">([</span><span class="mi">1</span><span class="p">])</span>
 <span class="k">else</span><span class="p">:</span>
-    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">load</span></a></a><span class="p">(</span><span class="n">xyz_path</span><span class="p">)</span>
-    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">load</span></a></a><span class="p">(</span><span class="n">labels_path</span><span class="p">)</span>
-    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a><span class="p">[</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a> <span class="o">==</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># Normalize labels to match model units</span>
+    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a></a></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">load</span></a></a></a></a></a><span class="p">(</span><span class="n">xyz_path</span><span class="p">)</span>
+    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a></a></a> <span class="o">=</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.load.html#numpy.load" title="numpy.load" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">load</span></a></a></a></a></a><span class="p">(</span><span class="n">labels_path</span><span class="p">)</span>
+    <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a></a></a><span class="p">[</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a></a></a> <span class="o">==</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># Normalize labels to match model units</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">EnMap observations:&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Number of pixels: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Categories: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">unique</span></a></a><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Number of pixels: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Categories: </span><span class="si">{</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><a href="https://numpy.org/doc/stable/reference/generated/numpy.unique.html#numpy.unique" title="numpy.unique" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-function"><span class="n">np</span><span class="o">.</span><span class="n">unique</span></a></a></a></a></a><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a></a></a><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Configure Custom Grid for EnMap</span>
-<span class="n">gp</span><span class="o">.</span><span class="n">set_custom_grid</span><span class="p">(</span><span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a><span class="p">)</span>
+<span class="n">gp</span><span class="o">.</span><span class="n">set_custom_grid</span><span class="p">(</span><span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span> <a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">xyz_enmap</span></a></a></a></a></a><span class="p">)</span>
 
 <span class="c1"># Activate both Centered (Gravity) and Custom (EnMap) grids</span>
 <span class="n">gp</span><span class="o">.</span><span class="n">set_active_grid</span><span class="p">(</span>
@@ -280,15 +279,15 @@ Grid(values=array([[-6.86311507e+05,  4.53422704e+06,  1.31536606e+02],
        [-6.78457499e+05,  4.53496092e+06, -8.63073923e+02],
        [-6.78457499e+05,  4.53496092e+06, -1.34724562e+03],
        [-6.78457499e+05,  4.53496092e+06, -2.02000000e+03]],
-      shape=(38777, 3)), length=array([], dtype=float64), _octree_grid=RegularGrid(resolution=array([512, 400,  32]), extent=array([-7.075210e+05, -6.755580e+05,  4.526832e+06,  4.551949e+06,
-       -5.000000e+02,  5.050000e+02]), values=array([[-7.07489786e+05,  4.52686340e+06, -4.84296875e+02],
-       [-7.07489786e+05,  4.52686340e+06, -4.52890625e+02],
-       [-7.07489786e+05,  4.52686340e+06, -4.21484375e+02],
+      shape=(38777, 3)), length=array([], dtype=float64), _octree_grid=RegularGrid(resolution=array([1024,  800,   32]), extent=array([-7.075210e+05, -6.755580e+05,  4.526832e+06,  4.551949e+06,
+       -5.000000e+02,  5.050000e+02]), values=array([[-7.07505393e+05,  4.52684770e+06, -4.84296875e+02],
+       [-7.07505393e+05,  4.52684770e+06, -4.52890625e+02],
+       [-7.07505393e+05,  4.52684770e+06, -4.21484375e+02],
        ...,
-       [-6.75589214e+05,  4.55191760e+06,  4.26484375e+02],
-       [-6.75589214e+05,  4.55191760e+06,  4.57890625e+02],
-       [-6.75589214e+05,  4.55191760e+06,  4.89296875e+02]],
-      shape=(6553600, 3)), mask_topo=array([], shape=(0, 3), dtype=bool), _transform=None, _base_resolution=array([32, 25,  2])), _dense_grid=None, _custom_grid=CustomGrid(values=array([[-6.86311507e+05,  4.53422704e+06,  1.31536606e+02],
+       [-6.75573607e+05,  4.55193330e+06,  4.26484375e+02],
+       [-6.75573607e+05,  4.55193330e+06,  4.57890625e+02],
+       [-6.75573607e+05,  4.55193330e+06,  4.89296875e+02]],
+      shape=(26214400, 3)), mask_topo=array([], shape=(0, 3), dtype=bool), _transform=None, _base_resolution=array([64, 50,  2])), _dense_grid=None, _custom_grid=CustomGrid(values=array([[-6.86311507e+05,  4.53422704e+06,  1.31536606e+02],
        [-6.84340294e+05,  4.53983741e+06,  3.46467194e+02],
        [-6.96432927e+05,  4.54468963e+06,  3.20259308e+02],
        [-6.91163723e+05,  4.54302168e+06,  2.81383545e+02],
@@ -392,7 +391,7 @@ Grid(values=array([[-6.86311507e+05,  4.53422704e+06,  1.31536606e+02],
 the observations using a baseline model run.</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">norm_params</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span>
     <span class="n">baseline_fw_gravity_np</span><span class="o">=</span><span class="n">baseline</span><span class="p">(</span><span class="n">geo_model</span><span class="p">),</span>
-    <span class="n">observed_gravity</span><span class="o">=</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="p">,</span>
+    <span class="n">observed_gravity</span><span class="o">=</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a></a></a></a><span class="p">,</span>
     <span class="n">method</span><span class="o">=</span><span class="s2">&quot;align_to_reference&quot;</span>
 <span class="p">)</span>
 </pre></div>
@@ -561,8 +560,8 @@ p(data | θ) → MCMC Proposes Next θ
 <span class="p">)</span>
 
 <span class="c1"># Prepare observed data tensors</span>
-<span class="n">gravity_obs_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-<span class="n">enmap_obs_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+<span class="n">gravity_obs_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">observed_gravity_ugal</span></a></a></a></a></a><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+<span class="n">enmap_obs_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><a href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="numpy.ndarray" class="sphx-glr-backref-module-numpy sphx-glr-backref-type-py-class sphx-glr-backref-instance"><span class="n">labels_enmap</span></a></a></a></a></a><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
 <span class="n">joint_obs</span> <span class="o">=</span> <span class="p">[</span><span class="n">gravity_obs_tensor</span><span class="p">,</span> <span class="n">enmap_obs_tensor</span><span class="p">]</span>
 </pre></div>
 </div>
@@ -646,7 +645,7 @@ STATUS: Balanced. Both datasets should contribute.
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot; Loaded inference results from </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Loaded inference results from /home/leguark/PycharmProjects/Mineye-Terranigma/examples/02_probabilistic_modeling/arviz_data_joint_feb2026.nc
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Loaded inference results from /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/arviz_data_joint_feb2026.nc
 </pre></div>
 </div>
 </section>
@@ -717,122 +716,143 @@ by injecting the entropy field and calling gpv.plot_3d.</p>
 </pre></div>
 </div>
 <ul class="sphx-glr-horizontal">
-<li><img src="../_images/sphx_glr_07_joint_inversion_004.png" srcset="../_images/sphx_glr_07_joint_inversion_004.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_004.png" srcset="../_images/sphx_glr_07_joint_inversion_004.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
 <li><img src="../_images/sphx_glr_07_joint_inversion_005.png" srcset="../_images/sphx_glr_07_joint_inversion_005.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
 <li><img src="../_images/sphx_glr_07_joint_inversion_006.png" srcset="../_images/sphx_glr_07_joint_inversion_006.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
 <li><img src="../_images/sphx_glr_07_joint_inversion_007.png" srcset="../_images/sphx_glr_07_joint_inversion_007.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
 <li><img src="../_images/sphx_glr_07_joint_inversion_008.png" srcset="../_images/sphx_glr_07_joint_inversion_008.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
 <li><img src="../_images/sphx_glr_07_joint_inversion_009.png" srcset="../_images/sphx_glr_07_joint_inversion_009.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_010.png" srcset="../_images/sphx_glr_07_joint_inversion_010.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-multi-img"/></li>
 </ul>
 <ul class="sphx-glr-horizontal">
-<li><img src="../_images/sphx_glr_07_joint_inversion_010.png" srcset="../_images/sphx_glr_07_joint_inversion_010.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
 <li><img src="../_images/sphx_glr_07_joint_inversion_011.png" srcset="../_images/sphx_glr_07_joint_inversion_011.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_012.png" srcset="../_images/sphx_glr_07_joint_inversion_012.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_013.png" srcset="../_images/sphx_glr_07_joint_inversion_013.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_014.png" srcset="../_images/sphx_glr_07_joint_inversion_014.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_015.png" srcset="../_images/sphx_glr_07_joint_inversion_015.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_016.png" srcset="../_images/sphx_glr_07_joint_inversion_016.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_017.png" srcset="../_images/sphx_glr_07_joint_inversion_017.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_018.png" srcset="../_images/sphx_glr_07_joint_inversion_018.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_019.png" srcset="../_images/sphx_glr_07_joint_inversion_019.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_07_joint_inversion_020.png" srcset="../_images/sphx_glr_07_joint_inversion_020.png" alt="07 joint inversion" class = "sphx-glr-multi-img"/></li>
 </ul>
 <div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Computing prior probability fields...
 Active grids: GridTypes.DENSE|NONE
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-/home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:103: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
-Please either pass the dim explicitly or simply use torch.linalg.cross.
-The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:63.)
-  return func(*args, **kwargs)
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Active grids: GridTypes.DENSE|TOPOGRAPHY|NONE
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-/home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
-../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+
+[SUCCESS] Generated paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper.png
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+[SUCCESS] Generated PyVista paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper_pyvista.png
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
 From version 0.50, passing this as a positional argument will result in a TypeError.
   gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
 
 Computing posterior probability fields...
 Active grids: GridTypes.DENSE|NONE
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
 Active grids: GridTypes.DENSE|TOPOGRAPHY|NONE
 Setting Backend To: AvailableBackends.PYTORCH
-Using sequential processing for 1 surfaces
-/home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
-../../../gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+
+[SUCCESS] Generated paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper.png
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+[SUCCESS] Generated PyVista paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper_pyvista.png
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+`StructuredGrid.extract_surface` will change in the future. It currently defaults to
+`&#39;dataset_surface&#39;`, but will change to `None`. Explicitly set the `algorithm` keyword to
+silence this warning.
+  polydata = grid.extract_surface()
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
 From version 0.50, passing this as a positional argument will result in a TypeError.
   gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
 </pre></div>
@@ -857,7 +877,7 @@ From version 0.50, passing this as a positional argument will result in a TypeEr
 <span class="c1"># sphinx_gallery_thumbnail_number = 8</span>
 </pre></div>
 </div>
-<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 28.238 seconds)</p>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (1 minutes 6.739 seconds)</p>
 <div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-examples-probabilistic-07-joint-inversion-py">
 <div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
 <p><a class="reference download internal" download="" href="../_downloads/08a7e451bfc7adf14ba03de8d38555e3/07_joint_inversion.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">07_joint_inversion.ipynb</span></code></a></p>
@@ -894,24 +914,24 @@ From version 0.50, passing this as a positional argument will result in a TypeEr
 
 
 
-<h3>Navigation</h3>
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 </ul>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../examples_basic/index.html">Basic Examples</a></li>
 </ul>
-<ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="index.html">Probabilistic Modeling Examples</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="index.html#gallery-overview">Gallery Overview</a></li>
-<li class="toctree-l2"><a class="reference internal" href="index.html#why-probabilistic-modeling">Why Probabilistic Modeling?</a></li>
-<li class="toctree-l2"><a class="reference internal" href="index.html#prerequisites">Prerequisites</a></li>
-<li class="toctree-l2"><a class="reference internal" href="index.html#example-descriptions">Example Descriptions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="index.html#inference-methods">Inference Methods</a></li>
-<li class="toctree-l2"><a class="reference internal" href="index.html#computational-requirements">Computational Requirements</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html#visualization-and-diagnostics">Visualization and Diagnostics</a></li>
-</ul>
-</li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="index.html">Probabilistic Modeling Examples</a></li>
 </ul>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../examples_segmentation/index.html">Hyperspectral Segmentation</a></li>
@@ -926,21 +946,11 @@ From version 0.50, passing this as a positional argument will result in a TypeEr
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="index.html">Probabilistic Modeling Examples</a><ul>
       <li>Previous: <a href="06_enmap_inversion.html" title="previous chapter">Bayesian EnMap Inversion: Categorical Likelihood and Ordinal Probabilities</a></li>
-      <li>Next: <a href="../examples_segmentation/index.html" title="next chapter">Hyperspectral Segmentation</a></li>
+      <li>Next: <a href="08_soricom_magnetic_inversion.html" title="next chapter">Bayesian Magnetic Inversion: Soricom Chromite Lens</a></li>
   </ul></li>
   </ul></li>
 </ul>
 </div>
-<search id="searchbox" style="display: none" role="search">
-  <h3 id="searchlabel">Quick search</h3>
-    <div class="searchformwrapper">
-    <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</search>
-<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -957,8 +967,8 @@ From version 0.50, passing this as a positional argument will result in a TypeEr
       &#169;2024-2026, Terranigma Solutions GmbH.
       
       |
-      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
-      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
       
       |
       <a href="../_sources/examples_probabilistic/07_joint_inversion.rst.txt"

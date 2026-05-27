@@ -133,8 +133,8 @@ Get Data Paths
 
  .. code-block:: none
 
-    Orientations: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/orientations_mod.csv
-    Points: /home/leguark/PycharmProjects/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/points_mod.csv
+    Orientations: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/orientations_mod.csv
+    Points: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/Model_Input_Data/Simple-Models/points_mod.csv
 
 
 
@@ -386,58 +386,8 @@ Run Prior Predictive Sampling
 
 
     Running 50 prior predictive samples...
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
+    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+      return func(*args, **kwargs)
     ✓ Prior predictive sampling complete
 
 
@@ -499,47 +449,29 @@ Visualize Uncertainty
  .. code-block:: none
 
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    /home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: 'linewidth', 'contour_colors'
+    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+      return func(*args, **kwargs)
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: 'linewidth', 'contour_colors'
       contour_set = ax.contour(
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     ✓ Visualization complete
 
 
@@ -586,7 +518,7 @@ Summary Statistics
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (0 minutes 43.492 seconds)
+   **Total running time of the script:** (4 minutes 19.423 seconds)
 
 
 .. _sphx_glr_download_examples_probabilistic_03_error_propagation_dips.py:

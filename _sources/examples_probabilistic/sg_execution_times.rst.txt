@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:28.238** total execution time for 6 files **from examples_probabilistic**:
+**02:17.545** total execution time for 7 files **from examples_probabilistic**:
 
 .. container::
 
@@ -32,8 +32,8 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_examples_probabilistic_07_joint_inversion.py` (``07_joint_inversion.py``)
-     - 00:28.238
+   * - :ref:`sphx_glr_examples_probabilistic_08_soricom_magnetic_inversion.py` (``08_soricom_magnetic_inversion.py``)
+     - 02:17.545
      - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_02_error_propagation.py` (``02_error_propagation.py``)
      - 00:00.000
@@ -48,5 +48,8 @@ Computation times
      - 00:00.000
      - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_06_enmap_inversion.py` (``06_enmap_inversion.py``)
+     - 00:00.000
+     - 0.0
+   * - :ref:`sphx_glr_examples_probabilistic_07_joint_inversion.py` (``07_joint_inversion.py``)
      - 00:00.000
      - 0.0

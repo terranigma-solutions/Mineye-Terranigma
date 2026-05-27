@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:05.502** total execution time for 3 files **from examples_basic**:
+**00:20.144** total execution time for 4 files **from examples_basic**:
 
 .. container::
 
@@ -32,12 +32,15 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_examples_basic_02_complex_tharsis_model.py` (``02_complex_tharsis_model.py``)
-     - 00:05.502
+   * - :ref:`sphx_glr_examples_basic_03_gravity_forward_model.py` (``03_gravity_forward_model.py``)
+     - 00:18.651
+     - 0.0
+   * - :ref:`sphx_glr_examples_basic_04_soricom_fault_model.py` (``04_soricom_fault_model.py``)
+     - 00:01.493
      - 0.0
    * - :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py` (``01_simple_tharsis_model.py``)
      - 00:00.000
      - 0.0
-   * - :ref:`sphx_glr_examples_basic_03_gravity_forward_model.py` (``03_gravity_forward_model.py``)
+   * - :ref:`sphx_glr_examples_basic_02_complex_tharsis_model.py` (``02_complex_tharsis_model.py``)
      - 00:00.000
      - 0.0

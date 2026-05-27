@@ -36,6 +36,10 @@ Workflow Stages
    The examples in this gallery require EnMap L2A products. Paths to data should be configured in ``mineye.config.paths`` or provided as environment variables as shown in the scripts.
 
 
+.. raw:: html
+
+  <div id='sg-tag-list' class='sphx-glr-tag-list'></div>
+
 
 .. raw:: html
 
@@ -52,7 +56,7 @@ Workflow Stages
   .. image:: /examples_segmentation/images/thumb/sphx_glr_01_enmap_lith_segmentation_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_segmentation_01_enmap_lith_segmentation.py`
+  :doc:`/examples_segmentation/01_enmap_lith_segmentation`
 
 .. raw:: html
 
@@ -69,7 +73,7 @@ Workflow Stages
   .. image:: /examples_segmentation/images/thumb/sphx_glr_02_enmap_data_extraction_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_segmentation_02_enmap_data_extraction.py`
+  :doc:`/examples_segmentation/02_enmap_data_extraction`
 
 .. raw:: html
 
@@ -86,7 +90,7 @@ Workflow Stages
   .. image:: /examples_segmentation/images/thumb/sphx_glr_03_enmap_gempy_comparison_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_segmentation_03_enmap_gempy_comparison.py`
+  :doc:`/examples_segmentation/03_enmap_gempy_comparison`
 
 .. raw:: html
 

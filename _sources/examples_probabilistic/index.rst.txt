@@ -104,6 +104,10 @@ All examples use ArviZ for posterior analysis:
    where possible to enable quick visualization without re-running full inversions.
 
 
+.. raw:: html
+
+  <div id='sg-tag-list' class='sphx-glr-tag-list'></div>
+
 
 .. raw:: html
 
@@ -120,7 +124,7 @@ All examples use ArviZ for posterior analysis:
   .. image:: /examples_probabilistic/images/thumb/sphx_glr_02_error_propagation_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_probabilistic_02_error_propagation.py`
+  :doc:`/examples_probabilistic/02_error_propagation`
 
 .. raw:: html
 
@@ -137,7 +141,7 @@ All examples use ArviZ for posterior analysis:
   .. image:: /examples_probabilistic/images/thumb/sphx_glr_03_error_propagation_dips_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_probabilistic_03_error_propagation_dips.py`
+  :doc:`/examples_probabilistic/03_error_propagation_dips`
 
 .. raw:: html
 
@@ -154,7 +158,7 @@ All examples use ArviZ for posterior analysis:
   .. image:: /examples_probabilistic/images/thumb/sphx_glr_04_gravity_inversion_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_probabilistic_04_gravity_inversion.py`
+  :doc:`/examples_probabilistic/04_gravity_inversion`
 
 .. raw:: html
 
@@ -171,7 +175,7 @@ All examples use ArviZ for posterior analysis:
   .. image:: /examples_probabilistic/images/thumb/sphx_glr_05_magnetics_inversion_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_probabilistic_05_magnetics_inversion.py`
+  :doc:`/examples_probabilistic/05_magnetics_inversion`
 
 .. raw:: html
 
@@ -188,7 +192,7 @@ All examples use ArviZ for posterior analysis:
   .. image:: /examples_probabilistic/images/thumb/sphx_glr_06_enmap_inversion_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_probabilistic_06_enmap_inversion.py`
+  :doc:`/examples_probabilistic/06_enmap_inversion`
 
 .. raw:: html
 
@@ -205,11 +209,28 @@ All examples use ArviZ for posterior analysis:
   .. image:: /examples_probabilistic/images/thumb/sphx_glr_07_joint_inversion_thumb.png
     :alt:
 
-  :ref:`sphx_glr_examples_probabilistic_07_joint_inversion.py`
+  :doc:`/examples_probabilistic/07_joint_inversion`
 
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Bayesian Joint Inversion: Gravity and EnMap</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="What Makes the Soricom Model Different?">
+
+.. only:: html
+
+  .. image:: /examples_probabilistic/images/thumb/sphx_glr_08_soricom_magnetic_inversion_thumb.png
+    :alt:
+
+  :doc:`/examples_probabilistic/08_soricom_magnetic_inversion`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Bayesian Magnetic Inversion: Soricom Chromite Lens</div>
     </div>
 
 
@@ -229,6 +250,7 @@ All examples use ArviZ for posterior analysis:
    /examples_probabilistic/05_magnetics_inversion
    /examples_probabilistic/06_enmap_inversion
    /examples_probabilistic/07_joint_inversion
+   /examples_probabilistic/08_soricom_magnetic_inversion
 
 
 

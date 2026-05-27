@@ -104,7 +104,7 @@ Import Libraries
 We load the required scientific packages, GemPy ecosystem, and Pyro for 
 probabilistic programming.
 
-.. GENERATED FROM PYTHON SOURCE LINES 88-123
+.. GENERATED FROM PYTHON SOURCE LINES 88-124
 
 .. code-block:: Python
 
@@ -133,7 +133,8 @@ probabilistic programming.
         gempy_viz,
         plot_probability_heatmap,
         compute_probability_density_fields,
-        plot_many_observed_vs_forward
+        plot_many_observed_vs_forward,
+        probability_fields_for
     )
     from mineye.GeoModel.model_one.probabilistic_model_likelihoods import enmap_likelihood_fn
 
@@ -147,16 +148,10 @@ probabilistic programming.
 
 
 
-.. rst-class:: sphx-glr-script-out
-
- .. code-block:: none
-
-    Setting Backend To: AvailableBackends.PYTORCH
 
 
 
-
-.. GENERATED FROM PYTHON SOURCE LINES 124-134
+.. GENERATED FROM PYTHON SOURCE LINES 125-135
 
 Step 1: Model Configuration
 ---------------------------
@@ -169,7 +164,7 @@ geological model.
 - Y: 4526832 to 4551949
 - Z: -500 to 505 (meters)
 
-.. GENERATED FROM PYTHON SOURCE LINES 134-138
+.. GENERATED FROM PYTHON SOURCE LINES 135-139
 
 .. code-block:: Python
 
@@ -184,7 +179,7 @@ geological model.
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 139-149
+.. GENERATED FROM PYTHON SOURCE LINES 140-150
 
 Step 2: Load EnMap Observations
 -------------------------------
@@ -197,7 +192,7 @@ derived from such data.
 
 **Units**: Discrete categorical labels (0, 1, 2...).
 
-.. GENERATED FROM PYTHON SOURCE LINES 149-166
+.. GENERATED FROM PYTHON SOURCE LINES 150-167
 
 .. code-block:: Python
 
@@ -236,14 +231,14 @@ derived from such data.
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 167-171
+.. GENERATED FROM PYTHON SOURCE LINES 168-172
 
 Step 3: Initial Geological Model Setup
 --------------------------------------
 
 We create the base GemPy model using geological orientations and points.
 
-.. GENERATED FROM PYTHON SOURCE LINES 171-196
+.. GENERATED FROM PYTHON SOURCE LINES 172-197
 
 .. code-block:: Python
 
@@ -286,16 +281,13 @@ We create the base GemPy model using geological orientations and points.
  .. code-block:: none
 
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:103: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
-    Please either pass the dim explicitly or simply use torch.linalg.cross.
-    The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:63.)
+    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
       return func(*args, **kwargs)
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 197-202
+.. GENERATED FROM PYTHON SOURCE LINES 198-203
 
 Step 4: Configure Custom Grid for Observations
 ----------------------------------------------
@@ -303,7 +295,7 @@ Step 4: Configure Custom Grid for Observations
 We set a custom grid at the exact XYZ locations where we have EnMap labels. 
 This ensures GemPy predicts rock types exactly where we have observations.
 
-.. GENERATED FROM PYTHON SOURCE LINES 202-210
+.. GENERATED FROM PYTHON SOURCE LINES 203-211
 
 .. code-block:: Python
 
@@ -382,15 +374,15 @@ This ensures GemPy predicts rock types exactly where we have observations.
            [-6.84567741e+05,  4.52929901e+06,  3.24543060e+02],
            [-6.83278871e+05,  4.53161139e+06,  2.89459503e+02],
            [-7.05682465e+05,  4.54836670e+06,  3.66013245e+02],
-           [-6.88282720e+05,  4.53183884e+06,  1.89883438e+02]]), length=array([], dtype=float64), _octree_grid=RegularGrid(resolution=array([512, 400,  32]), extent=array([-7.075210e+05, -6.755580e+05,  4.526832e+06,  4.551949e+06,
-           -5.000000e+02,  5.050000e+02]), values=array([[-7.07489786e+05,  4.52686340e+06, -4.84296875e+02],
-           [-7.07489786e+05,  4.52686340e+06, -4.52890625e+02],
-           [-7.07489786e+05,  4.52686340e+06, -4.21484375e+02],
+           [-6.88282720e+05,  4.53183884e+06,  1.89883438e+02]]), length=array([], dtype=float64), _octree_grid=RegularGrid(resolution=array([1024,  800,   32]), extent=array([-7.075210e+05, -6.755580e+05,  4.526832e+06,  4.551949e+06,
+           -5.000000e+02,  5.050000e+02]), values=array([[-7.07505393e+05,  4.52684770e+06, -4.84296875e+02],
+           [-7.07505393e+05,  4.52684770e+06, -4.52890625e+02],
+           [-7.07505393e+05,  4.52684770e+06, -4.21484375e+02],
            ...,
-           [-6.75589214e+05,  4.55191760e+06,  4.26484375e+02],
-           [-6.75589214e+05,  4.55191760e+06,  4.57890625e+02],
-           [-6.75589214e+05,  4.55191760e+06,  4.89296875e+02]],
-          shape=(6553600, 3)), mask_topo=array([], shape=(0, 3), dtype=bool), _transform=None, _base_resolution=array([32, 25,  2])), _dense_grid=None, _custom_grid=CustomGrid(values=array([[-6.86311507e+05,  4.53422704e+06,  1.31536606e+02],
+           [-6.75573607e+05,  4.55193330e+06,  4.26484375e+02],
+           [-6.75573607e+05,  4.55193330e+06,  4.57890625e+02],
+           [-6.75573607e+05,  4.55193330e+06,  4.89296875e+02]],
+          shape=(26214400, 3)), mask_topo=array([], shape=(0, 3), dtype=bool), _transform=None, _base_resolution=array([64, 50,  2])), _dense_grid=None, _custom_grid=CustomGrid(values=array([[-6.86311507e+05,  4.53422704e+06,  1.31536606e+02],
            [-6.84340294e+05,  4.53983741e+06,  3.46467194e+02],
            [-6.96432927e+05,  4.54468963e+06,  3.20259308e+02],
            [-6.91163723e+05,  4.54302168e+06,  2.81383545e+02],
@@ -450,7 +442,7 @@ This ensures GemPy predicts rock types exactly where we have observations.
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 211-216
+.. GENERATED FROM PYTHON SOURCE LINES 212-217
 
 Step 5: Baseline Forward Model
 ------------------------------
@@ -458,7 +450,7 @@ Step 5: Baseline Forward Model
 We compute the model at the custom grid locations to establish a baseline 
 comparison with the observations.
 
-.. GENERATED FROM PYTHON SOURCE LINES 216-227
+.. GENERATED FROM PYTHON SOURCE LINES 217-228
 
 .. code-block:: Python
 
@@ -482,7 +474,6 @@ comparison with the observations.
  .. code-block:: none
 
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
 
     Baseline Forward Model:
       Scalar field range: -0.04 to 0.05
@@ -490,7 +481,7 @@ comparison with the observations.
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 228-247
+.. GENERATED FROM PYTHON SOURCE LINES 229-248
 
 Step 6: Define Prior Distributions
 -----------------------------------
@@ -512,7 +503,7 @@ We use a Normal distribution:
 - **Mean (μ)**: 10 degrees. Our best guess for the regional dip.
 - **Std (σ)**: 10 degrees. Represents significant uncertainty in our knowledge.
 
-.. GENERATED FROM PYTHON SOURCE LINES 247-258
+.. GENERATED FROM PYTHON SOURCE LINES 248-259
 
 .. code-block:: Python
 
@@ -534,7 +525,7 @@ We use a Normal distribution:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 259-267
+.. GENERATED FROM PYTHON SOURCE LINES 260-268
 
 Step 7: Inspecting the Likelihood Function
 ------------------------------------------
@@ -545,7 +536,7 @@ The likelihood function is crucial for connecting model predictions to
 observations. For EnMap data, we use an ordinal classification likelihood.
 Let's inspect what it does internally:
 
-.. GENERATED FROM PYTHON SOURCE LINES 267-271
+.. GENERATED FROM PYTHON SOURCE LINES 268-272
 
 .. code-block:: Python
 
@@ -569,14 +560,14 @@ Let's inspect what it does internally:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 272-276
+.. GENERATED FROM PYTHON SOURCE LINES 273-277
 
 **Full Source Code**
 
 For complete transparency, here's the full implementation of the 
 EnMap likelihood function:
 
-.. GENERATED FROM PYTHON SOURCE LINES 276-281
+.. GENERATED FROM PYTHON SOURCE LINES 277-282
 
 .. code-block:: Python
 
@@ -627,7 +618,7 @@ EnMap likelihood function:
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 282-293
+.. GENERATED FROM PYTHON SOURCE LINES 283-294
 
 Step 8: Probabilistic Model Creation
 ------------------------------------
@@ -641,7 +632,7 @@ likelihood function into a single Pyro model.
 3. Compute forward model (predict scalar fields at surface).
 4. Apply `enmap_likelihood_fn` to compute :math:`p(data|\theta)`.
 
-.. GENERATED FROM PYTHON SOURCE LINES 293-305
+.. GENERATED FROM PYTHON SOURCE LINES 294-306
 
 .. code-block:: Python
 
@@ -670,7 +661,7 @@ likelihood function into a single Pyro model.
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 306-312
+.. GENERATED FROM PYTHON SOURCE LINES 307-313
 
 Step 9: Prior Predictive Check
 ------------------------------
@@ -679,7 +670,7 @@ Before running expensive inference, we check if our priors allow for the
 observed rock types. If the prior predictions don't even cover the 
 observations, the model might be poorly specified.
 
-.. GENERATED FROM PYTHON SOURCE LINES 312-334
+.. GENERATED FROM PYTHON SOURCE LINES 313-335
 
 .. code-block:: Python
 
@@ -719,113 +710,11 @@ observations, the model might be poorly specified.
  .. code-block:: none
 
     Running prior predictive...
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
-    Using sequential processing for 1 surfaces
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 335-341
+.. GENERATED FROM PYTHON SOURCE LINES 336-342
 
 Step 10: MCMC Inference using NUTS
 ----------------------------------
@@ -834,7 +723,7 @@ We use the No-U-Turn Sampler (NUTS) to sample from the posterior distribution.
 NUTS is an efficient Hamiltonian Monte Carlo algorithm that avoids the need 
 for manual tuning of step sizes.
 
-.. GENERATED FROM PYTHON SOURCE LINES 341-376
+.. GENERATED FROM PYTHON SOURCE LINES 342-377
 
 .. code-block:: Python
 
@@ -881,12 +770,12 @@ for manual tuning of step sizes.
 
  .. code-block:: none
 
-    Loaded inference results from /home/leguark/PycharmProjects/Mineye-Terranigma/examples/02_probabilistic_modeling/arviz_data_enmap_feb2026.nc
+    Loaded inference results from /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/arviz_data_enmap_feb2026.nc
 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 377-382
+.. GENERATED FROM PYTHON SOURCE LINES 378-383
 
 Step 11: Posterior Analysis
 ---------------------------
@@ -894,7 +783,7 @@ Step 11: Posterior Analysis
 We visualize how the data has informed our knowledge of the layer dips and 
 assess the reduction in uncertainty.
 
-.. GENERATED FROM PYTHON SOURCE LINES 382-404
+.. GENERATED FROM PYTHON SOURCE LINES 383-405
 
 .. code-block:: Python
 
@@ -951,95 +840,367 @@ assess the reduction in uncertainty.
     Visualizing geological uncertainty...
     Active grids: GridTypes.OCTREE|NONE
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
+    /home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+      return func(*args, **kwargs)
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
-    /home/leguark/PycharmProjects/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: 'linewidth', 'contour_colors'
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: 'linewidth', 'contour_colors'
       contour_set = ax.contour(
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
     Setting Backend To: AvailableBackends.PYTORCH
-    Using sequential processing for 1 surfaces
 
-    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fb30a248e10>
+    <gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7fd9943403b0>
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 405-443
+.. GENERATED FROM PYTHON SOURCE LINES 406-418
+
+**Probability Density Fields and Information Entropy**
+
+To visualize the spatial uncertainty of the geological structure, we compute
+probability density fields and information entropy.
+
+* **Probability Density Field**: Shows the probability of each geological unit
+  existing at any given location.
+* **Information Entropy**: Quantifies the total uncertainty. High entropy means
+  high uncertainty about which unit is present.
+
+Note: The 3D visualization is already handled inside probability_fields_for()
+by generating a multi-panel PyVista paper-quality figure.
+
+.. GENERATED FROM PYTHON SOURCE LINES 418-453
+
+.. code-block:: Python
+
+
+    # Recreate the model to reset grid state
+    simple_geo_model = gp.create_geomodel(
+        project_name='enmap_inversion',
+        extent=extent,
+        refinement=5,
+        importer_helper=gp.data.ImporterHelper(
+            path_to_orientations=paths.get_orientations_path(),
+            path_to_surface_points=paths.get_points_path(),
+        )
+    )
+
+    gp.map_stack_to_surfaces(
+        gempy_model=simple_geo_model,
+        mapping_object={"Tournaisian_Plutonites": ["Tournaisian Plutonites"]}
+    )
+
+    # Prior Probability Fields
+    print("\nComputing prior probability fields...")
+    topography_path = paths.get_topography_path()
+    probability_fields_for(
+        geo_model=simple_geo_model,
+        inference_data=data.prior,
+        topography_path=topography_path
+    )
+
+    # Posterior Probability Fields
+    if hasattr(data, 'posterior'):
+        print("\nComputing posterior probability fields...")
+        probability_fields_for(
+            geo_model=simple_geo_model,
+            inference_data=data.posterior,
+            topography_path=topography_path
+        )
+
+
+
+
+.. rst-class:: sphx-glr-horizontal
+
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_005.png
+         :alt: 06 enmap inversion
+         :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_005.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_006.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_006.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_007.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_007.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_008.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_008.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_009.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_009.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_010.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_010.png
+         :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_011.png
+         :alt: Cell Number: mid Direction: y
+         :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_011.png
+         :class: sphx-glr-multi-img
+
+.. rst-class:: sphx-glr-horizontal
+
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_012.png
+          :alt: 06 enmap inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_012.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_013.png
+          :alt: 06 enmap inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_013.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_014.png
+          :alt: 06 enmap inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_014.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_015.png
+          :alt: 06 enmap inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_015.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_016.png
+          :alt: 06 enmap inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_016.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_017.png
+          :alt: 06 enmap inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_017.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_018.png
+          :alt: 06 enmap inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_018.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_019.png
+          :alt: 06 enmap inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_019.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_020.png
+          :alt: 06 enmap inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_020.png
+          :class: sphx-glr-multi-img
+
+    *
+
+      .. image-sg:: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_021.png
+          :alt: 06 enmap inversion
+          :srcset: /examples_probabilistic/images/sphx_glr_06_enmap_inversion_021.png
+          :class: sphx-glr-multi-img
+
+
+.. rst-class:: sphx-glr-script-out
+
+ .. code-block:: none
+
+
+    Computing prior probability fields...
+    Active grids: GridTypes.DENSE|NONE
+    Setting Backend To: AvailableBackends.PYTORCH
+    Setting Backend To: AvailableBackends.PYTORCH
+    Setting Backend To: AvailableBackends.PYTORCH
+    Setting Backend To: AvailableBackends.PYTORCH
+    Setting Backend To: AvailableBackends.PYTORCH
+    Setting Backend To: AvailableBackends.PYTORCH
+    Active grids: GridTypes.DENSE|TOPOGRAPHY|NONE
+    Setting Backend To: AvailableBackends.PYTORCH
+
+    [SUCCESS] Generated paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper.png
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+    [SUCCESS] Generated PyVista paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper_pyvista.png
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+    Computing posterior probability fields...
+    Active grids: GridTypes.DENSE|NONE
+    Setting Backend To: AvailableBackends.PYTORCH
+    Setting Backend To: AvailableBackends.PYTORCH
+    Setting Backend To: AvailableBackends.PYTORCH
+    Setting Backend To: AvailableBackends.PYTORCH
+    Setting Backend To: AvailableBackends.PYTORCH
+    Setting Backend To: AvailableBackends.PYTORCH
+    Active grids: GridTypes.DENSE|TOPOGRAPHY|NONE
+    Setting Backend To: AvailableBackends.PYTORCH
+
+    [SUCCESS] Generated paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper.png
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+    [SUCCESS] Generated PyVista paper-quality figure saved to: /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/probability_fields_paper_pyvista.png
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_topography_3d.py:29: PyVistaFutureWarning: The default value of `algorithm` for the filter
+    `StructuredGrid.extract_surface` will change in the future. It currently defaults to
+    `'dataset_surface'`, but will change to `None`. Explicitly set the `algorithm` keyword to
+    silence this warning.
+      polydata = grid.extract_surface()
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning: 
+    /home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument 'color' must be passed as a keyword argument to function 'BasePlotter.add_mesh'.
+    From version 0.50, passing this as a positional argument will result in a TypeError.
+      gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+
+
+
+.. GENERATED FROM PYTHON SOURCE LINES 454-492
 
 Step 12: Summary and Conclusions
 --------------------------------
@@ -1084,7 +1245,7 @@ sphinx_gallery_thumbnail_number = 2
 
 .. rst-class:: sphx-glr-timing
 
-   **Total running time of the script:** (1 minutes 18.013 seconds)
+   **Total running time of the script:** (7 minutes 58.462 seconds)
 
 
 .. _sphx_glr_download_examples_probabilistic_06_enmap_inversion.py:
