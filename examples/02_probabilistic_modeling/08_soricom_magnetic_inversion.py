@@ -50,6 +50,7 @@ from mineye.GeoModel.model_one.visualization import (
     gempy_viz,
     plot_many_observed_vs_forward,
     generate_gravity_uncertainty_plots,
+    probability_fields_for
 )
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 
@@ -591,6 +592,65 @@ if "sigma_stations" in data.posterior_predictive:
     )
     plt.title("Per-Station Noise Distribution (Sigma) — Soricom Magnetics")
     plt.show()
+
+# %%
+# **Probability Density Fields and Information Entropy**
+#
+# To visualize the spatial uncertainty of the geological structure, we compute
+# probability density fields and information entropy.
+#
+# * **Probability Density Field**: Shows the probability of each geological unit
+#   existing at any given location.
+# * **Information Entropy**: Quantifies the total uncertainty. High entropy means
+#   high uncertainty about which unit is present.
+#
+# Note: The 3D visualization is already handled inside probability_fields_for()
+# by generating a multi-panel PyVista paper-quality figure.
+
+# Recreate the model to reset grid state
+geo_model = gp.create_geomodel(
+    project_name=SoricomModelConfig.PROJECT_NAME,
+    extent=SoricomModelConfig.EXTENT,
+    refinement=SoricomModelConfig.REFINEMENT,
+    importer_helper=gp.data.ImporterHelper(
+        path_to_orientations=paths.get_soricom_orientations(),
+        path_to_surface_points=paths.get_soricom_formation_points(),
+    ),
+)
+
+geo_model.grid = geo_model.grid.init_octree_grid(
+    extent=SoricomModelConfig.EXTENT,
+    octree_levels=SoricomModelConfig.REFINEMENT,
+)
+geo_model.interpolation_options.number_octree_levels_surface = 2
+
+gp.map_stack_to_surfaces(
+    gempy_model=geo_model,
+    mapping_object=SoricomModelConfig.SURFACE_MAPPING,
+)
+
+geo_model.structural_frame.structural_groups[
+    SoricomModelConfig.FAULT_GROUP_INDEX
+].structural_relation = gp.data.StackRelationType.FAULT
+geo_model.structural_frame.fault_relations = SoricomModelConfig.FAULT_RELATIONS_MATRIX
+
+# Prior Probability Fields
+print("\nComputing prior probability fields...")
+topography_path = paths.get_topography_path()
+probability_fields_for(
+    geo_model=geo_model,
+    inference_data=data.prior,
+    topography_path=topography_path
+)
+
+# Posterior Probability Fields
+if hasattr(data, 'posterior'):
+    print("\nComputing posterior probability fields...")
+    probability_fields_for(
+        geo_model=geo_model,
+        inference_data=data.posterior,
+        topography_path=topography_path
+    )
 
 # %%
 # Summary

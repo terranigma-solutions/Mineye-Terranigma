@@ -110,7 +110,8 @@ from mineye.GeoModel.model_one.visualization import (
     gempy_viz,
     plot_probability_heatmap,
     compute_probability_density_fields,
-    plot_many_observed_vs_forward
+    plot_many_observed_vs_forward,
+    probability_fields_for
 )
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import enmap_likelihood_fn
 
@@ -400,6 +401,54 @@ print(f"\nUncertainty Reduction in Dips: {reduction:.1f}%")
 # Visualize the resulting geological model uncertainty
 print("\nVisualizing geological uncertainty...")
 gempy_viz(simple_geo_model, data)
+
+# %%
+# **Probability Density Fields and Information Entropy**
+#
+# To visualize the spatial uncertainty of the geological structure, we compute
+# probability density fields and information entropy.
+#
+# * **Probability Density Field**: Shows the probability of each geological unit
+#   existing at any given location.
+# * **Information Entropy**: Quantifies the total uncertainty. High entropy means
+#   high uncertainty about which unit is present.
+#
+# Note: The 3D visualization is already handled inside probability_fields_for()
+# by generating a multi-panel PyVista paper-quality figure.
+
+# Recreate the model to reset grid state
+simple_geo_model = gp.create_geomodel(
+    project_name='enmap_inversion',
+    extent=extent,
+    refinement=5,
+    importer_helper=gp.data.ImporterHelper(
+        path_to_orientations=paths.get_orientations_path(),
+        path_to_surface_points=paths.get_points_path(),
+    )
+)
+
+gp.map_stack_to_surfaces(
+    gempy_model=simple_geo_model,
+    mapping_object={"Tournaisian_Plutonites": ["Tournaisian Plutonites"]}
+)
+
+# Prior Probability Fields
+print("\nComputing prior probability fields...")
+topography_path = paths.get_topography_path()
+probability_fields_for(
+    geo_model=simple_geo_model,
+    inference_data=data.prior,
+    topography_path=topography_path
+)
+
+# Posterior Probability Fields
+if hasattr(data, 'posterior'):
+    print("\nComputing posterior probability fields...")
+    probability_fields_for(
+        geo_model=simple_geo_model,
+        inference_data=data.posterior,
+        topography_path=topography_path
+    )
 
 # %%
 # Step 12: Summary and Conclusions
