@@ -99,7 +99,11 @@ from gempy_engine.core.data.geophysics_input import MagneticsInput
 
 def read_magnetics():
     """Read preprocessed magnetic data from extracted numpy arrays."""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        this_file = __file__
+    except NameError:
+        this_file = sys.argv[0]
+    current_dir = os.path.dirname(os.path.abspath(this_file))
     xyz_path = os.path.join(current_dir, 'soricom_magnetic_xyz_adaptive.npy')
     mag_path = os.path.join(current_dir, 'soricom_magnetic_values_adaptive.npy')
     xyz = np.load(xyz_path)
@@ -622,4 +626,4 @@ if "sigma_stations" in data.posterior_predictive:
 # - :ref:`sphx_glr_02_probabilistic_modeling_04_gravity_inversion.py`
 # - :ref:`sphx_glr_02_probabilistic_modeling_05_magnetics_inversion.py`
 
-# sphinx_gallery_thumbnail_number = 20
+# sphinx_gallery_thumbnail_number = 4
