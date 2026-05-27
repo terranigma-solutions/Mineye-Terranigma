@@ -69,7 +69,7 @@ def generate_gravity_uncertainty_plots(gravity_samples_norm, observed_gravity_ug
 
 
 def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.InferenceData,
-              n_samples=20, ve=5):
+              n_samples=20, ve=3):
     gp.set_active_grid(
         grid=geo_model.grid,
         grid_type=[geo_model.grid.GridTypes.OCTREE],
@@ -94,17 +94,18 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
         n_samples=n_samples,
         samples=(prior_inference_data.prior[r'dips'].values[0, :]),
         update_model_fn=_update_model_for_plotting,
-        gempy_plot=p2d
+        gempy_plot=p2d,
     )
 
     if hasattr(prior_inference_data, 'posterior') and True:
+        n_surfaces = len(geo_model.structural_frame.elements_colors_contacts)
         plot_gempy(
             geo_model=geo_model,
             n_samples=n_samples,
             samples=(prior_inference_data.posterior[r'dips'].values[0, :]),
             update_model_fn=_update_model_for_plotting,
             gempy_plot=p2d,
-            contour_colors=[default_red],
+            contour_colors=[default_red] * n_surfaces,
         )
 
     return p2d
