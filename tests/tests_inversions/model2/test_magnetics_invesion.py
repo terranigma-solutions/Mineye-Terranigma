@@ -281,8 +281,9 @@ class TestMagneticInversion:
         geo_model, xy_ravel = self._setup_magnetic_geomodel(magnetic_data)
 
         observed_norm = observed_magnetics_nt
-        forward_norm = data.prior[r'magnetic_response'].mean(axis=1)
-        many_forward_norm = data.posterior_predictive[r'magnetic_response'].values[
+        magnetic_response = r'$\mu_{magnetics}$'
+        forward_norm = data.prior[magnetic_response].mean(axis=1)
+        many_forward_norm = data.posterior_predictive[magnetic_response].values[
             0, -40:-20
         ]
 
@@ -340,36 +341,37 @@ class TestMagneticInversion:
 
         plt.show()
 
+        magnetic_response_key = r'$\mu_{magnetics}$'
         plot_geophysics_comparison(
-            forward_norm=data.prior[r'magnetic_response'].mean(axis=1),
+            forward_norm=data.prior[magnetic_response_key].mean(axis=1),
             normalization_method='align_to_reference',
             observed_ugal=observed_magnetics_nt,
             xy_ravel=xy_ravel,
         )
 
         plot_geophysics_comparison(
-            forward_norm=data.posterior_predictive[r'magnetic_response'].mean(axis=1),
+            forward_norm=data.posterior_predictive[magnetic_response_key].mean(axis=1),
             normalization_method='align_to_reference',
             observed_ugal=observed_magnetics_nt,
             xy_ravel=xy_ravel,
         )
 
-        if hasattr(data, 'prior') and r'magnetic_response' in data.prior:
+        if hasattr(data, 'prior') and magnetic_response_key in data.prior:
             from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots
 
             magnetic_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-                gravity_samples_norm=data.prior[r'magnetic_response'].values[0, :],
+                gravity_samples_norm=data.prior[magnetic_response_key].values[0, :],
                 observed_gravity_ugal=observed_magnetics_nt,
                 xy_ravel=xy_ravel,
             )
 
-        if hasattr(data, 'posterior') and r'magnetic_response' in data.prior:
+        if hasattr(data, 'posterior') and magnetic_response_key in data.prior:
             from mineye.GeoModel.model_one.visualization import generate_gravity_uncertainty_plots
 
             magnetic_samples_norm, unit_label = generate_gravity_uncertainty_plots(
-                gravity_samples_norm=data.posterior_predictive[r'magnetic_response'].values[0, :],
+                gravity_samples_norm=data.posterior_predictive[magnetic_response_key].values[0, :],
                 observed_gravity_ugal=observed_magnetics_nt,
                 xy_ravel=xy_ravel,
             )
 
-        gempy_viz(geo_model, data)
+        # gempy_viz(geo_model, data)
