@@ -27,7 +27,6 @@ from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comp
 from mineye.config import paths
 from mineye.config.example_parameters import SoricomModelConfig
 
-
 nc_path = "arviz_data_magnetic_soricom.nc"
 
 
@@ -94,7 +93,7 @@ class TestMagneticInversion:
         magnetic_observations_tensor = torch.tensor(observed_magnetics_nt)
 
         # Prior predictive
-        if False:
+        if True:
             prior_inference_data: az.InferenceData = gpp.run_predictive(
                 prob_model=prob_model,
                 geo_model=geo_model,
@@ -114,8 +113,8 @@ class TestMagneticInversion:
                 target_accept_prob=0.65,
                 max_tree_depth=5,
                 init_strategy='median',
-                num_samples=20,
-                warmup_steps=20,
+                num_samples=200,
+                warmup_steps=200,
             ),
             plot_trace=True,
             run_posterior_predictive=True,
@@ -146,29 +145,29 @@ class TestMagneticInversion:
         # 3) Priors
         n_orientations = geo_model.orientations_copy.xyz.shape[0]
         model_priors = {
-            self.prior_key_dips: dist.Normal(
-                loc=torch.full((n_orientations,), 10.0, dtype=torch.float64),
-                scale=torch.tensor(10.0, dtype=torch.float64),
-                validate_args=True,
-            ),
-            self.prior_key_susceptibility: dist.Normal(
-                loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=torch.float64),
-                scale=torch.tensor(0.03, dtype=torch.float64),
-            ).to_event(1),
+                self.prior_key_dips          : dist.Normal(
+                    loc=torch.full((n_orientations,), 10.0, dtype=torch.float64),
+                    scale=torch.tensor(10.0, dtype=torch.float64),
+                    validate_args=True,
+                ),
+                self.prior_key_susceptibility: dist.Normal(
+                    loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=torch.float64),
+                    scale=torch.tensor(0.03, dtype=torch.float64),
+                ).to_event(1),
         }
 
         # 4) Deterministics
         post_forward_dets = {
-            "magnetic_response_raw": lambda samples, gm, sol: sol.magnetics,
-            "magnetic_response": lambda samples, gm, sol: align_forward_to_observed(
-                sol.magnetics, norm_params,
-            ),
-            "mean_magnetics": lambda samples, gm, sol: torch.mean(
-                align_forward_to_observed(sol.magnetics, norm_params),
-            ),
-            "max_magnetics": lambda samples, gm, sol: torch.max(
-                align_forward_to_observed(sol.magnetics, norm_params), 0,
-            ),
+                "magnetic_response_raw": lambda samples, gm, sol: sol.magnetics,
+                "magnetic_response"    : lambda samples, gm, sol: align_forward_to_observed(
+                    sol.magnetics, norm_params,
+                ),
+                "mean_magnetics"       : lambda samples, gm, sol: torch.mean(
+                    align_forward_to_observed(sol.magnetics, norm_params),
+                ),
+                "max_magnetics"        : lambda samples, gm, sol: torch.max(
+                    align_forward_to_observed(sol.magnetics, norm_params), 0,
+                ),
         }
 
         # 5) Likelihood
@@ -218,9 +217,9 @@ class TestMagneticInversion:
         gradient_tensor_dict = calculate_magnetic_gradient_tensor(
             centered_grid=geo_model.grid.centered_grid,
             igrf_params={
-                "inclination": 57.0,
-                "declination": 4.0,
-                "intensity": 47500.0,
+                    "inclination": 57.0,
+                    "declination": 4.0,
+                    "intensity"  : 47500.0,
             },
             compute_tmi=True,
             units_nT=True,
@@ -231,9 +230,9 @@ class TestMagneticInversion:
                 mag_kernel=gradient_tensor_dict['tmi_kernel'],
                 susceptibilities=np.array([0.0, 0.05, 0.001, 0.001]),
                 igrf_params={
-                    "inclination": gradient_tensor_dict['inclination'],
-                    "declination": gradient_tensor_dict['declination'],
-                    "intensity": gradient_tensor_dict['intensity'],
+                        "inclination": gradient_tensor_dict['inclination'],
+                        "declination": gradient_tensor_dict['declination'],
+                        "intensity"  : gradient_tensor_dict['intensity'],
                 },
             ),
         )
@@ -273,8 +272,6 @@ class TestMagneticInversion:
                 geo_model.geophysics_input.magnetics_input.susceptibilities = susceptibilities
 
         return interpolation_input
-
-
 
     # --- Analysis tests ---
 
