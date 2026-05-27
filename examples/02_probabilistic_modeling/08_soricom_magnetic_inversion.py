@@ -636,7 +636,7 @@ geo_model.structural_frame.fault_relations = SoricomModelConfig.FAULT_RELATIONS_
 
 # Prior Probability Fields
 print("\nComputing prior probability fields...")
-topography_path = paths.get_topography_path()
+topography_path = paths.get_soricom_dem_path()
 probability_fields_for(
     geo_model=geo_model,
     inference_data=data.prior,
