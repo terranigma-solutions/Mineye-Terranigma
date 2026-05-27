@@ -347,7 +347,7 @@ def test_extract_magnetic_points(data_dir):
     """
     raster_path = os.path.join(
         data_dir, 'Geophysical_Raw_Data',
-        'merged_masked_B1B2_mean_median_201_up3m.ers',
+        'magnetics_model2.ers',
     )
     dem_path = os.path.join(data_dir, 'Topographic_Data', 'soricom_DEM10m.tif')
 
@@ -441,7 +441,7 @@ def test_spatial_correlation_reduction(data_dir):
     """
     raster_path = os.path.join(
         data_dir, 'Geophysical_Raw_Data',
-        'merged_masked_B1B2_mean_median_201_up3m.ers',
+        'magnetics_model2.ers',
     )
     dem_path = os.path.join(data_dir, 'Topographic_Data', 'soricom_DEM10m.tif')
 
@@ -547,7 +547,7 @@ def test_gradient_peak_extraction(data_dir):
     """
     raster_path = os.path.join(
         data_dir, 'Geophysical_Raw_Data',
-        'merged_masked_B1B2_mean_median_201_up3m.ers',
+        'magnetics_model2.ers',
     )
     dem_path = os.path.join(data_dir, 'Topographic_Data', 'soricom_DEM10m.tif')
 

@@ -16,7 +16,7 @@ def test_read_magnetic_raster(data_dir, geophysical_dir):
     raster_path = os.path.join(
         data_dir,
         'Geophysical_Raw_Data',
-        'merged_masked_B1B2_mean_median_201_up3m.ers',
+        'magnetics_model2.ers',
     )
 
     assert os.path.exists(raster_path), f"Raster not found: {raster_path}"
