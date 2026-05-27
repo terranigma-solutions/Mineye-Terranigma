@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>EnMap Lithological Segmentation &#8212; Mineye-Terranigma 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=0ca6144b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=fd6457a4" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <link rel="icon" href="../_static/favicon.ico"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-examples-segmentation-01-enmap-lith-segmentation-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code.</p>
+</div>
+<section class="sphx-glr-example-title" id="enmap-lithological-segmentation">
+<span id="sphx-glr-examples-segmentation-01-enmap-lith-segmentation-py"></span><h1>EnMap Lithological Segmentation<a class="headerlink" href="#enmap-lithological-segmentation" title="Link to this heading">¶</a></h1>
+<p>This example demonstrates the workflow for lithological segmentation using EnMap hyperspectral data.
+It covers feature extraction, data preparation, and the Bayesian segmentation process.</p>
+<p><strong>Overview</strong></p>
+<p>EnMap (Environmental Mapping and Analysis Program) is a German hyperspectral satellite mission.
+This example shows how to process EnMap L2A products to identify different lithological units.</p>
+<p><strong>Key Steps</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Feature Extraction</strong>: Extracting meaningful features from the hyperspectral cube (MNF, absorption depths, derivative PCs).</p></li>
+<li><p><strong>Preprocessing</strong>: Detrending and background-field removal to account for sensor artifacts.</p></li>
+<li><p><strong>Bayesian Segmentation</strong>: Running the core segmentation engine to classify pixels and estimate uncertainty.</p></li>
+<li><p><strong>Export</strong>: Saving the results as georeferenced GeoTIFFs.</p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This example requires an EnMap L2A product folder. Update the <cite>enmap_folder</cite> path to point to your local data.</p>
+</div>
+<section id="import-libraries">
+<h2>Import Libraries<a class="headerlink" href="#import-libraries" title="Link to this heading">¶</a></h2>
+<p>We import the necessary modules for EnMap feature extraction and the core segmentation workflow.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.BayesianSegmentation.EnMap_feature_extraction</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">enmap_to_feature_stack</span><span class="p">,</span>
+    <span class="n">plot_feature_quicklooks</span><span class="p">,</span>
+    <span class="n">save_detrended_swir_column_median_plot</span><span class="p">,</span>
+    <span class="n">features_to_memory_datasets</span><span class="p">,</span>
+    <span class="n">write_features_to_files</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.BayesianSegmentation.full_workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_workflow</span>
+</pre></div>
+</div>
+</section>
+<section id="parameters">
+<h2>Parameters<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h2>
+<p>Define the input paths and hyperparameters for the segmentation.
+The <cite>enmap_folder</cite> should point to a valid EnMAP L2A directory containing <cite>SPECTRAL_IMAGE.TIF</cite> and metadata.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Attempt to get paths from Sphinx config if running in gallery</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">sphinx.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span>
+    <span class="c1"># This is a bit of a hack to check if we are in a sphinx build</span>
+    <span class="c1"># In a real gallery build, we might use environment variables</span>
+    <span class="n">enmap_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;ENMAP_DATA_ROOT&#39;</span><span class="p">,</span> <span class="s1">&#39;examples/Data/Segmentation_Input_Data/Enmap&#39;</span><span class="p">)</span>
+    <span class="n">output_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;SEGMENTATION_OUTPUT_ROOT&#39;</span><span class="p">,</span> <span class="s1">&#39;examples/Data/Segmentation_Output_Data&#39;</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">enmap_root</span> <span class="o">=</span> <span class="s1">&#39;examples/Data/Segmentation_Input_Data/Enmap&#39;</span>
+    <span class="n">output_root</span> <span class="o">=</span> <span class="s1">&#39;examples/Data/Segmentation_Output_Data&#39;</span>
+
+<span class="c1"># Paths</span>
+<span class="n">enmap_folder</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">enmap_root</span><span class="p">,</span> <span class="s2">&quot;ENMAP01-____L2A-DT0000026661_20230712T114038Z_001_V010402_20240818T134118Z&quot;</span><span class="p">)</span>
+<span class="n">output_prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_root</span><span class="p">,</span> <span class="s2">&quot;EnMap&quot;</span><span class="p">)</span>
+
+<span class="c1"># If the path is relative, make it relative to the project root</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isabs</span><span class="p">(</span><span class="n">enmap_folder</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">script_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span>
+    <span class="k">except</span> <span class="ne">NameError</span><span class="p">:</span>
+        <span class="c1"># __file__ is not defined when running in some environments (like Sphinx Gallery exec)</span>
+        <span class="c1"># In Sphinx Gallery, the CWD is typically the directory where the script is located</span>
+        <span class="n">script_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
+
+    <span class="c1"># Sphinx Gallery execution check: if we are in &#39;docs/source/examples_segmentation&#39;</span>
+    <span class="c1"># or similar, the project root is 3 levels up. Otherwise, assume 2 levels up.</span>
+    <span class="k">if</span> <span class="s1">&#39;docs/source&#39;</span> <span class="ow">in</span> <span class="n">script_dir</span><span class="p">:</span>
+        <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">script_dir</span><span class="p">,</span> <span class="s2">&quot;../../../&quot;</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">script_dir</span><span class="p">,</span> <span class="s2">&quot;../../&quot;</span><span class="p">))</span>
+
+    <span class="n">enmap_folder</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="n">enmap_folder</span><span class="p">)</span>
+    <span class="n">output_prefix</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="n">output_prefix</span><span class="p">)</span>
+
+<span class="c1"># Segmentation hyperparameters</span>
+<span class="n">n_classes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span>
+<span class="n">iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="n">beta_init</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">30.0</span>
+<span class="n">beta_jump</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span>
+<span class="n">save_npy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+
+<span class="c1"># Detrending / background-field removal settings</span>
+<span class="n">detrend</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">detrend_sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">120.0</span>
+<span class="n">detrend_downsample</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="mi">4</span>
+<span class="n">detrend_buffer_px</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span>
+<span class="n">detrend_den_thresh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.2</span>
+
+<span class="c1"># Additional exclusions and handling</span>
+<span class="n">edge_px</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">40</span>
+<span class="n">mnf_buffer_px</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">destripe</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="c1"># Workflow options</span>
+<span class="n">use_soil_mask</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">plot_tci</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+</pre></div>
+</div>
+</section>
+<section id="feature-extraction">
+<h2>Feature Extraction<a class="headerlink" href="#feature-extraction" title="Link to this heading">¶</a></h2>
+<p>We extract a stack of descriptive features from the EnMap cube.
+This includes Minimum Noise Fraction (MNF) transforms, specific absorption depth maps, and derivative-based Principal Components.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">enmap_folder</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;EnMAP folder not found at </span><span class="si">{</span><span class="n">enmap_folder</span><span class="si">}</span><span class="s2">. Skipping extraction for demonstration.&quot;</span><span class="p">)</span>
+    <span class="n">features</span><span class="p">,</span> <span class="n">meta</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">features</span><span class="p">,</span> <span class="n">meta</span> <span class="o">=</span> <span class="n">enmap_to_feature_stack</span><span class="p">(</span>
+        <span class="n">enmap_folder</span><span class="p">,</span>
+        <span class="n">detrend</span><span class="o">=</span><span class="n">detrend</span><span class="p">,</span>
+        <span class="n">detrend_sigma</span><span class="o">=</span><span class="n">detrend_sigma</span><span class="p">,</span>
+        <span class="n">detrend_downsample</span><span class="o">=</span><span class="n">detrend_downsample</span><span class="p">,</span>
+        <span class="n">detrend_buffer_px</span><span class="o">=</span><span class="n">detrend_buffer_px</span><span class="p">,</span>
+        <span class="n">detrend_den_thresh</span><span class="o">=</span><span class="n">detrend_den_thresh</span><span class="p">,</span>
+        <span class="n">mnf_buffer_px</span><span class="o">=</span><span class="n">mnf_buffer_px</span><span class="p">,</span>
+        <span class="n">edge_px</span><span class="o">=</span><span class="n">edge_px</span><span class="p">,</span>
+        <span class="n">destripe</span><span class="o">=</span><span class="n">destripe</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracted </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">features</span><span class="p">)</span><span class="si">}</span><span class="s2"> feature layers&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>EnMAP folder not found at /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/Data/Segmentation_Input_Data/Enmap/ENMAP01-____L2A-DT0000026661_20230712T114038Z_001_V010402_20240818T134118Z. Skipping extraction for demonstration.
+</pre></div>
+</div>
+</section>
+<section id="qa-plotting">
+<h2>QA Plotting<a class="headerlink" href="#qa-plotting" title="Link to this heading">¶</a></h2>
+<p>Visualize the extracted features and diagnostic plots to ensure the preprocessing (like detrending) worked as expected.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">features</span><span class="p">:</span>
+    <span class="n">output_prefix_abs</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">output_prefix</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Pass show=True to ensure Sphinx Gallery captures the plots</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[Workflow] Plotting feature quicklooks...&quot;</span><span class="p">)</span>
+        <span class="n">plot_feature_quicklooks</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="n">output_prefix_abs</span><span class="p">,</span> <span class="n">show</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[WARN] Could not create feature quicklooks: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">diag_path</span> <span class="o">=</span> <span class="n">save_detrended_swir_column_median_plot</span><span class="p">(</span>
+            <span class="n">enmap_folder</span><span class="o">=</span><span class="n">enmap_folder</span><span class="p">,</span>
+            <span class="n">out_prefix</span><span class="o">=</span><span class="n">output_prefix_abs</span><span class="p">,</span>
+            <span class="n">target_nm</span><span class="o">=</span><span class="mf">2200.0</span><span class="p">,</span>
+            <span class="n">use_qa_mask</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">edge_px</span><span class="o">=</span><span class="n">edge_px</span><span class="p">,</span>
+            <span class="n">detrend_sigma</span><span class="o">=</span><span class="n">detrend_sigma</span><span class="p">,</span>
+            <span class="n">detrend_downsample</span><span class="o">=</span><span class="n">detrend_downsample</span><span class="p">,</span>
+            <span class="n">detrend_buffer_px</span><span class="o">=</span><span class="n">detrend_buffer_px</span><span class="p">,</span>
+            <span class="n">detrend_den_thresh</span><span class="o">=</span><span class="n">detrend_den_thresh</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved diagnostic plot to </span><span class="si">{</span><span class="n">diag_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not create diagnostic plot: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="data-preparation">
+<h2>Data Preparation<a class="headerlink" href="#data-preparation" title="Link to this heading">¶</a></h2>
+<p>Wrap the extracted features into in-memory datasets and persist them to disk for the segmentation engine.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">features</span> <span class="ow">and</span> <span class="n">meta</span><span class="p">:</span>
+    <span class="n">bands_dict</span><span class="p">,</span> <span class="n">open_datasets</span><span class="p">,</span> <span class="n">memfiles</span> <span class="o">=</span> <span class="n">features_to_memory_datasets</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="n">meta</span><span class="p">)</span>
+
+    <span class="n">ref_key</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">bands_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+    <span class="n">ref_ds</span> <span class="o">=</span> <span class="n">bands_dict</span><span class="p">[</span><span class="n">ref_key</span><span class="p">]</span>
+    <span class="n">ref_bounds</span> <span class="o">=</span> <span class="n">ref_ds</span><span class="o">.</span><span class="n">bounds</span>
+    <span class="n">bounds</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">float</span><span class="p">(</span><span class="n">ref_bounds</span><span class="o">.</span><span class="n">left</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">ref_bounds</span><span class="o">.</span><span class="n">bottom</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">ref_bounds</span><span class="o">.</span><span class="n">right</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">ref_bounds</span><span class="o">.</span><span class="n">top</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">paths_dict</span> <span class="o">=</span> <span class="n">write_features_to_files</span><span class="p">(</span><span class="n">bands_dict</span><span class="p">,</span> <span class="n">meta</span><span class="p">,</span> <span class="n">output_prefix</span><span class="p">)</span>
+
+    <span class="c1"># %%</span>
+    <span class="c1"># Bayesian Segmentation</span>
+    <span class="c1"># ---------------------</span>
+    <span class="c1">#</span>
+    <span class="c1"># Run the Markov Chain Monte Carlo (MCMC) based Bayesian segmentation.</span>
+    <span class="c1"># This process iteratively updates the class labels and calculates the entropy (uncertainty).</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">run_workflow</span><span class="p">(</span>
+            <span class="n">bands</span><span class="o">=</span><span class="n">paths_dict</span><span class="p">,</span>
+            <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span>
+            <span class="n">n_classes</span><span class="o">=</span><span class="n">n_classes</span><span class="p">,</span>
+            <span class="n">beta_init</span><span class="o">=</span><span class="n">beta_init</span><span class="p">,</span>
+            <span class="n">n_iterations</span><span class="o">=</span><span class="n">iterations</span><span class="p">,</span>
+            <span class="n">beta_jump_length</span><span class="o">=</span><span class="n">beta_jump</span><span class="p">,</span>
+            <span class="n">use_soil_mask</span><span class="o">=</span><span class="n">use_soil_mask</span><span class="p">,</span>
+            <span class="n">save_npy</span><span class="o">=</span><span class="n">save_npy</span><span class="p">,</span>
+            <span class="n">plot_tci</span><span class="o">=</span><span class="n">plot_tci</span><span class="p">,</span>
+            <span class="n">ref_band</span><span class="o">=</span><span class="n">ref_key</span><span class="p">,</span>
+            <span class="n">output_prefix</span><span class="o">=</span><span class="n">output_prefix</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="c1"># Cleanup open file handles</span>
+        <span class="k">for</span> <span class="n">ds</span> <span class="ow">in</span> <span class="n">open_datasets</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">ds</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">pass</span>
+        <span class="k">for</span> <span class="n">mf</span> <span class="ow">in</span> <span class="n">memfiles</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">mf</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">pass</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Skipping segmentation because features were not extracted.&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Skipping segmentation because features were not extracted.
+</pre></div>
+</div>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (0 minutes 0.007 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-examples-segmentation-01-enmap-lith-segmentation-py">
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/231122027b294cede588b0d326b8cc5d/01_enmap_lith_segmentation.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">01_enmap_lith_segmentation.ipynb</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/cf7b9b62780d99b18045b64ce0964fa2/01_enmap_lith_segmentation.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">01_enmap_lith_segmentation.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-zip docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/6dde01184df12bbf8b9edc290455568f/01_enmap_lith_segmentation.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">zipped:</span> <span class="pre">01_enmap_lith_segmentation.zip</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/MINEYE_LOGO.png" alt="Logo of Mineye-Terranigma"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Mineye-Terranigma</a></h1>
+
+
+
+<p class="blurb">Implicit Geological Modeling & Bayesian Geophysical Inversion</p>
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_basic/index.html">Basic Examples</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_probabilistic/index.html">Probabilistic Modeling Examples</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_segmentation/index.html">Hyperspectral Segmentation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024-2026, Terranigma Solutions GmbH.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/examples_segmentation_v2/01_enmap_lith_segmentation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

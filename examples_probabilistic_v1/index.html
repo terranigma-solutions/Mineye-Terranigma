@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Probabilistic Modeling Examples &#8212; Mineye-Terranigma 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=0ca6144b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=fd6457a4" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <link rel="icon" href="../_static/favicon.ico"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="probabilistic-modeling-examples">
+<h1>Probabilistic Modeling Examples<a class="headerlink" href="#probabilistic-modeling-examples" title="Link to this heading">¶</a></h1>
+<p>This gallery contains advanced examples of probabilistic geological modeling and Bayesian
+geophysical inversion using GemPy with Pyro probabilistic programming.</p>
+<section id="gallery-overview">
+<h2>Gallery Overview<a class="headerlink" href="#gallery-overview" title="Link to this heading">¶</a></h2>
+<p>These examples demonstrate uncertainty quantification and probabilistic inference methods
+for geological and geophysical problems. They leverage PyTorch and Pyro to perform:</p>
+<ul class="simple">
+<li><p>Uncertainty propagation through geological models</p></li>
+<li><p>Bayesian inversion of geophysical data</p></li>
+<li><p>Joint inversion of multiple data types</p></li>
+<li><p>Posterior sampling and credible interval estimation</p></li>
+</ul>
+</section>
+<section id="why-probabilistic-modeling">
+<h2>Why Probabilistic Modeling?<a class="headerlink" href="#why-probabilistic-modeling" title="Link to this heading">¶</a></h2>
+<p>Traditional deterministic geological models provide a single “best guess” interpretation.
+Probabilistic modeling offers several advantages:</p>
+<ul class="simple">
+<li><p><strong>Quantifies uncertainty</strong>: Provides probability distributions over model parameters</p></li>
+<li><p><strong>Incorporates prior knowledge</strong>: Combines geological expertise with data</p></li>
+<li><p><strong>Rigorous inference</strong>: Uses Bayesian statistics for optimal parameter estimation</p></li>
+<li><p><strong>Risk assessment</strong>: Enables decision-making under uncertainty for resource exploration</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Completion of Basic Examples gallery</p></li>
+<li><p>Understanding of probability and statistics</p></li>
+<li><p>Familiarity with Bayesian inference concepts (helpful but not required)</p></li>
+<li><p>Installed packages: <code class="docutils literal notranslate"><span class="pre">gempy</span></code>, <code class="docutils literal notranslate"><span class="pre">gempy-probability</span></code>, <code class="docutils literal notranslate"><span class="pre">pyro-ppl</span></code>, <code class="docutils literal notranslate"><span class="pre">torch</span></code>, <code class="docutils literal notranslate"><span class="pre">arviz</span></code></p></li>
+</ul>
+</section>
+<section id="example-descriptions">
+<h2>Example Descriptions<a class="headerlink" href="#example-descriptions" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>02_error_propagation.py</strong>: Propagate uncertainty in surface point locations through
+a geological model to understand how data uncertainty affects predictions</p></li>
+<li><p><strong>03_error_propagation_dips.py</strong>: Extend uncertainty analysis to orientation data,
+demonstrating the impact of dip and azimuth uncertainties</p></li>
+<li><p><strong>04_gravity_inversion.py</strong>: Full Bayesian inversion of gravity data to infer
+subsurface density distributions and geological parameters</p></li>
+<li><p><strong>05_magnetics_inversion.py</strong>: Magnetic data inversion demonstrating joint
+geophysical-geological inference</p></li>
+<li><p><strong>06_enmap_inversion.py</strong>: Surface lithology inversion using EnMap satellite
+classifications with Categorical likelihood and ordinal probabilities</p></li>
+<li><p><strong>07_joint_inversion.py</strong>: Joint Bayesian inversion of gravity and EnMap data,
+demonstrating multi-grid setup and likelihood balance diagnostics</p></li>
+</ul>
+</section>
+<section id="inference-methods">
+<h2>Inference Methods<a class="headerlink" href="#inference-methods" title="Link to this heading">¶</a></h2>
+<p>These examples use two main inference approaches:</p>
+<ol class="arabic simple">
+<li><p><strong>Variational Inference (VI)</strong>:</p>
+<ul class="simple">
+<li><p>Fast approximate inference using gradient descent</p></li>
+<li><p>Suitable for large-scale problems</p></li>
+<li><p>Provides mean-field or structured approximations</p></li>
+</ul>
+</li>
+<li><p><strong>Markov Chain Monte Carlo (MCMC)</strong>:</p>
+<ul class="simple">
+<li><p>Accurate sampling from posterior distributions</p></li>
+<li><p>Slower but more robust</p></li>
+<li><p>Uses Hamiltonian Monte Carlo (HMC) and NUTS algorithms</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="computational-requirements">
+<h2>Computational Requirements<a class="headerlink" href="#computational-requirements" title="Link to this heading">¶</a></h2>
+<p>Probabilistic modeling is computationally intensive:</p>
+<ul class="simple">
+<li><p>Expect runtime of minutes to hours depending on problem size</p></li>
+<li><p>GPU acceleration recommended for large inversions</p></li>
+<li><p>Some examples save pre-computed results (<code class="docutils literal notranslate"><span class="pre">arviz_data_*.nc</span></code> files)</p></li>
+</ul>
+</section>
+<section id="visualization-and-diagnostics">
+<h2>Visualization and Diagnostics<a class="headerlink" href="#visualization-and-diagnostics" title="Link to this heading">¶</a></h2>
+<p>All examples use ArviZ for posterior analysis:</p>
+<ul class="simple">
+<li><p>Trace plots to check convergence</p></li>
+<li><p>Posterior distributions and credible intervals</p></li>
+<li><p>Effective sample size and <span class="math notranslate nohighlight">\(\\hat{R}\)</span> diagnostics</p></li>
+<li><p>Posterior predictive checks</p></li>
+</ul>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://pyro.ai">Pyro Documentation</a> - Probabilistic programming framework</p></li>
+<li><p><a class="reference external" href="https://arviz-devs.github.io">ArviZ</a> - Exploratory analysis of Bayesian models</p></li>
+<li><p><a class="reference external" href="https://github.com/cgre-aachen/gempy_probability">GemPy-Probability</a> - Integration layer</p></li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Some examples may take significant time to run. Pre-computed results are provided
+where possible to enable quick visualization without re-running full inversions.</p>
+</div>
+<div id='sg-tag-list' class='sphx-glr-tag-list'></div><div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates uncertainty quantification through error propagation. We perturb a surface point&#x27;s Z-coordinate and propagate the uncertainty through the model."><img alt="" src="../_images/sphx_glr_02_error_propagation_thumb.png" />
+<p><a class="reference internal" href="../examples_probabilistic/02_error_propagation.html"><span class="doc">Error Propagation in Geological Models</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Error Propagation in Geological Models</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates uncertainty quantification by varying dip angles. We add uncertainty to orientation dips and propagate it through the geological model."><img alt="" src="../_images/sphx_glr_03_error_propagation_dips_thumb.png" />
+<p><a class="reference internal" href="../examples_probabilistic/03_error_propagation_dips.html"><span class="doc">Error Propagation for Dip Angles</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Error Propagation for Dip Angles</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This tutorial provides a comprehensive walkthrough of Bayesian gravity inversion using the GemPy-Probability framework. We&#x27;ll explore both the theoretical foundations and practical implementation of inferring geological parameters from gravity observations."><img alt="" src="../_images/sphx_glr_04_gravity_inversion_thumb.png" />
+<p><a class="reference internal" href="../examples_probabilistic/04_gravity_inversion.html"><span class="doc">Bayesian Gravity Inversion: Complete Workflow</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Bayesian Gravity Inversion: Complete Workflow</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="What&#x27;s Different from Gravity?"><img alt="" src="../_images/sphx_glr_05_magnetics_inversion_thumb.png" />
+<p><a class="reference internal" href="../examples_probabilistic/05_magnetics_inversion.html"><span class="doc">Bayesian Magnetic Inversion: TMI Inversion Workflow</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Bayesian Magnetic Inversion: TMI Inversion Workflow</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This tutorial demonstrates how to perform Bayesian inversion using surface lithological  classifications (e.g., from EnMap satellite data) as observations. Unlike gravity  inversion which uses continuous values, EnMap inversion deals with discrete categorical labels."><img alt="" src="../_images/sphx_glr_06_enmap_inversion_thumb.png" />
+<p><a class="reference internal" href="../examples_probabilistic/06_enmap_inversion.html"><span class="doc">Bayesian EnMap Inversion: Categorical Likelihood and Ordinal Probabilities</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Bayesian EnMap Inversion: Categorical Likelihood and Ordinal Probabilities</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This tutorial demonstrates a joint Bayesian inversion combining two disparate data types: 1. Gravity Data: Volumetric measurements sensitive to subsurface density contrasts. 2. EnMap Satellite Data: Surface lithology classifications sensitive to the intersection     of geological units with topography."><img alt="" src="../_images/sphx_glr_07_joint_inversion_thumb.png" />
+<p><a class="reference internal" href="../examples_probabilistic/07_joint_inversion.html"><span class="doc">Bayesian Joint Inversion: Gravity and EnMap</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Bayesian Joint Inversion: Gravity and EnMap</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="What Makes the Soricom Model Different?"><img alt="" src="../_images/sphx_glr_08_soricom_magnetic_inversion_thumb.png" />
+<p><a class="reference internal" href="../examples_probabilistic/08_soricom_magnetic_inversion.html"><span class="doc">Bayesian Magnetic Inversion: Soricom Chromite Lens</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Bayesian Magnetic Inversion: Soricom Chromite Lens</div>
+</div></div><div class="toctree-wrapper compound">
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/MINEYE_LOGO.png" alt="Logo of Mineye-Terranigma"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Mineye-Terranigma</a></h1>
+
+
+
+<p class="blurb">Implicit Geological Modeling & Bayesian Geophysical Inversion</p>
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_basic/index.html">Basic Examples</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_probabilistic/index.html">Probabilistic Modeling Examples</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_segmentation/index.html">Hyperspectral Segmentation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024-2026, Terranigma Solutions GmbH.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/examples_probabilistic_v1/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Bayesian Magnetic Inversion: Soricom Chromite Lens &#8212; Mineye-Terranigma 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=0ca6144b" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=fd6457a4" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=2082cf3c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/sg-tags.js?v=d80f6fa4"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <link rel="icon" href="../_static/favicon.ico"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-examples-probabilistic-08-soricom-magnetic-inversion-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code.</p>
+</div>
+<section class="sphx-glr-example-title" id="bayesian-magnetic-inversion-soricom-chromite-lens">
+<span id="sphx-glr-examples-probabilistic-08-soricom-magnetic-inversion-py"></span><h1>Bayesian Magnetic Inversion: Soricom Chromite Lens<a class="headerlink" href="#bayesian-magnetic-inversion-soricom-chromite-lens" title="Link to this heading">¶</a></h1>
+<p>This tutorial demonstrates Bayesian inversion of Total Magnetic Intensity (TMI)
+data using the Soricom fault structural model. It extends the magnetic inversion
+methodology to a more complex geological setting with a fault and a chromite
+lens hosted in ultramafic rocks.</p>
+<p><strong>What Makes the Soricom Model Different?</strong></p>
+<p>Unlike the simple Tharsis plutonite model (<span class="xref std std-ref">sphx_glr_02_probabilistic_modeling_05_magnetics_inversion.py</span>),
+the Soricom model features:</p>
+<ol class="arabic simple">
+<li><p><strong>A fault</strong>: The Main_Fault truncates all formations (fault-first structural
+frame ordering)</p></li>
+<li><p><strong>A chromite lens</strong>: A thin, high-susceptibility target embedded in host rock</p></li>
+<li><p><strong>Smaller extent</strong>: ~500 m × 350 m area at UTM zone 34N coordinates</p></li>
+<li><p><strong>Higher resolution</strong>: Octree refinement level 5 on a much smaller domain</p></li>
+</ol>
+<p><strong>Data and Preprocessing</strong></p>
+<p>TMI data is extracted from a merged B1B2 raster at the Soricom prospect.
+The raw measurements are in <strong>nanoTesla (nT)</strong> and include Earth’s background
+magnetic field (~47,500 nT at this location). Since the GemPy forward model
+computes <strong>TMI anomalies</strong> (deviations from the background field), we subtract
+the IGRF (International Geomagnetic Reference Field) intensity before inversion:</p>
+<div class="math notranslate nohighlight">
+\[TMI_{       ext{anomaly}} = TMI_{   ext{measured}} - IGRF_{ ext{intensity}}\]</div>
+<p>For comprehensive theory on Bayesian inversion, MCMC, and hierarchical
+likelihoods, see <span class="xref std std-ref">sphx_glr_02_probabilistic_modeling_04_gravity_inversion.py</span>.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+</pre></div>
+</div>
+<section id="import-libraries">
+<h2>Import Libraries<a class="headerlink" href="#import-libraries" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">dotenv</span>
+
+<span class="n">dotenv</span><span class="o">.</span><span class="n">load_dotenv</span><span class="p">()</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">gempy_probability.modules.plot.plot_posterior</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_red</span><span class="p">,</span> <span class="n">default_blue</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.visualization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">gempy_viz</span><span class="p">,</span>
+    <span class="n">plot_many_observed_vs_forward</span><span class="p">,</span>
+    <span class="n">generate_gravity_uncertainty_plots</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.plotting.probabilistic_analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">plot_geophysics_comparison</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy_probability</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gempy_viewer</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpv</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyro</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyro.distributions</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gempy_probability.core.samplers_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">NUTSConfig</span>
+
+<span class="c1"># Set random seeds for reproducibility</span>
+<span class="n">seed</span> <span class="o">=</span> <span class="mi">4003</span>
+<span class="n">pyro</span><span class="o">.</span><span class="n">set_rng_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">1234</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+</pre></div>
+</div>
+<p>Import Soricom-specific helpers</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">mineye.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">paths</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.config.example_parameters</span><span class="w"> </span><span class="kn">import</span> <span class="n">SoricomModelConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.geophysics</span><span class="w"> </span><span class="kn">import</span> <span class="n">align_forward_to_observed</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.probabilistic_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize</span><span class="p">,</span> <span class="n">set_magnetic_priors</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mineye.GeoModel.model_one.probabilistic_model_likelihoods</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">generate_multimagnetic_likelihood_hierarchical_per_station</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gempy_engine.modules.geophysics.magnetic_gradient</span><span class="w"> </span><span class="kn">import</span> <span class="n">calculate_magnetic_gradient_tensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gempy_engine.core.data.geophysics_input</span><span class="w"> </span><span class="kn">import</span> <span class="n">MagneticsInput</span>
+</pre></div>
+</div>
+</section>
+<section id="step-1-load-preprocessed-magnetic-observations">
+<h2>Step 1: Load Preprocessed Magnetic Observations<a class="headerlink" href="#step-1-load-preprocessed-magnetic-observations" title="Link to this heading">¶</a></h2>
+<p><strong>Preprocessing Applied</strong></p>
+<p>The raw TMI raster values (~47,000 nT) include Earth’s ambient magnetic field.
+To match the forward model (which computes anomalies), we subtract the IGRF
+intensity of 47,500 nT. The resulting anomalies range from -392 to -42 nT,
+consistent with the forward model output (~-550 to -475 nT).</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">read_magnetics</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read preprocessed magnetic data from extracted numpy arrays.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">this_file</span> <span class="o">=</span> <span class="vm">__file__</span>
+    <span class="k">except</span> <span class="ne">NameError</span><span class="p">:</span>
+        <span class="n">this_file</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">current_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">this_file</span><span class="p">))</span>
+    <span class="n">xyz_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">current_dir</span><span class="p">,</span> <span class="s1">&#39;soricom_magnetic_xyz_adaptive.npy&#39;</span><span class="p">)</span>
+    <span class="n">mag_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">current_dir</span><span class="p">,</span> <span class="s1">&#39;soricom_magnetic_values_adaptive.npy&#39;</span><span class="p">)</span>
+    <span class="n">xyz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">xyz_path</span><span class="p">)</span>
+    <span class="n">mag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">mag_path</span><span class="p">)</span>
+
+    <span class="c1"># Subsample 20 points for inversion (random subset, seed fixed)</span>
+    <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">xyz</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="nb">min</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">xyz</span><span class="p">)),</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">sampled_xyz</span> <span class="o">=</span> <span class="n">xyz</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+
+    <span class="c1"># IGRF: forward model outputs TMI anomalies, so subtract IGRF from raw TMI</span>
+    <span class="n">igrf_intensity_nT</span> <span class="o">=</span> <span class="mf">47_500.0</span>
+    <span class="n">observed_magnetics</span> <span class="o">=</span> <span class="n">mag</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">-</span> <span class="n">igrf_intensity_nT</span>
+    <span class="k">return</span> <span class="n">sampled_xyz</span><span class="p">,</span> <span class="n">observed_magnetics</span>
+
+
+<span class="n">magnetic_xyz</span><span class="p">,</span> <span class="n">observed_magnetics_nt</span> <span class="o">=</span> <span class="n">read_magnetics</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Magnetic observations:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Number of measurements: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">observed_magnetics_nt</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Range: </span><span class="si">{</span><span class="n">observed_magnetics_nt</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">observed_magnetics_nt</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> nT&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">observed_magnetics_nt</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> nT&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Magnetic observations:
+  Number of measurements: 20
+  Range: -392.4 to -42.1 nT
+  Mean: -211.5 nT
+</pre></div>
+</div>
+</section>
+<section id="step-2-setup-geomodel-with-soricom-fault-configuration">
+<h2>Step 2: Setup Geomodel with Soricom Fault Configuration<a class="headerlink" href="#step-2-setup-geomodel-with-soricom-fault-configuration" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">geo_model</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">create_geomodel</span><span class="p">(</span>
+    <span class="n">project_name</span><span class="o">=</span><span class="n">SoricomModelConfig</span><span class="o">.</span><span class="n">PROJECT_NAME</span><span class="p">,</span>
+    <span class="n">extent</span><span class="o">=</span><span class="n">SoricomModelConfig</span><span class="o">.</span><span class="n">EXTENT</span><span class="p">,</span>
+    <span class="n">refinement</span><span class="o">=</span><span class="n">SoricomModelConfig</span><span class="o">.</span><span class="n">REFINEMENT</span><span class="p">,</span>
+    <span class="n">importer_helper</span><span class="o">=</span><span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ImporterHelper</span><span class="p">(</span>
+        <span class="n">path_to_orientations</span><span class="o">=</span><span class="n">paths</span><span class="o">.</span><span class="n">get_soricom_orientations</span><span class="p">(),</span>
+        <span class="n">path_to_surface_points</span><span class="o">=</span><span class="n">paths</span><span class="o">.</span><span class="n">get_soricom_formation_points</span><span class="p">(),</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span> <span class="o">=</span> <span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">init_octree_grid</span><span class="p">(</span>
+    <span class="n">extent</span><span class="o">=</span><span class="n">SoricomModelConfig</span><span class="o">.</span><span class="n">EXTENT</span><span class="p">,</span>
+    <span class="n">octree_levels</span><span class="o">=</span><span class="n">SoricomModelConfig</span><span class="o">.</span><span class="n">REFINEMENT</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">geo_model</span><span class="o">.</span><span class="n">interpolation_options</span><span class="o">.</span><span class="n">number_octree_levels_surface</span> <span class="o">=</span> <span class="mi">2</span>
+
+<span class="n">gp</span><span class="o">.</span><span class="n">map_stack_to_surfaces</span><span class="p">(</span>
+    <span class="n">gempy_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+    <span class="n">mapping_object</span><span class="o">=</span><span class="n">SoricomModelConfig</span><span class="o">.</span><span class="n">SURFACE_MAPPING</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">geo_model</span><span class="o">.</span><span class="n">structural_frame</span><span class="o">.</span><span class="n">structural_groups</span><span class="p">[</span>
+    <span class="n">SoricomModelConfig</span><span class="o">.</span><span class="n">FAULT_GROUP_INDEX</span>
+<span class="p">]</span><span class="o">.</span><span class="n">structural_relation</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">StackRelationType</span><span class="o">.</span><span class="n">FAULT</span>
+<span class="n">geo_model</span><span class="o">.</span><span class="n">structural_frame</span><span class="o">.</span><span class="n">fault_relations</span> <span class="o">=</span> <span class="n">SoricomModelConfig</span><span class="o">.</span><span class="n">FAULT_RELATIONS_MATRIX</span>
+</pre></div>
+</div>
+<p>Compute initial model to see geometry</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gp</span><span class="o">.</span><span class="n">compute_model</span><span class="p">(</span><span class="n">geo_model</span><span class="p">)</span>
+<span class="n">gpv</span><span class="o">.</span><span class="n">plot_2d</span><span class="p">(</span><span class="n">geo_model</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_001.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_001.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+/home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:63.)
+  return func(*args, **kwargs)
+/home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  return func(*args, **kwargs)
+
+&lt;gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7f2577995d30&gt;
+</pre></div>
+</div>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gpv</span><span class="o">.</span><span class="n">plot_3d</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+    <span class="n">ve</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">image</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">kwargs_pyvista_bounds</span><span class="o">=</span><span class="p">{</span>
+        <span class="s1">&#39;show_xlabels&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s1">&#39;show_ylabels&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s1">&#39;show_zlabels&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_002.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_002.png" alt="08 soricom magnetic inversion" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: PyVistaDeprecationWarning:
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_3d/drawer_surfaces_3d.py:38: Argument &#39;color&#39; must be passed as a keyword argument to function &#39;BasePlotter.add_mesh&#39;.
+From version 0.50, passing this as a positional argument will result in a TypeError.
+  gempy_vista.surface_actors[element.name] = gempy_vista.p.add_mesh(
+
+&lt;gempy_viewer.modules.plot_3d.vista.GemPyToVista object at 0x7f2577995160&gt;
+</pre></div>
+</div>
+</section>
+<section id="step-3-setup-magnetic-forward-model">
+<h2>Step 3: Setup Magnetic Forward Model<a class="headerlink" href="#step-3-setup-magnetic-forward-model" title="Link to this heading">¶</a></h2>
+<p><strong>Magnetic Configuration</strong></p>
+<p>We configure centered grids at each measurement location and pre-compute the
+TMI gradient kernel (the linear operator that maps susceptibility to TMI).</p>
+<p><strong>Susceptibility values</strong> (initial guess, in SI units):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Main_Fault</span></code>: 0.0 (faults have no intrinsic susceptibility in this model)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">host_rock</span></code>: 0.05 (ultramafic host with moderate magnetite content)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">chromite_lense</span></code>: 0.001 (chromite has low magnetic susceptibility)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">basement</span></code>: 0.001 (low-susceptibility country rock)</p></li>
+</ul>
+<p><strong>IGRF parameters</strong> at Soricom (WGS 84 UTM zone 34N):
+- Inclination: 57.0°
+- Declination: 4.0°
+- Intensity: 47,500 nT</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gp</span><span class="o">.</span><span class="n">set_centered_grid</span><span class="p">(</span>
+    <span class="n">grid</span><span class="o">=</span><span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span>
+    <span class="n">centers</span><span class="o">=</span><span class="n">magnetic_xyz</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">15</span><span class="p">]),</span>
+    <span class="n">radius</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">2000</span><span class="p">,</span> <span class="mi">5000</span><span class="p">,</span> <span class="mi">2000</span><span class="p">]),</span>
+<span class="p">)</span>
+
+<span class="n">gradient_tensor_dict</span> <span class="o">=</span> <span class="n">calculate_magnetic_gradient_tensor</span><span class="p">(</span>
+    <span class="n">centered_grid</span><span class="o">=</span><span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">centered_grid</span><span class="p">,</span>
+    <span class="n">igrf_params</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;inclination&quot;</span><span class="p">:</span> <span class="mf">57.0</span><span class="p">,</span>
+        <span class="s2">&quot;declination&quot;</span><span class="p">:</span> <span class="mf">4.0</span><span class="p">,</span>
+        <span class="s2">&quot;intensity&quot;</span><span class="p">:</span> <span class="mf">47500.0</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">compute_tmi</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">units_nT</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">geo_model</span><span class="o">.</span><span class="n">geophysics_input</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">GeophysicsInput</span><span class="p">(</span>
+    <span class="n">magnetics_input</span><span class="o">=</span><span class="n">MagneticsInput</span><span class="p">(</span>
+        <span class="n">mag_kernel</span><span class="o">=</span><span class="n">gradient_tensor_dict</span><span class="p">[</span><span class="s1">&#39;tmi_kernel&#39;</span><span class="p">],</span>
+        <span class="n">susceptibilities</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.001</span><span class="p">,</span> <span class="mf">0.001</span><span class="p">]),</span>
+        <span class="n">igrf_params</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">&quot;inclination&quot;</span><span class="p">:</span> <span class="n">gradient_tensor_dict</span><span class="p">[</span><span class="s1">&#39;inclination&#39;</span><span class="p">],</span>
+            <span class="s2">&quot;declination&quot;</span><span class="p">:</span> <span class="n">gradient_tensor_dict</span><span class="p">[</span><span class="s1">&#39;declination&#39;</span><span class="p">],</span>
+            <span class="s2">&quot;intensity&quot;</span><span class="p">:</span> <span class="n">gradient_tensor_dict</span><span class="p">[</span><span class="s1">&#39;intensity&#39;</span><span class="p">],</span>
+        <span class="p">},</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">geo_model</span><span class="o">.</span><span class="n">interpolation_options</span><span class="o">.</span><span class="n">mesh_extraction</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="n">gp</span><span class="o">.</span><span class="n">set_active_grid</span><span class="p">(</span>
+    <span class="n">grid</span><span class="o">=</span><span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span>
+    <span class="n">grid_type</span><span class="o">=</span><span class="p">[</span><span class="n">geo_model</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">GridTypes</span><span class="o">.</span><span class="n">CENTERED</span><span class="p">],</span>
+    <span class="n">reset</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">gp</span><span class="o">.</span><span class="n">compute_model</span><span class="p">(</span><span class="n">geo_model</span><span class="p">)</span>
+
+<span class="n">geo_model</span><span class="o">.</span><span class="n">interpolation_options</span><span class="o">.</span><span class="n">sigmoid_slope</span> <span class="o">=</span> <span class="mi">100</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">✓ Geomodel configured with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">magnetic_xyz</span><span class="p">)</span><span class="si">}</span><span class="s2"> magnetic measurement locations&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Active grids: GridTypes.OCTREE|CENTERED|NONE
+Active grids: GridTypes.CENTERED|NONE
+Setting Backend To: AvailableBackends.PYTORCH
+
+✓ Geomodel configured with 20 magnetic measurement locations
+</pre></div>
+</div>
+</section>
+<section id="step-4-compute-baseline-forward-model">
+<h2>Step 4: Compute Baseline Forward Model<a class="headerlink" href="#step-4-compute-baseline-forward-model" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">sol</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">compute_model</span><span class="p">(</span><span class="n">geo_model</span><span class="p">)</span>
+<span class="n">baseline_fw_magnetics_np</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">sol</span><span class="o">.</span><span class="n">magnetics</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sol</span><span class="o">.</span><span class="n">magnetics</span><span class="p">,</span> <span class="s1">&#39;detach&#39;</span><span class="p">)</span>
+    <span class="k">else</span> <span class="n">sol</span><span class="o">.</span><span class="n">magnetics</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Baseline forward magnetics:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Range: </span><span class="si">{</span><span class="n">baseline_fw_magnetics_np</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">baseline_fw_magnetics_np</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> nT&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">baseline_fw_magnetics_np</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> nT&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+
+Baseline forward magnetics:
+  Range: -550.8 to -475.6 nT
+  Mean: -524.1 nT
+</pre></div>
+</div>
+</section>
+<section id="step-5-normalize-forward-model-to-observations">
+<h2>Step 5: Normalize Forward Model to Observations<a class="headerlink" href="#step-5-normalize-forward-model-to-observations" title="Link to this heading">¶</a></h2>
+<p>We align the forward model anomalies to the observed anomaly scale using
+<code class="docutils literal notranslate"><span class="pre">align_to_reference</span></code>, matching mean and standard deviation.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">norm_params</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span>
+    <span class="n">baseline_fw_gravity_np</span><span class="o">=</span><span class="n">baseline_fw_magnetics_np</span><span class="p">,</span>
+    <span class="n">observed_gravity</span><span class="o">=</span><span class="n">observed_magnetics_nt</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;align_to_reference&quot;</span><span class="p">,</span>
+    <span class="n">extrapolation_buffer</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Normalization parameters:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Method: </span><span class="si">{</span><span class="n">norm_params</span><span class="p">[</span><span class="s1">&#39;method&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Computing align_to_reference alignment parameters...
+  Alignment params: {&#39;method&#39;: &#39;align_to_reference&#39;, &#39;reference_mean&#39;: -211.51229858398438, &#39;reference_std&#39;: 81.00399017333984, &#39;baseline_forward_mean&#39;: -524.0854965423575, &#39;baseline_forward_std&#39;: 17.63784969998283}
+
+Normalization parameters:
+  Method: align_to_reference
+</pre></div>
+</div>
+<p>Visualize baseline fit</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">plot_geophysics_comparison</span><span class="p">(</span>
+    <span class="n">forward_norm</span><span class="o">=</span><span class="n">align_forward_to_observed</span><span class="p">(</span><span class="n">baseline_fw_magnetics_np</span><span class="p">,</span> <span class="n">norm_params</span><span class="p">),</span>
+    <span class="n">normalization_method</span><span class="o">=</span><span class="s2">&quot;align_to_reference&quot;</span><span class="p">,</span>
+    <span class="n">observed_ugal</span><span class="o">=</span><span class="n">observed_magnetics_nt</span><span class="p">,</span>
+    <span class="n">xy_ravel</span><span class="o">=</span><span class="n">magnetic_xyz</span><span class="p">,</span>
+    <span class="n">unit_label</span><span class="o">=</span><span class="s1">&#39;nT&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_003.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_003.png" alt="Observed  (align_to_reference), Forward Model  (align_to_reference), Residuals (Observed - Forward Model) (align_to_reference), Observed vs Forward Model Correlation" class = "sphx-glr-single-img"/></section>
+<section id="step-6-define-prior-distributions">
+<h2>Step 6: Define Prior Distributions<a class="headerlink" href="#step-6-define-prior-distributions" title="Link to this heading">¶</a></h2>
+<p><strong>Susceptibility Priors</strong> (SI units):</p>
+<p>Unlike the Tharsis model (2 units), the Soricom model has 4 units:
+fault, host rock, chromite lens, and basement. The fault and basement have
+near-zero susceptibility, while the host rock has moderate susceptibility
+and the chromite lens is a low-susceptibility target within the host.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">n_orientations</span> <span class="o">=</span> <span class="n">geo_model</span><span class="o">.</span><span class="n">orientations_copy</span><span class="o">.</span><span class="n">xyz</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">prior_key_dips</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;dips&#39;</span>
+<span class="n">prior_key_susceptibility</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;susceptibility&#39;</span>
+
+<span class="n">model_priors</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">prior_key_dips</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span>
+        <span class="n">loc</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">n_orientations</span><span class="p">,),</span> <span class="mf">10.0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+        <span class="n">scale</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+        <span class="n">validate_args</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">prior_key_susceptibility</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span>
+        <span class="n">loc</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.001</span><span class="p">,</span> <span class="mf">0.001</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+        <span class="n">scale</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.03</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">to_event</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="step-7-define-deterministic-functions">
+<h2>Step 7: Define Deterministic Functions<a class="headerlink" href="#step-7-define-deterministic-functions" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">post_forward_dets</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;magnetic_response_raw&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">samples</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">sol</span><span class="p">:</span> <span class="n">sol</span><span class="o">.</span><span class="n">magnetics</span><span class="p">,</span>
+    <span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{magnetics}</span><span class="s1">$&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">samples</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">sol</span><span class="p">:</span> <span class="n">align_forward_to_observed</span><span class="p">(</span>
+        <span class="n">sol</span><span class="o">.</span><span class="n">magnetics</span><span class="p">,</span> <span class="n">norm_params</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="s2">&quot;mean_magnetics&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">samples</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">sol</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span>
+        <span class="n">align_forward_to_observed</span><span class="p">(</span><span class="n">sol</span><span class="o">.</span><span class="n">magnetics</span><span class="p">,</span> <span class="n">norm_params</span><span class="p">),</span>
+    <span class="p">),</span>
+    <span class="s2">&quot;max_magnetics&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">samples</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">sol</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span>
+        <span class="n">align_forward_to_observed</span><span class="p">(</span><span class="n">sol</span><span class="o">.</span><span class="n">magnetics</span><span class="p">,</span> <span class="n">norm_params</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="step-8-define-likelihood-function">
+<h2>Step 8: Define Likelihood Function<a class="headerlink" href="#step-8-define-likelihood-function" title="Link to this heading">¶</a></h2>
+<p>Hierarchical likelihood with per-station noise. The global noise prior is
+centered at 150 nT, appropriate for the observed anomaly scatter of ~152 nT.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">likelihood_fn</span> <span class="o">=</span> <span class="n">generate_multimagnetic_likelihood_hierarchical_per_station</span><span class="p">(</span>
+    <span class="n">norm_params</span><span class="o">=</span><span class="n">norm_params</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Likelihood function created (hierarchical per-station)&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  Global mean noise prior: ~150.0 nT&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Likelihood function created (hierarchical per-station)
+  Global mean noise prior: ~150.0 nT
+</pre></div>
+</div>
+</section>
+<section id="step-9-create-probabilistic-model">
+<h2>Step 9: Create Probabilistic Model<a class="headerlink" href="#step-9-create-probabilistic-model" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">prob_model</span><span class="p">:</span> <span class="n">gpp</span><span class="o">.</span><span class="n">GemPyPyroModel</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">make_gempy_pyro_model</span><span class="p">(</span>
+    <span class="n">priors</span><span class="o">=</span><span class="n">model_priors</span><span class="p">,</span>
+    <span class="n">set_interp_input_fn</span><span class="o">=</span><span class="n">set_magnetic_priors</span><span class="p">,</span>
+    <span class="n">likelihood_fn</span><span class="o">=</span><span class="n">likelihood_fn</span><span class="p">,</span>
+    <span class="n">obs_name</span><span class="o">=</span><span class="s2">&quot;Magnetic Measurement (Soricom)&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Probabilistic model created&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  Model components:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;    - Priors: dips (orientations), susceptibility&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;    - Forward model: GemPy geological interpolation + TMI&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;    - Likelihood: Hierarchical per-station noise&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;    - Deterministics: magnetic_response, mean_magnetics, max_magnetics&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Setting Backend To: AvailableBackends.PYTORCH
+Probabilistic model created
+  Model components:
+    - Priors: dips (orientations), susceptibility
+    - Forward model: GemPy geological interpolation + TMI
+    - Likelihood: Hierarchical per-station noise
+    - Deterministics: magnetic_response, mean_magnetics, max_magnetics
+</pre></div>
+</div>
+</section>
+<section id="step-10-prior-predictive-checks">
+<h2>Step 10: Prior Predictive Checks<a class="headerlink" href="#step-10-prior-predictive-checks" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Running prior predictive sampling (100 samples)...&quot;</span><span class="p">)</span>
+<span class="n">prior_inference_data</span><span class="p">:</span> <span class="n">az</span><span class="o">.</span><span class="n">InferenceData</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">run_predictive</span><span class="p">(</span>
+    <span class="n">prob_model</span><span class="o">=</span><span class="n">prob_model</span><span class="p">,</span>
+    <span class="n">geo_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+    <span class="n">y_obs_list</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">observed_magnetics_nt</span><span class="p">),</span>
+    <span class="n">n_samples</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">plot_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✓ Prior predictive sampling complete&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_004.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_004.png" alt="dips, dips, susceptibility, susceptibility, mu_log_sigma, mu_log_sigma, tau_log_sigma, tau_log_sigma, log_sigma_stations, log_sigma_stations, $\mu_{magnetics}$, $\mu_{magnetics}$, sigma_stations, sigma_stations, Magnetic Measurement (Soricom), Magnetic Measurement (Soricom)" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Running prior predictive sampling (100 samples)...
+/home/leguark/.venv/2025/lib/python3.13/site-packages/arviz/stats/density_utils.py:488: UserWarning: Your data appears to have a single value or no finite values
+  warnings.warn(&quot;Your data appears to have a single value or no finite values&quot;)
+✓ Prior predictive sampling complete
+</pre></div>
+</div>
+</section>
+<section id="visualize-prior-geological-models">
+<h2>Visualize Prior Geological Models<a class="headerlink" href="#visualize-prior-geological-models" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gempy_viz</span><span class="p">(</span>
+    <span class="n">geo_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+    <span class="n">prior_inference_data</span><span class="o">=</span><span class="n">prior_inference_data</span><span class="p">,</span>
+    <span class="n">n_samples</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_005.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_005.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Active grids: GridTypes.OCTREE|NONE
+Setting Backend To: AvailableBackends.PYTORCH
+/home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  return func(*args, **kwargs)
+Setting Backend To: AvailableBackends.PYTORCH
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: &#39;linewidth&#39;, &#39;contour_colors&#39;
+  contour_set = ax.contour(
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+
+&lt;gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7f26b9c9f250&gt;
+</pre></div>
+</div>
+<p>Compare Multiple Prior Predictions to Observations</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">plot_many_observed_vs_forward</span><span class="p">(</span>
+    <span class="n">forward_norm</span><span class="o">=</span><span class="n">align_forward_to_observed</span><span class="p">(</span><span class="n">baseline_fw_magnetics_np</span><span class="p">,</span> <span class="n">norm_params</span><span class="p">),</span>
+    <span class="n">many_forward_norm</span><span class="o">=</span><span class="n">prior_inference_data</span><span class="o">.</span><span class="n">prior</span><span class="p">[</span><span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{magnetics}</span><span class="s1">$&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">10</span><span class="p">:],</span>
+    <span class="n">observed_norm</span><span class="o">=</span><span class="n">observed_magnetics_nt</span><span class="p">,</span>
+    <span class="n">unit_label</span><span class="o">=</span><span class="s1">&#39;nT&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_006.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_006.png" alt="Observed vs Forward Model Correlation" class = "sphx-glr-single-img"/></section>
+<section id="step-11-load-pre-computed-results">
+<h2>Step 11: Load Pre-computed Results<a class="headerlink" href="#step-11-load-pre-computed-results" title="Link to this heading">¶</a></h2>
+<p>Full MCMC inference takes hours. Load pre-computed results from a previous
+run with 200 warmup steps, 200 samples, and NUTS sampler.</p>
+<p>To run inference yourself, set <code class="docutils literal notranslate"><span class="pre">RUN_SIMULATION</span> <span class="pre">=</span> <span class="pre">True</span></code> below.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">RUN_SIMULATION</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="k">if</span> <span class="n">RUN_SIMULATION</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Running NUTS inference...&quot;</span><span class="p">)</span>
+
+    <span class="n">magnetic_observations_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">observed_magnetics_nt</span><span class="p">)</span>
+
+    <span class="c1"># MCMC inference</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">gpp</span><span class="o">.</span><span class="n">run_nuts_inference</span><span class="p">(</span>
+        <span class="n">prob_model</span><span class="o">=</span><span class="n">prob_model</span><span class="p">,</span>
+        <span class="n">geo_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+        <span class="n">y_obs_list</span><span class="o">=</span><span class="n">magnetic_observations_tensor</span><span class="p">,</span>
+        <span class="n">config</span><span class="o">=</span><span class="n">NUTSConfig</span><span class="p">(</span>
+            <span class="n">step_size</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span>
+            <span class="n">adapt_step_size</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">target_accept_prob</span><span class="o">=</span><span class="mf">0.65</span><span class="p">,</span>
+            <span class="n">max_tree_depth</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+            <span class="n">init_strategy</span><span class="o">=</span><span class="s1">&#39;median&#39;</span><span class="p">,</span>
+            <span class="n">num_samples</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+            <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">plot_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">run_posterior_predictive</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">data</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">prior_inference_data</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;✓ NUTS inference complete&quot;</span><span class="p">)</span>
+
+<span class="k">else</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+
+    <span class="n">current_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">getfile</span><span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">currentframe</span><span class="p">()))</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">data_path</span> <span class="o">=</span> <span class="n">current_dir</span> <span class="o">/</span> <span class="s2">&quot;arviz_data_magnetic_soricom.nc&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Data file not found at </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2">. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Please run the simulation first with RUN_SIMULATION=True&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">from_netcdf</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">data_path</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✓ Loaded inference results from </span><span class="si">{</span><span class="n">data_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>✓ Loaded inference results from /home/leguark/Projects/gempy_project/Mineye-Terranigma/examples/02_probabilistic_modeling/arviz_data_magnetic_soricom.nc
+</pre></div>
+</div>
+</section>
+<section id="analysis-parameter-posterior-statistics">
+<h2>Analysis: Parameter Posterior Statistics<a class="headerlink" href="#analysis-parameter-posterior-statistics" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">posterior_dips</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;dips&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Posterior dip statistics:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Shape: </span><span class="si">{</span><span class="n">posterior_dips</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">posterior_dips</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">°&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Std: </span><span class="si">{</span><span class="n">posterior_dips</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">°&quot;</span><span class="p">)</span>
+
+<span class="n">posterior_suscept</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">&#39;susceptibility&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Posterior susceptibility statistics:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Fault       - Mean: </span><span class="si">{</span><span class="n">posterior_suscept</span><span class="p">[:,</span><span class="w"> </span><span class="p">:,</span><span class="w"> </span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> SI&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Host rock   - Mean: </span><span class="si">{</span><span class="n">posterior_suscept</span><span class="p">[:,</span><span class="w"> </span><span class="p">:,</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> SI&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Chromite    - Mean: </span><span class="si">{</span><span class="n">posterior_suscept</span><span class="p">[:,</span><span class="w"> </span><span class="p">:,</span><span class="w"> </span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> SI&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Basement    - Mean: </span><span class="si">{</span><span class="n">posterior_suscept</span><span class="p">[:,</span><span class="w"> </span><span class="p">:,</span><span class="w"> </span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> SI&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;prior&#39;</span><span class="p">):</span>
+    <span class="n">prior_dips</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">prior</span><span class="p">[</span><span class="s1">&#39;dips&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">uncertainty_reduction</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">posterior_dips</span><span class="o">.</span><span class="n">std</span><span class="p">()</span> <span class="o">/</span> <span class="n">prior_dips</span><span class="o">.</span><span class="n">std</span><span class="p">())</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Uncertainty reduction in dips: </span><span class="si">{</span><span class="n">uncertainty_reduction</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%&quot;</span><span class="p">)</span>
+    <span class="n">prior_suscept</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">prior</span><span class="p">[</span><span class="s1">&#39;susceptibility&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">suscept_uncertainty_reduction</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="mi">1</span> <span class="o">-</span> <span class="n">posterior_suscept</span><span class="o">.</span><span class="n">std</span><span class="p">()</span> <span class="o">/</span> <span class="n">prior_suscept</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+    <span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Uncertainty reduction in susceptibility: </span><span class="si">{</span><span class="n">suscept_uncertainty_reduction</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Posterior dip statistics:
+  Shape: (1, 200, 16)
+  Mean: 10.44°
+  Std: 3.14°
+
+Posterior susceptibility statistics:
+  Fault       - Mean: -0.0109 SI
+  Host rock   - Mean: 0.0167 SI
+  Chromite    - Mean: 0.0657 SI
+  Basement    - Mean: 0.0770 SI
+
+Uncertainty reduction in dips: 68.7%
+Uncertainty reduction in susceptibility: -12.1%
+</pre></div>
+</div>
+</section>
+<section id="analysis-predictive-performance">
+<h2>Analysis: Predictive Performance<a class="headerlink" href="#analysis-predictive-performance" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">posterior_magnetics</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">posterior_predictive</span><span class="p">[</span><span class="s1">&#39;Magnetic Measurement (Soricom)&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Posterior predictive magnetics:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">posterior_magnetics</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> nT&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Std: </span><span class="si">{</span><span class="n">posterior_magnetics</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> nT&quot;</span><span class="p">)</span>
+
+<span class="n">residuals</span> <span class="o">=</span> <span class="n">posterior_magnetics</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span> <span class="o">-</span> <span class="n">observed_magnetics_nt</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Residuals (posterior mean - observed):&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Mean: </span><span class="si">{</span><span class="n">residuals</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> nT (bias)&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  RMS: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">((</span><span class="n">residuals</span><span class="w"> </span><span class="o">**</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> nT (fit quality)&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Posterior predictive magnetics:
+  Mean: -211.5 nT
+  Std: 81.0 nT
+
+Residuals (posterior mean - observed):
+  Mean: 0.00 nT (bias)
+  RMS: 0.00 nT (fit quality)
+</pre></div>
+</div>
+</section>
+<section id="posterior-predictive-model-fit-analysis">
+<h2>Posterior Predictive: Model Fit Analysis<a class="headerlink" href="#posterior-predictive-model-fit-analysis" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">plot_many_observed_vs_forward</span><span class="p">(</span>
+    <span class="n">forward_norm</span><span class="o">=</span><span class="n">align_forward_to_observed</span><span class="p">(</span><span class="n">baseline_fw_magnetics_np</span><span class="p">,</span> <span class="n">norm_params</span><span class="p">),</span>
+    <span class="n">many_forward_norm</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">posterior_predictive</span><span class="p">[</span><span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{magnetics}</span><span class="s1">$&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">20</span><span class="p">:],</span>
+    <span class="n">observed_norm</span><span class="o">=</span><span class="n">observed_magnetics_nt</span><span class="p">,</span>
+    <span class="n">unit_label</span><span class="o">=</span><span class="s1">&#39;nT&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_007.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_007.png" alt="Observed vs Forward Model Correlation" class = "sphx-glr-single-img"/><p>Density plots comparing prior and posterior distributions</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">az</span><span class="o">.</span><span class="n">plot_density</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="n">data</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">prior</span><span class="p">],</span>
+    <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;dips&quot;</span><span class="p">,</span> <span class="s2">&quot;susceptibility&quot;</span><span class="p">],</span>
+    <span class="n">filter_vars</span><span class="o">=</span><span class="s2">&quot;like&quot;</span><span class="p">,</span>
+    <span class="n">hdi_prob</span><span class="o">=</span><span class="mf">0.9999</span><span class="p">,</span>
+    <span class="n">shade</span><span class="o">=</span><span class="mf">.2</span><span class="p">,</span>
+    <span class="n">data_labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Posterior&quot;</span><span class="p">,</span> <span class="s2">&quot;Prior&quot;</span><span class="p">],</span>
+    <span class="n">colors</span><span class="o">=</span><span class="p">[</span><span class="n">default_red</span><span class="p">,</span> <span class="n">default_blue</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_008.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_008.png" alt="dips 0, dips 1, dips 2, dips 3, dips 4, dips 5, dips 6, dips 7, dips 8, dips 9, dips 10, dips 11, dips 12, dips 13, dips 14, dips 15, susceptibility 0, susceptibility 1, susceptibility 2, susceptibility 3" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>array([[&lt;Axes: title={&#39;center&#39;: &#39;dips\n0&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;dips\n1&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;dips\n2&#39;}&gt;],
+       [&lt;Axes: title={&#39;center&#39;: &#39;dips\n3&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;dips\n4&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;dips\n5&#39;}&gt;],
+       [&lt;Axes: title={&#39;center&#39;: &#39;dips\n6&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;dips\n7&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;dips\n8&#39;}&gt;],
+       [&lt;Axes: title={&#39;center&#39;: &#39;dips\n9&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;dips\n10&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;dips\n11&#39;}&gt;],
+       [&lt;Axes: title={&#39;center&#39;: &#39;dips\n12&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;dips\n13&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;dips\n14&#39;}&gt;],
+       [&lt;Axes: title={&#39;center&#39;: &#39;dips\n15&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;susceptibility\n0&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;susceptibility\n1&#39;}&gt;],
+       [&lt;Axes: title={&#39;center&#39;: &#39;susceptibility\n2&#39;}&gt;,
+        &lt;Axes: title={&#39;center&#39;: &#39;susceptibility\n3&#39;}&gt;, &lt;Axes: &gt;]],
+      dtype=object)
+</pre></div>
+</div>
+</section>
+<section id="geological-model-uncertainty-visualization">
+<h2>Geological Model Uncertainty Visualization<a class="headerlink" href="#geological-model-uncertainty-visualization" title="Link to this heading">¶</a></h2>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">gempy_viz</span><span class="p">(</span>
+    <span class="n">geo_model</span><span class="o">=</span><span class="n">geo_model</span><span class="p">,</span>
+    <span class="n">prior_inference_data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span>
+    <span class="n">n_samples</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_009.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_009.png" alt="Cell Number: mid Direction: y" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Active grids: GridTypes.OCTREE|NONE
+Setting Backend To: AvailableBackends.PYTORCH
+/home/leguark/.venv/2025/lib/python3.13/site-packages/torch/utils/_device.py:116: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  return func(*args, **kwargs)
+Setting Backend To: AvailableBackends.PYTORCH
+/home/leguark/Projects/gempy_project/gempy_viewer/gempy_viewer/modules/plot_2d/drawer_contours_2d.py:38: UserWarning: The following kwargs were not used by contour: &#39;linewidth&#39;, &#39;contour_colors&#39;
+  contour_set = ax.contour(
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+Setting Backend To: AvailableBackends.PYTORCH
+
+&lt;gempy_viewer.modules.plot_2d.visualization_2d.Plot2D object at 0x7f26b39296d0&gt;
+</pre></div>
+</div>
+<p>Spatial Comparison: Prior Predictions</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">plot_geophysics_comparison</span><span class="p">(</span>
+    <span class="n">forward_norm</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">prior</span><span class="p">[</span><span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{magnetics}</span><span class="s1">$&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="n">normalization_method</span><span class="o">=</span><span class="s1">&#39;align_to_reference&#39;</span><span class="p">,</span>
+    <span class="n">observed_ugal</span><span class="o">=</span><span class="n">observed_magnetics_nt</span><span class="p">,</span>
+    <span class="n">xy_ravel</span><span class="o">=</span><span class="n">magnetic_xyz</span><span class="p">,</span>
+    <span class="n">unit_label</span><span class="o">=</span><span class="s1">&#39;nT&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_010.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_010.png" alt="Observed  (align_to_reference), Forward Model  (align_to_reference), Residuals (Observed - Forward Model) (align_to_reference), Observed vs Forward Model Correlation" class = "sphx-glr-single-img"/><p>Spatial Comparison: Posterior Predictions</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">plot_geophysics_comparison</span><span class="p">(</span>
+    <span class="n">forward_norm</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">posterior_predictive</span><span class="p">[</span><span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{magnetics}</span><span class="s1">$&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="n">normalization_method</span><span class="o">=</span><span class="s1">&#39;align_to_reference&#39;</span><span class="p">,</span>
+    <span class="n">observed_ugal</span><span class="o">=</span><span class="n">observed_magnetics_nt</span><span class="p">,</span>
+    <span class="n">xy_ravel</span><span class="o">=</span><span class="n">magnetic_xyz</span><span class="p">,</span>
+    <span class="n">unit_label</span><span class="o">=</span><span class="s1">&#39;nT&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_011.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_011.png" alt="Observed  (align_to_reference), Forward Model  (align_to_reference), Residuals (Observed - Forward Model) (align_to_reference), Observed vs Forward Model Correlation" class = "sphx-glr-single-img"/><p>Uncertainty Quantification: Prior</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">generate_gravity_uncertainty_plots</span></code> function works with any geophysical
+data type — we pass <code class="docutils literal notranslate"><span class="pre">unit_label</span></code> and <code class="docutils literal notranslate"><span class="pre">response_label</span></code> to override the
+default gravity labels.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">magnetic_samples_norm</span><span class="p">,</span> <span class="n">unit_label</span> <span class="o">=</span> <span class="n">generate_gravity_uncertainty_plots</span><span class="p">(</span>
+    <span class="n">gravity_samples_norm</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">prior</span><span class="p">[</span><span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{magnetics}</span><span class="s1">$&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:],</span>
+    <span class="n">observed_gravity_ugal</span><span class="o">=</span><span class="n">observed_magnetics_nt</span><span class="p">,</span>
+    <span class="n">xy_ravel</span><span class="o">=</span><span class="n">magnetic_xyz</span><span class="p">,</span>
+    <span class="n">unit_label</span><span class="o">=</span><span class="s1">&#39;nT&#39;</span><span class="p">,</span>
+    <span class="n">response_label</span><span class="o">=</span><span class="s1">&#39;Magnetics&#39;</span><span class="p">,</span>
+    <span class="n">title_prefix</span><span class="o">=</span><span class="s1">&#39;Magnetic&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../_images/sphx_glr_08_soricom_magnetic_inversion_012.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_012.png" alt="Magnetic Uncertainty Propagation from Dip Uncertainty, Mean Gravity ± 95% CI, Prediction Uncertainty (Std. Dev.), Coefficient of Variation (Relative Uncertainty), Observed vs Predicted with Uncertainty" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_08_soricom_magnetic_inversion_013.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_013.png" alt="Gravity Profiles with Uncertainty, Profile along X, Profile along Y, Profile along Diagonal1, Profile along Diagonal2" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_08_soricom_magnetic_inversion_014.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_014.png" alt="Mean Gravity (Interpolated), Prediction Uncertainty (Std. Dev.)" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>============================================================
+EXTRACTED NORMALIZED SAMPLES
+============================================================
+Number of samples: 100
+Number of devices: 20
+Normalization was applied DURING inference (not post-processing)
+All samples use consistent normalization parameters from observed data
+============================================================
+
+
+============================================================
+UNCERTAINTY SUMMARY STATISTICS
+============================================================
+Mean gravity:        2443.63 ± 16.13 nT
+Mean uncertainty:    971.14 nT
+Max uncertainty:     1019.63 nT
+Min uncertainty:     910.53 nT
+Mean CV:             39.74%
+RMSE:                2656.48 nT
+Correlation (R):     -0.109
+============================================================
+</pre></div>
+</div>
+<p>Uncertainty Quantification: Posterior</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s1">&#39;posterior_predictive&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{magnetics}</span><span class="s1">$&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">posterior_predictive</span><span class="p">:</span>
+    <span class="n">magnetic_samples_norm</span><span class="p">,</span> <span class="n">unit_label</span> <span class="o">=</span> <span class="n">generate_gravity_uncertainty_plots</span><span class="p">(</span>
+        <span class="n">gravity_samples_norm</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">posterior_predictive</span><span class="p">[</span><span class="sa">r</span><span class="s1">&#39;$\mu_</span><span class="si">{magnetics}</span><span class="s1">$&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:],</span>
+        <span class="n">observed_gravity_ugal</span><span class="o">=</span><span class="n">observed_magnetics_nt</span><span class="p">,</span>
+        <span class="n">xy_ravel</span><span class="o">=</span><span class="n">magnetic_xyz</span><span class="p">,</span>
+        <span class="n">unit_label</span><span class="o">=</span><span class="s1">&#39;nT&#39;</span><span class="p">,</span>
+        <span class="n">response_label</span><span class="o">=</span><span class="s1">&#39;Magnetics&#39;</span><span class="p">,</span>
+        <span class="n">title_prefix</span><span class="o">=</span><span class="s1">&#39;Magnetic&#39;</span><span class="p">,</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<ul class="sphx-glr-horizontal">
+<li><img src="../_images/sphx_glr_08_soricom_magnetic_inversion_015.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_015.png" alt="Magnetic Uncertainty Propagation from Dip Uncertainty, Mean Gravity ± 95% CI, Prediction Uncertainty (Std. Dev.), Coefficient of Variation (Relative Uncertainty), Observed vs Predicted with Uncertainty" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_08_soricom_magnetic_inversion_016.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_016.png" alt="Gravity Profiles with Uncertainty, Profile along X, Profile along Y, Profile along Diagonal1, Profile along Diagonal2" class = "sphx-glr-multi-img"/></li>
+<li><img src="../_images/sphx_glr_08_soricom_magnetic_inversion_017.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_017.png" alt="Mean Gravity (Interpolated), Prediction Uncertainty (Std. Dev.)" class = "sphx-glr-multi-img"/></li>
+</ul>
+<div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>============================================================
+EXTRACTED NORMALIZED SAMPLES
+============================================================
+Number of samples: 200
+Number of devices: 20
+Normalization was applied DURING inference (not post-processing)
+All samples use consistent normalization parameters from observed data
+============================================================
+
+
+============================================================
+UNCERTAINTY SUMMARY STATISTICS
+============================================================
+Mean gravity:        -207.99 ± 28.35 nT
+Mean uncertainty:    37.53 nT
+Max uncertainty:     60.13 nT
+Min uncertainty:     28.09 nT
+Mean CV:             18.44%
+RMSE:                73.95 nT
+Correlation (R):     0.416
+============================================================
+</pre></div>
+</div>
+<p><strong>Sigma Analysis: Outlier Detection</strong></p>
+<p>Hierarchical modeling automatically identifies stations with unusually high
+noise, which may indicate localized geological complexity not captured by
+the simple 4-unit model.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="s2">&quot;sigma_stations&quot;</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">posterior_predictive</span><span class="p">:</span>
+    <span class="n">posterior_sigmas</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">posterior_predictive</span><span class="p">[</span><span class="s2">&quot;sigma_stations&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">station_noise_mean</span> <span class="o">=</span> <span class="n">posterior_sigmas</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">sigma_global_mean</span> <span class="o">=</span> <span class="n">station_noise_mean</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">problematic</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">station_noise_mean</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">sigma_global_mean</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Potential outlier stations identified: </span><span class="si">{</span><span class="n">problematic</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">az</span><span class="o">.</span><span class="n">plot_density</span><span class="p">(</span>
+        <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="n">data</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">prior</span><span class="p">],</span>
+        <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;sigma_stations&quot;</span><span class="p">],</span>
+        <span class="n">filter_vars</span><span class="o">=</span><span class="s2">&quot;like&quot;</span><span class="p">,</span>
+        <span class="n">hdi_prob</span><span class="o">=</span><span class="mf">0.9999</span><span class="p">,</span>
+        <span class="n">shade</span><span class="o">=</span><span class="mf">.2</span><span class="p">,</span>
+        <span class="n">data_labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Posterior&quot;</span><span class="p">,</span> <span class="s2">&quot;Prior&quot;</span><span class="p">],</span>
+        <span class="n">colors</span><span class="o">=</span><span class="p">[</span><span class="n">default_red</span><span class="p">,</span> <span class="n">default_blue</span><span class="p">],</span>
+    <span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Per-Station Noise Distribution (Sigma) — Soricom Magnetics&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img src="../_images/sphx_glr_08_soricom_magnetic_inversion_018.png" srcset="../_images/sphx_glr_08_soricom_magnetic_inversion_018.png" alt="log_sigma_stations 0, log_sigma_stations 1, log_sigma_stations 2, log_sigma_stations 3, log_sigma_stations 4, log_sigma_stations 5, log_sigma_stations 6, log_sigma_stations 7, log_sigma_stations 8, log_sigma_stations 9, log_sigma_stations 10, log_sigma_stations 11, log_sigma_stations 12, log_sigma_stations 13, log_sigma_stations 14, log_sigma_stations 15, log_sigma_stations 16, log_sigma_stations 17, log_sigma_stations 18, log_sigma_stations 19, sigma_stations 0, sigma_stations 1, sigma_stations 2, sigma_stations 3, sigma_stations 4, sigma_stations 5, sigma_stations 6, sigma_stations 7, sigma_stations 8, sigma_stations 9, sigma_stations 10, sigma_stations 11, sigma_stations 12, sigma_stations 13, sigma_stations 14, sigma_stations 15, sigma_stations 16, sigma_stations 17, sigma_stations 18, sigma_stations 19, Per-Station Noise Distribution (Sigma) — Soricom Magnetics" class = "sphx-glr-single-img"/><div class="sphx-glr-script-out highlight-none notranslate"><div class="highlight"><pre><span></span>Potential outlier stations identified: []
+</pre></div>
+</div>
+</section>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h2>
+<p><strong>Key Takeaways</strong></p>
+<ol class="arabic simple">
+<li><p><strong>IGRF subtraction is essential</strong>: Raw TMI values include Earth’s background
+field (~47,500 nT). The forward model computes anomalies, so the data must
+match. Without this step, the likelihood is numerically flat and NUTS cannot
+move.</p></li>
+<li><p><strong>Susceptibility prior width matters</strong>: A prior scale of 0.03 (wider than
+the 0.01 used for Tharsis) allows the sampler to explore meaningful
+parameter space. Tight priors (&lt; 0.01) can freeze the chain.</p></li>
+<li><p><strong>Noise prior calibration</strong>: The hierarchical noise prior should match the
+observed data scatter (~150 nT). A prior at 50 nT would force the model
+to explain structural variance as noise, creating a too-narrow posterior.</p></li>
+<li><p><strong>Fault geometry is constrained</strong>: Despite magnetic data being primarily
+sensitive to susceptibility, the posterior dip distribution is narrower
+than the prior, showing the data provides geometric constraints.</p></li>
+</ol>
+<p><strong>Comparison with Gravity Inversion</strong></p>
+<ul class="simple">
+<li><p>Magnetic inversion shares the same Bayesian framework but uses TMI forward
+physics and susceptibility instead of density.</p></li>
+<li><p>The Soricom model has more units (4 vs 2) at a smaller spatial scale.</p></li>
+<li><p>Hierarchical likelihoods perform similarly for both data types.</p></li>
+</ul>
+<p>For theoretical background, see:
+- <span class="xref std std-ref">sphx_glr_02_probabilistic_modeling_04_gravity_inversion.py</span>
+- <span class="xref std std-ref">sphx_glr_02_probabilistic_modeling_05_magnetics_inversion.py</span></p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># sphinx_gallery_thumbnail_number = 4</span>
+</pre></div>
+</div>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> (1 minutes 51.289 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-examples-probabilistic-08-soricom-magnetic-inversion-py">
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/8abdc946a0df166529b0f86f272891a0/08_soricom_magnetic_inversion.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">08_soricom_magnetic_inversion.ipynb</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/3b082c490dd53d46517170b2bae8ec27/08_soricom_magnetic_inversion.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">08_soricom_magnetic_inversion.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-zip docutils container">
+<p><a class="reference download internal" download="" href="../_downloads/1275ea88f7259d30c8703c3a461cb0ad/08_soricom_magnetic_inversion.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">zipped:</span> <span class="pre">08_soricom_magnetic_inversion.zip</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/MINEYE_LOGO.png" alt="Logo of Mineye-Terranigma"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Mineye-Terranigma</a></h1>
+
+
+
+<p class="blurb">Implicit Geological Modeling & Bayesian Geophysical Inversion</p>
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_basic/index.html">Basic Examples</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_probabilistic/index.html">Probabilistic Modeling Examples</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples_segmentation/index.html">Hyperspectral Segmentation</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api_reference.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024-2026, Terranigma Solutions GmbH.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/examples_probabilistic_v1/08_soricom_magnetic_inversion.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
