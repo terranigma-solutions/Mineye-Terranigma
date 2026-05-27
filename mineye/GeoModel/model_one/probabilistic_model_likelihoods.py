@@ -126,7 +126,7 @@ def generate_multimagnetic_likelihood_hierarchical_per_station(norm_params):
         mu_log_sigma = pyro.sample(
             "mu_log_sigma",
             dist.Normal(
-                torch.tensor(np.log(50.0), dtype=torch.float64),  # ~50 nT typical
+                torch.tensor(np.log(150.0), dtype=torch.float64),  # ~150 nT typical noise for magnetics
                 torch.tensor(0.5, dtype=torch.float64)
             )
         )

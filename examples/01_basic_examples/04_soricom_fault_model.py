@@ -31,8 +31,9 @@ This model uses:
 * **Topographic integration**: DEM for accurate surface representation
 
 .. note::
-   The coordinate system uses local UTM coordinates with elevations in meters
-   above sea level.
+   The coordinate system uses EPSG:32634 (WGS 84 UTM zone 34N) with elevations in meters
+   above sea level. Data was originally in EPSG:2462 (SIRGAS 2000 UTM 24S) and
+   transformed to match the DEM CRS.
 """
 
 # %%
@@ -84,12 +85,13 @@ from mineye.config.example_parameters import SoricomModelConfig
 #
 # **Model Extent**: The bounding box defines the 3D volume:
 #
-# * **X range**: ~500m (local easting)
-# * **Y range**: ~200m (local northing)
-# * **Z range**: ~200m (from 1500m to 1700m elevation)
+# * **X range**: ~480m (easting in EPSG:32634)
+# * **Y range**: ~370m (northing in EPSG:32634)
+# * **Z range**: ~230m (from 1494m to 1726m elevation)
 #
 # The vertical extent captures the chromite deposit and surrounding host rock,
-# including the fault structure that offsets the units.
+# including the fault structure that offsets the units. Coordinates are in
+# EPSG:32634 (WGS 84 UTM zone 34N), matching the DEM.
 
 print("=" * 60)
 print("Soricom Fault Model Configuration")
@@ -143,12 +145,20 @@ geo_model = gp.create_geomodel(
     project_name=SoricomModelConfig.PROJECT_NAME,
     extent=SoricomModelConfig.EXTENT,
     refinement=SoricomModelConfig.REFINEMENT,
-    resolution=SoricomModelConfig.RESOLUTION,
+    # resolution=SoricomModelConfig.RESOLUTION,
     importer_helper=gp.data.ImporterHelper(
         path_to_orientations=orientations_path,
         path_to_surface_points=formation_points_path,
     )
 )
+
+geo_model.grid = geo_model.grid.init_octree_grid(
+    extent=SoricomModelConfig.EXTENT,
+    octree_levels=SoricomModelConfig.REFINEMENT,
+    base_resolution=np.array([2, 2, 4])
+)
+
+geo_model.interpolation_options.number_octree_levels_surface = 5
 
 # %%
 # Map Geological Units and Fault Series
@@ -225,8 +235,15 @@ print(geo_model.structural_frame.fault_relations)
 topography_path = paths.get_soricom_dem_path()
 gp.set_topography_from_file(
     grid=geo_model.grid,
-    filepath=topography_path
+    filepath=topography_path,
+    crop_to_extent=[
+            geo_model.grid.extent[0],
+            geo_model.grid.extent[2],
+            geo_model.grid.extent[1],
+            geo_model.grid.extent[3]
+    ]
 )
+gpv.plot_3d(geo_model)
 
 # %%
 # Compute the Model
@@ -261,7 +278,7 @@ gp.compute_model(geo_model)
 # * Offset relationships across faults
 # * Input data distribution
 
-gpv.plot_2d(geo_model, direction='y', cell_number='mid', show_data=True)
+gpv.plot_2d(geo_model, direction='y', show_topography=True, cell_number='mid', show_data=True)
 
 # %%
 # 3D Visualization
@@ -277,10 +294,7 @@ gpv.plot_2d(geo_model, direction='y', cell_number='mid', show_data=True)
 # * **Input data**: Surface points and orientations used for interpolation
 # * **Topography**: Surface elevation (disabled here for clarity)
 #
-# Note: Topography is hidden (``show_topography=False``) to better visualize
-# the subsurface fault structure.
-
-gpv.plot_3d(geo_model, image=False, show_topography=False)
+gpv.plot_3d(geo_model, image=False, show_topography=True, show_octree=False)
 
 # %%
 # Summary and Key Concepts

@@ -19,6 +19,7 @@ dependencies = [
     "scikit-image",
     "scikit-learn",
     "geopandas",
+    "gempy_probability", # Standard declaration for your local package
 ]
 
 [project.optional-dependencies]
@@ -26,6 +27,12 @@ dev = [
     "pytest>=8.0.0",
 ]
 
+# --- uv Specific Configurations ---
+[tool.uv.sources]
+# Tell uv exactly where to find the local package
+gempy_probability = { path = "../gempy_probability", editable = true }
+
+# --- Build & Tool Configurations ---
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["mineye*"]

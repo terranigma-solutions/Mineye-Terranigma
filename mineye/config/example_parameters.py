@@ -105,11 +105,11 @@ class SoricomModelConfig:
     """Configuration parameters for the Soricom geological model."""
 
     PROJECT_NAME = 'soricom_model'
-    # Updated extent to properly encompass all data points
-    # Data ranges: X: 4441902-4442274, Y: 4588250-4588536, Z: 1558-1660
-    EXTENT = [4441850, 4442350, 4588200, 4588400, 1500, 1700]
+    # Extent in EPSG:32634 (WGS 84 UTM zone 34N), matching the DEM CRS
+    # Data ranges: X: 441794-442166, Y: 4586284-4586569, Z: 1558-1687
+    EXTENT = [441_739, 442_221, 4_586_241, 4_586_612, 1_494, 1_726]
     RESOLUTION = [50, 50, 50]
-    REFINEMENT = 4
+    REFINEMENT = 5
     SURFACE_MAPPING = {
         "Fault_Series": ["Main_Fault"],
         "host_rock": ["host_rock"],
@@ -127,7 +127,8 @@ class SoricomModelConfig:
 class SoricomSimpleModelConfig:
     """Configuration parameters for the simple Soricom geological model (without fault)."""
     PROJECT_NAME = 'soricom_simple_model'
-    EXTENT = [4441850, 4442350, 4588200, 4588400, 1700, 1500]
+    # Extent in EPSG:32634 (WGS 84 UTM zone 34N)
+    EXTENT = [441739, 442221, 4586241, 4586612, 1726, 1494]
     RESOLUTION = [50, 50, 50]
     REFINEMENT = 4
     SURFACE_MAPPING = {
@@ -138,8 +139,9 @@ class SoricomSimpleModelConfig:
 
 class SoricomErosiveModelConfig:
     PROJECT_NAME = 'soricom_erosive_model'
-    # Data ranges: X: 4441902-4442274, Y: 4588250-4588536, Z: 1520-1660 (underlying layer extends deeper)
-    EXTENT = [4441850, 4442350, 4588200, 4588400, 1700, 1450]
+    # Extent in EPSG:32634 (WGS 84 UTM zone 34N), matching the DEM CRS
+    # Data ranges: X: 441794-442166, Y: 4586284-4586569, Z: 1520-1660 (underlying layer extends deeper)
+    EXTENT = [441739, 442221, 4586241, 4586612, 1726, 1450]
     RESOLUTION = [50, 50, 50]
     REFINEMENT = 4
 

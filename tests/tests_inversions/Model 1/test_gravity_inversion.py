@@ -17,7 +17,7 @@ from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_m
 from mineye.GeoModel.model_one.visualization import (generate_gravity_uncertainty_plots,
                                                      gempy_viz,
                                                      plot_many_observed_vs_forward,
-                                                     compute_probability_density_fields, probability_fields_for)
+                                                     compute_probability_density_fields, probability_fields_for, generate_pyvista_paper_quality_figure, setup_probability_fields)
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 # noinspection PyUnusedImports
 from tests import conftest
@@ -260,7 +260,10 @@ class TestProbabilisticInversion:
         gravity_data, observed_gravity_ugal = read_gravity(geophysical_dir)
         geo_model, xy_ravel = setup_geomodel(gravity_data, simple_geo_model)
 
-
         topography_path = os.path.join(topography_dir, 'topo_reduced_sf0.1.tif')
-        probability_fields_for(geo_model, data.prior, topography_path)
-        probability_fields_for(geo_model, data.posterior, topography_path)
+        online_prob = setup_probability_fields(geo_model, data.prior, topography_path)
+
+        # 1. Generate the paper-quality, multi-panel summary figure
+        generate_pyvista_paper_quality_figure(geo_model, online_prob)
+        # probability_fields_for(geo_model, data.prior, topography_path)
+        # probability_fields_for(geo_model, data.posterior, topography_path)
