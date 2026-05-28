@@ -29,6 +29,81 @@ from mineye.config import paths
 from mineye.config.example_parameters import SoricomModelConfig
 
 nc_path = "../../../examples/02_probabilistic_modeling/arviz_data_magnetic_soricom.nc"
+nc_path_z = "../../../examples/02_probabilistic_modeling/arviz_data_magnetic_soricom_z.nc"
+
+_original_z_coords = None
+
+
+def _update_model_for_plotting_z(geo_model: gp.data.GeoModel, sample_value: np.ndarray, sample_idx: int):
+    global _original_z_coords
+    if _original_z_coords is None:
+        _original_z_coords = geo_model.surface_points_copy.df['Z'].to_numpy(copy=True)
+
+    scale_z = geo_model.input_transform.scale[2]
+    shifts_m = sample_value / scale_z  # Convert relative shifts in transformed coordinates to meters
+
+    new_z = _original_z_coords.copy()
+    # Point 0: Main_Fault (no change)
+    # Points 1-12: host_rock -> shifted by shifts_m[0] (layer wide)
+    new_z[1:13] = _original_z_coords[1:13] + shifts_m[0]
+    # Points 13-21: chromite lense -> shifted by shifts_m[1:] (independent)
+    new_z[13:22] = _original_z_coords[13:22] + shifts_m[1:]
+
+    gp.modify_surface_points(
+        geo_model=geo_model,
+        Z=new_z
+    )
+
+
+def gempy_viz_z(geo_model: gp.data.GeoModel, prior_inference_data: az.InferenceData,
+                n_samples=20, ve=3):
+    from gempy_probability.modules.plot.plot_gempy import plot_gempy
+    import gempy_viewer as gpv
+
+    gp.set_active_grid(
+        grid=geo_model.grid,
+        grid_type=[geo_model.grid.GridTypes.OCTREE],
+        reset=True
+    )
+
+    geo_model.geophysics_input = None
+
+    gp.compute_model(gempy_model=geo_model)
+
+    p2d = gpv.plot_2d(
+        model=geo_model,
+        show_topography=False,
+        legend=False,
+        show_lith=False,
+        show_data=False,
+        show=False,
+        ve=ve
+    )
+
+    global _original_z_coords
+    _original_z_coords = None
+
+    plot_gempy(
+        geo_model=geo_model,
+        n_samples=n_samples,
+        samples=(prior_inference_data.prior['surface_points_z'].values[0, :]),
+        update_model_fn=_update_model_for_plotting_z,
+        gempy_plot=p2d,
+    )
+
+    if hasattr(prior_inference_data, 'posterior'):
+        n_surfaces = len(geo_model.structural_frame.elements_colors_contacts)
+        _original_z_coords = None
+        plot_gempy(
+            geo_model=geo_model,
+            n_samples=n_samples,
+            samples=(prior_inference_data.posterior['surface_points_z'].values[0, :]),
+            update_model_fn=_update_model_for_plotting_z,
+            gempy_plot=p2d,
+            contour_colors=[default_red] * n_surfaces,
+        )
+
+    return p2d
 
 
 def _create_soricom_geomodel():
@@ -65,6 +140,7 @@ def _create_soricom_geomodel():
 class TestMagneticInversion:
     prior_key_dips = r'dips'
     prior_key_susceptibility = r'susceptibility'
+    prior_key_surface_points_z = r'surface_points_z'
 
     def test_run_predictive(self, geophysical_dir, n_samples=50):
         import time
@@ -152,7 +228,92 @@ class TestMagneticInversion:
         data.extend(prior_inference_data)
         data.to_netcdf(os.path.join(os.path.dirname(__file__), arviz_data_filename))
 
-    def _create_probabilistic_model(self, geophysical_dir):
+    def test_run_predictive_z(self, geophysical_dir, n_samples=50):
+        import time
+        import gempy_viewer as gpv
+
+        geo_model, observed_magnetics_nt, prob_model = self._create_probabilistic_model(
+            geophysical_dir=geophysical_dir,
+            use_z_priors=True
+        )
+
+        magnetic_observations_tensor = torch.tensor(observed_magnetics_nt)
+
+        start_time = time.time()
+        prior_inference_data: az.InferenceData = gpp.run_predictive(
+            prob_model=prob_model,
+            geo_model=geo_model,
+            y_obs_list=magnetic_observations_tensor,
+            n_samples=20,
+            plot_trace=True
+        )
+        elapsed_time = time.time() - start_time
+        print(f"Prior predictive sampling (Z-priors) completed in {elapsed_time:.2f} seconds ({elapsed_time / 60:.2f} minutes)")
+
+        if True:
+            gp.set_active_grid(
+                grid=geo_model.grid,
+                grid_type=[geo_model.grid.GridTypes.OCTREE],
+                reset=True
+            )
+
+            geo_model.geophysics_input = None
+            draw = 15
+            global _original_z_coords
+            _original_z_coords = None
+            _update_model_for_plotting_z(
+                geo_model=geo_model,
+                sample_value=(prior_inference_data[self.prior_key_surface_points_z].values[0, :][draw]),
+                sample_idx=draw
+            )
+            gp.compute_model(gempy_model=geo_model)
+            gpv.plot_3d(geo_model)
+
+    def test_magnetic_inversion_z(
+            self, geophysical_dir, n_samples=50,
+            arviz_data_filename="arviz_data_magnetic_soricom_z.nc",
+    ):
+        """Test magnetic inversion using the Soricom fault model and NUTS sampler with Z position priors."""
+        print("Soricom magnetic inversion (Z-priors) with NUTS...")
+        geo_model, observed_magnetics_nt, prob_model = self._create_probabilistic_model(
+            geophysical_dir,
+            use_z_priors=True
+        )
+
+        magnetic_observations_tensor = torch.tensor(observed_magnetics_nt)
+
+        # Prior predictive
+        if True:
+            prior_inference_data: az.InferenceData = gpp.run_predictive(
+                prob_model=prob_model,
+                geo_model=geo_model,
+                y_obs_list=magnetic_observations_tensor,
+                n_samples=100,
+                plot_trace=True,
+            )
+
+        # NUTS inference
+        data = gpp.run_nuts_inference(
+            prob_model=prob_model,
+            geo_model=geo_model,
+            y_obs_list=magnetic_observations_tensor,
+            config=NUTSConfig(
+                step_size=0.0001,
+                adapt_step_size=True,
+                target_accept_prob=0.65,
+                max_tree_depth=5,
+                init_strategy='median',
+                num_samples=200,
+                warmup_steps=200,
+            ),
+            plot_trace=True,
+            run_posterior_predictive=True,
+        )
+
+        data.extend(prior_inference_data)
+        data.to_netcdf(os.path.join(os.path.dirname(__file__), arviz_data_filename))
+
+    def _create_probabilistic_model(self, geophysical_dir, use_z_priors=False):
         # 1) Read magnetic point data
         magnetic_data, observed_magnetics_nt = self._read_magnetics(geophysical_dir)
 
@@ -175,7 +336,21 @@ class TestMagneticInversion:
         float_ = torch.float32
         # 3) Priors
         n_orientations = geo_model.orientations_copy.xyz.shape[0]
-        model_priors = {
+        if use_z_priors:
+            model_priors = {
+                self.prior_key_surface_points_z: dist.Normal(
+                    loc=torch.tensor([0.0] * 10, dtype=float_, device=device),
+                    scale=torch.tensor([15.0] * 10, dtype=float_, device=device) * geo_model.input_transform.scale[2],
+                    validate_args=True,
+                ).to_event(1),
+                self.prior_key_susceptibility: dist.Normal(
+                    loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=float_, device=device),
+                    scale=torch.tensor(0.03, dtype=float_, device=device),
+                ).to_event(1),
+            }
+            set_interp_input_fn = self._set_magnetic_priors_z
+        else:
+            model_priors = {
                 self.prior_key_dips          : dist.Normal(
                     loc=torch.full((n_orientations,), 10.0, dtype=float_, device=device),
                     scale=torch.tensor(10.0, dtype=float_, device=device),
@@ -185,7 +360,8 @@ class TestMagneticInversion:
                     loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=float_, device=device),
                     scale=torch.tensor(0.03, dtype=float_, device=device),
                 ).to_event(1),
-        }
+            }
+            set_interp_input_fn = self._set_magnetic_priors
 
         # 4) Deterministics
         post_forward_dets = {
@@ -209,7 +385,7 @@ class TestMagneticInversion:
         # 6) Pyro model
         prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
             priors=model_priors,
-            set_interp_input_fn=self._set_magnetic_priors,
+            set_interp_input_fn=set_interp_input_fn,
             likelihood_fn=likelihood_fn,
             obs_name="Magnetic Measurement (Soricom)",
         )
@@ -303,6 +479,29 @@ class TestMagneticInversion:
                 geo_model.geophysics_input.magnetics_input.susceptibilities = susceptibilities
 
         return interpolation_input
+
+    @staticmethod
+    def _set_magnetic_priors_z(samples: dict, geo_model: gp.data.GeoModel):
+        from gempy.modules.data_manipulation import interpolation_input_from_structural_frame
+        interp_input = interpolation_input_from_structural_frame(geo_model)
+
+        if TestMagneticInversion.prior_key_surface_points_z in samples:
+            shifts = samples[TestMagneticInversion.prior_key_surface_points_z]
+            coords = interp_input.surface_points.sp_coords.clone()
+
+            # Index 1:13 are the 12 host_rock points -> shifted by shifts[0] (layer wide)
+            coords[1:13, 2] = coords[1:13, 2] + shifts[0]
+            # Index 13:22 are the 9 chromite lense points -> shifted by shifts[1:] (independent)
+            coords[13:22, 2] = coords[13:22, 2] + shifts[1:]
+
+            interp_input.surface_points.sp_coords = coords
+
+        if TestMagneticInversion.prior_key_susceptibility in samples:
+            susceptibilities = samples[TestMagneticInversion.prior_key_susceptibility]
+            if geo_model.geophysics_input and geo_model.geophysics_input.magnetics_input:
+                geo_model.geophysics_input.magnetics_input.susceptibilities = susceptibilities
+
+        return interp_input
 
     # --- Analysis tests ---
 
@@ -404,4 +603,49 @@ class TestMagneticInversion:
                 observed_gravity_ugal=observed_magnetics_nt,
                 xy_ravel=xy_ravel,
             )
+
+    def test_run_kde_sections_z(self, geophysical_dir):
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_magnetic_soricom_z.nc"))
+        magnetic_data, observed_magnetics_nt = self._read_magnetics(geophysical_dir)
+        geo_model, xy_ravel = self._setup_magnetic_geomodel(magnetic_data)
+
+        gempy_viz_z(geo_model, data, n_samples=100)
+
+    def test_run_analysis_z(self, geophysical_dir):
+        data = az.from_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_magnetic_soricom_z.nc"))
+
+        az.plot_posterior(data, var_names=[self.prior_key_surface_points_z, "susceptibility"])
+        plt.show()
+
+        magnetic_data, observed_magnetics_nt = self._read_magnetics(geophysical_dir)
+        geo_model, xy_ravel = self._setup_magnetic_geomodel(magnetic_data)
+
+        plt.rcParams['figure.dpi'] = 72
+
+        axes = az.plot_density(
+            data=[data, data.prior],
+            var_names=[self.prior_key_surface_points_z, "susceptibility"],
+            filter_vars="like",
+            hdi_prob=0.9999,
+            shade=.2,
+            data_labels=["Posterior", "Prior"],
+            colors=[default_red, default_blue],
+        )
+
+        plt.show()
+
+        magnetic_response_key = r'$\mu_{magnetics}$'
+        plot_geophysics_comparison(
+            forward_norm=data.prior[magnetic_response_key].mean(axis=1),
+            normalization_method='align_to_reference',
+            observed_ugal=observed_magnetics_nt,
+            xy_ravel=xy_ravel,
+        )
+
+        plot_geophysics_comparison(
+            forward_norm=data.posterior_predictive[magnetic_response_key].mean(axis=1),
+            normalization_method='align_to_reference',
+            observed_ugal=observed_magnetics_nt,
+            xy_ravel=xy_ravel,
+        )
 
