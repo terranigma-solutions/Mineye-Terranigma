@@ -23,7 +23,7 @@ from gempy_probability.modules.plot.plot_posterior import default_red, default_b
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.probabilistic_model import normalize
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multimagnetic_likelihood_fixed_std
-from mineye.GeoModel.model_one.visualization import plot_many_observed_vs_forward
+from mineye.GeoModel.model_one.visualization import plot_many_observed_vs_forward, probability_fields_for
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 from mineye.config import paths
 from mineye.config.example_parameters import SoricomModelConfig
@@ -486,3 +486,50 @@ class TestMagneticInversion:
             observed_ugal=observed_magnetics_nt,
             xy_ravel=xy_ravel,
         )
+
+    def test_probability_plots(self, geophysical_dir):
+        """Generate prior and posterior probability fields for the Soricom magnetic inversion."""
+        if not os.path.exists(nc_path):
+            pytest.skip(f"Pre-computed inversion NetCDF file not found at: {nc_path}")
+        data = az.from_netcdf(nc_path)
+
+        magnetic_data, observed_magnetics_nt = self._read_magnetics(geophysical_dir)
+        geo_model, xy_ravel = self._setup_magnetic_geomodel(magnetic_data)
+        geo_model.interpolation_options.number_octree_levels = 5
+
+        topography_path = paths.get_soricom_dem_path()
+
+        print("\nComputing prior probability fields...")
+        original_z = geo_model.surface_points_copy.df['Z'].to_numpy(copy=True)
+        global _original_z_coords
+        _original_z_coords = None
+        probability_fields_for(
+            geo_model=geo_model,
+            inference_data=data.prior,
+            topography_path=topography_path,
+            var_name=self.prior_key_surface_points_z,
+            update_model_fn=_update_model_for_plotting,
+            ve=1,
+        )
+
+        if hasattr(data, 'posterior'):
+            # Restore model Z so posterior OnlineProbability init uses baseline lithology
+            gp.modify_surface_points(geo_model=geo_model, Z=original_z)
+            _original_z_coords = None
+            print("\nComputing posterior probability fields...")
+            probability_fields_for(
+                geo_model=geo_model,
+                inference_data=data.posterior,
+                topography_path=topography_path,
+                var_name=self.prior_key_surface_points_z,
+                update_model_fn=_update_model_for_plotting,
+                ve=1,
+            )
+            
+    
+    def test_basic_models(self):
+        import gempy_viewer as gpv
+        geo_model = _create_soricom_geomodel()
+        gp.compute_model(geo_model)
+        gpv.plot_3d(geo_model)
+
