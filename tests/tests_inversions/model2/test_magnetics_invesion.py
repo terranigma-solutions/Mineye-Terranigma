@@ -22,13 +22,14 @@ from gempy_probability.core.samplers_data import NUTSConfig
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.probabilistic_model import normalize
-from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multimagnetic_likelihood_hierarchical_per_station
+from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multimagnetic_likelihood_fixed_std
 from mineye.GeoModel.model_one.visualization import plot_many_observed_vs_forward
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 from mineye.config import paths
 from mineye.config.example_parameters import SoricomModelConfig
 
-nc_path = os.path.join(os.path.dirname(__file__), "../../../examples/02_probabilistic_modeling/arviz_data_magnetic_soricom_z.nc")
+# nc_path = os.path.join(os.path.dirname(__file__), "../../../examples/02_probabilistic_modeling/1779977602")
+nc_path ="/home/leguark/Projects/gempy_project/Mineye-Terranigma/tests/tests_inversions/model2/arviz_data_magnetic_soricom_z_1779982462.nc" 
 
 _original_z_coords = None
 
@@ -79,6 +80,8 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: az.InferenceDat
         ve=ve
     )
 
+    # Cache original Z *before* the prior loop mutates the model in-place
+    original_z = geo_model.surface_points_copy.df['Z'].to_numpy(copy=True)
     global _original_z_coords
     _original_z_coords = None
 
@@ -91,8 +94,10 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: az.InferenceDat
     )
 
     if hasattr(prior_inference_data, 'posterior'):
-        n_surfaces = len(geo_model.structural_frame.elements_colors_contacts)
+        # Restore model to original Z so the posterior overlay is correctly anchored
+        gp.modify_surface_points(geo_model=geo_model, Z=original_z)
         _original_z_coords = None
+        n_surfaces = len(geo_model.structural_frame.elements_colors_contacts)
         plot_gempy(
             geo_model=geo_model,
             n_samples=n_samples,
@@ -155,13 +160,13 @@ class TestMagneticInversion:
             prob_model=prob_model,
             geo_model=geo_model,
             y_obs_list=magnetic_observations_tensor,
-            n_samples=20,
+            n_samples=100,
             plot_trace=True
         )
         elapsed_time = time.time() - start_time
         print(f"Prior predictive sampling completed in {elapsed_time:.2f} seconds ({elapsed_time / 60:.2f} minutes)")
 
-        if True:
+        if False:
             geo_model.interpolation_options.mesh_extraction = True
             gp.set_active_grid(
                 grid=geo_model.grid,
@@ -199,7 +204,8 @@ class TestMagneticInversion:
         geo_model, observed_magnetics_nt, prob_model = self._create_probabilistic_model(
             geophysical_dir,
         )
-
+        import time
+        arviz_data_filename = f"arviz_data_magnetic_soricom_z_{int(time.time())}.nc"
         magnetic_observations_tensor = torch.tensor(observed_magnetics_nt)
 
         # Prior predictive
@@ -223,8 +229,8 @@ class TestMagneticInversion:
                 target_accept_prob=0.65,
                 max_tree_depth=5,
                 init_strategy='median',
-                num_samples=200,
-                warmup_steps=200,
+                num_samples=50,
+                warmup_steps=50,
             ),
             plot_trace=True,
             run_posterior_predictive=True,
@@ -241,9 +247,6 @@ class TestMagneticInversion:
         geo_model, xy_ravel = self._setup_magnetic_geomodel(magnetic_data)
 
         geo_model.interpolation_options.sigmoid_slope = 100
-        # import pykeops
-        # pykeops.config.verbose = True
-        # Compute baseline forward magnetics
         baseline_fw_magnetics_np = self._baseline_magnetics(geo_model)
 
         norm_params = normalize(
@@ -261,9 +264,9 @@ class TestMagneticInversion:
                 scale=torch.tensor([15.0] * 10, dtype=float_, device=device) * geo_model.input_transform.scale[2],
                 validate_args=True,
             ).to_event(1),
-            self.prior_key_susceptibility: dist.Normal(
-                loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=float_, device=device),
-                scale=torch.tensor(0.03, dtype=float_, device=device),
+            self.prior_key_susceptibility: dist.LogNormal(
+                loc=torch.tensor([-9.21, -9.21, -0.69, -9.21], dtype=float_, device=device),
+                scale=torch.tensor([0.1, 0.1, 0.2, 0.1], dtype=float_, device=device),
             ).to_event(1),
         }
 
@@ -281,9 +284,10 @@ class TestMagneticInversion:
                 ),
         }
 
-        # 5) Likelihood
-        likelihood_fn = generate_multimagnetic_likelihood_hierarchical_per_station(
+        # 5) Likelihood — fixed std to let NUTS explore parameters freely
+        likelihood_fn = generate_multimagnetic_likelihood_fixed_std(
             norm_params=norm_params,
+            sigma_value=150.0,  # ~2x baseline residual std, reasonable nT noise floor
         )
 
         # 6) Pyro model
@@ -339,7 +343,7 @@ class TestMagneticInversion:
         geo_model.geophysics_input = gp.data.GeophysicsInput(
             magnetics_input=MagneticsInput(
                 mag_kernel=gradient_tensor_dict['tmi_kernel'],
-                susceptibilities=np.array([0.0, 0.05, 0.001, 0.001]),
+                susceptibilities=np.array([0.0001, 0.0001, 0.5, 0.0001]),
                 igrf_params={
                         "inclination": gradient_tensor_dict['inclination'],
                         "declination": gradient_tensor_dict['declination'],
@@ -416,8 +420,9 @@ class TestMagneticInversion:
         data = az.from_netcdf(nc_path)
         magnetic_data, observed_magnetics_nt = self._read_magnetics(geophysical_dir)
         geo_model, xy_ravel = self._setup_magnetic_geomodel(magnetic_data)
+        geo_model.interpolation_options.number_octree_levels = 5
 
-        gempy_viz(geo_model, data, n_samples=100)
+        gempy_viz(geo_model, data, n_samples=49)
 
     def test_run_outlier_detection(self, geophysical_dir):
         if not os.path.exists(nc_path):
