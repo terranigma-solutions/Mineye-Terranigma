@@ -68,14 +68,18 @@ class TestMagneticInversion:
 
     def test_run_predictive(self, geophysical_dir, n_samples=50):
         import time
+        import gempy_viewer as gpv
+
+        if False:
+            geo_model = _create_soricom_geomodel()
+            gp.compute_model(geo_model)
+            gpv.plot_3d(geo_model)
         
         geo_model, observed_magnetics_nt, prob_model = self._create_probabilistic_model(
             geophysical_dir=geophysical_dir,
         )
 
         magnetic_observations_tensor = torch.tensor(observed_magnetics_nt)
-        import gempy_viewer as gpv
-        gpv.plot_3d(geo_model)
 
         start_time = time.time()
         prior_inference_data: az.InferenceData = gpp.run_predictive(
@@ -87,22 +91,23 @@ class TestMagneticInversion:
         )
         elapsed_time = time.time() - start_time
         print(f"Prior predictive sampling completed in {elapsed_time:.2f} seconds ({elapsed_time / 60:.2f} minutes)")
+        
+        if False:
+            gp.set_active_grid(
+                grid=geo_model.grid,
+                grid_type=[geo_model.grid.GridTypes.OCTREE],
+                reset=True
+            )
 
-        gp.set_active_grid(
-            grid=geo_model.grid,
-            grid_type=[geo_model.grid.GridTypes.OCTREE],
-            reset=True
-        )
-
-        geo_model.geophysics_input = None
-        draw = 15
-        _update_model_for_plotting(
-            geo_model=geo_model,
-            sample_value=(prior_inference_data[r'dips'].values[0, :][draw]),
-            sample_idx=draw
-        )
-        gp.compute_model(gempy_model=geo_model)
-        gpv.plot_3d(geo_model)
+            geo_model.geophysics_input = None
+            draw = 15
+            _update_model_for_plotting(
+                geo_model=geo_model,
+                sample_value=(prior_inference_data[r'dips'].values[0, :][draw]),
+                sample_idx=draw
+            )
+            gp.compute_model(gempy_model=geo_model)
+            gpv.plot_3d(geo_model)
 
     def test_magnetic_inversion(
             self, geophysical_dir, n_samples=50,
