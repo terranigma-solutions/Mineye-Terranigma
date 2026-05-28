@@ -27,7 +27,7 @@ from tests.tests_inversions.conftest import simple_geo_model, topography_dir
 class TestProbabilisticInversion:
     prior_key_dips = r'dips'
     prior_key_density = r'density'
-
+    
     def test_run_predictive(self, simple_geo_model, geophysical_dir, n_samples=50):
         geo_model, observed_gravity_ugal, prob_model = self._create_probabilistic_model(geophysical_dir, simple_geo_model)
 

@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from pyro import distributions as dist
+from torch.xpu import device
 
 import gempy as gp
 import gempy_probability as gpp
@@ -66,19 +67,27 @@ class TestMagneticInversion:
     prior_key_susceptibility = r'susceptibility'
 
     def test_run_predictive(self, geophysical_dir, n_samples=50):
+        import time
+        
         geo_model, observed_magnetics_nt, prob_model = self._create_probabilistic_model(
             geophysical_dir=geophysical_dir,
         )
 
         magnetic_observations_tensor = torch.tensor(observed_magnetics_nt)
-        prior_inference_data: az.InferenceData = gpp.run_predictive(
-            prob_model=prob_model,
-            geo_model=geo_model,
-            y_obs_list=magnetic_observations_tensor,
-            n_samples=100,
-            # n_samples=2,
-            plot_trace=True,
-        )
+
+        compute_prior_predictive = True
+        if compute_prior_predictive:
+            start_time = time.time()
+            prior_inference_data: az.InferenceData = gpp.run_predictive(
+                prob_model=prob_model,
+                geo_model=geo_model,
+                y_obs_list=magnetic_observations_tensor,
+                # n_samples=100,
+                n_samples=40,
+                plot_trace=False
+            )
+            elapsed_time = time.time() - start_time
+            print(f"Prior predictive sampling completed in {elapsed_time:.2f} seconds ({elapsed_time / 60:.2f} minutes)")
 
     def test_magnetic_inversion(
             self, geophysical_dir, n_samples=50,
@@ -131,7 +140,8 @@ class TestMagneticInversion:
         geo_model, xy_ravel = self._setup_magnetic_geomodel(magnetic_data)
 
         geo_model.interpolation_options.sigmoid_slope = 100
-
+        # import pykeops
+        # pykeops.config.verbose = True
         # Compute baseline forward magnetics
         baseline_fw_magnetics_np = self._baseline_magnetics(geo_model)
 
@@ -141,18 +151,19 @@ class TestMagneticInversion:
             method="align_to_reference",
             extrapolation_buffer=0.3,
         )
-
+        device= torch.device("cuda" if torch.cuda.is_available() and True else "cpu")
+        float_ = torch.float32
         # 3) Priors
         n_orientations = geo_model.orientations_copy.xyz.shape[0]
         model_priors = {
                 self.prior_key_dips          : dist.Normal(
-                    loc=torch.full((n_orientations,), 10.0, dtype=torch.float64),
-                    scale=torch.tensor(10.0, dtype=torch.float64),
+                    loc=torch.full((n_orientations,), 10.0, dtype=float_, device=device),
+                    scale=torch.tensor(10.0, dtype=float_, device=device),
                     validate_args=True,
                 ),
                 self.prior_key_susceptibility: dist.Normal(
-                    loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=torch.float64),
-                    scale=torch.tensor(0.03, dtype=torch.float64),
+                    loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=float_, device=device),
+                    scale=torch.tensor(0.03, dtype=float_, device=device),
                 ).to_event(1),
         }
 
