@@ -96,6 +96,8 @@ def _update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: np.nda
         _original_z_coords = geo_model.surface_points_copy.df['Z'].to_numpy(copy=True)
 
     scale_z = geo_model.input_transform.scale[2]
+    if hasattr(sample_value, 'detach'):
+        sample_value = sample_value.detach().cpu().numpy()
     shifts_m = sample_value / scale_z
 
     new_z = _original_z_coords.copy()
@@ -224,11 +226,13 @@ def _set_magnetic_priors(samples: dict, geo_model: gp.data.GeoModel):
     if prior_key_surface_points_z in samples:
         shifts = samples[prior_key_surface_points_z]
         coords = interp_input.surface_points.sp_coords.clone()
+        # coords is on CPU (gempy_engine expects CPU tensors); bring shifts to CPU too
+        shifts_cpu = shifts.to(coords.device)
 
         # Index 1:13 = 12 host_rock points → shifted by shifts[0] (layer wide)
-        coords[1:13, 2] = coords[1:13, 2] + shifts[0]
+        coords[1:13, 2] = coords[1:13, 2] + shifts_cpu[0]
         # Index 13:22 = 9 chromite lense points → shifted by shifts[1:] (independent)
-        coords[13:22, 2] = coords[13:22, 2] + shifts[1:]
+        coords[13:22, 2] = coords[13:22, 2] + shifts_cpu[1:]
 
         interp_input.surface_points.sp_coords = coords
 
@@ -546,7 +550,7 @@ else:
     import inspect
 
     current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
-    data_path = current_dir / "arviz_data_magnetic_soricom.nc"
+    data_path = current_dir / "arviz_data_magnetic_soricom_z.nc"
 
     if not data_path.exists():
         raise FileNotFoundError(
@@ -761,7 +765,6 @@ topography_path = paths.get_soricom_dem_path()
 
 # Cache Z for restore between prior and posterior
 original_z_prior = geo_model.surface_points_copy.df['Z'].to_numpy(copy=True)
-global _original_z_coords
 _original_z_coords = None
 
 probability_fields_for(
