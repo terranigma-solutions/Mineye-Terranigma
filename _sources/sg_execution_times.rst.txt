@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**02:17.545** total execution time for 14 files **from all galleries**:
+**00:37.369** total execution time for 14 files **from all galleries**:
 
 .. container::
 
@@ -33,7 +33,7 @@ Computation times
      - Time
      - Mem (MB)
    * - :ref:`sphx_glr_examples_probabilistic_08_soricom_magnetic_inversion.py` (``../../examples/02_probabilistic_modeling/08_soricom_magnetic_inversion.py``)
-     - 02:17.545
+     - 00:37.369
      - 0.0
    * - :ref:`sphx_glr_examples_basic_01_simple_tharsis_model.py` (``../../examples/01_basic_examples/01_simple_tharsis_model.py``)
      - 00:00.000

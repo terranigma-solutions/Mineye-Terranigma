@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**02:17.545** total execution time for 7 files **from examples_probabilistic**:
+**00:37.369** total execution time for 7 files **from examples_probabilistic**:
 
 .. container::
 
@@ -33,7 +33,7 @@ Computation times
      - Time
      - Mem (MB)
    * - :ref:`sphx_glr_examples_probabilistic_08_soricom_magnetic_inversion.py` (``08_soricom_magnetic_inversion.py``)
-     - 02:17.545
+     - 00:37.369
      - 0.0
    * - :ref:`sphx_glr_examples_probabilistic_02_error_propagation.py` (``02_error_propagation.py``)
      - 00:00.000
