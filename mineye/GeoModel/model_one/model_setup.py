@@ -58,7 +58,10 @@ def setup_geomodel(gravity_data, simple_geo_model: gp.data.GeoModel):
         grid_type=[geo_model.grid.GridTypes.CENTERED],
         reset=True
     )
-    gp.compute_model(geo_model, engine_config=gp.data.GemPyEngineConfig(backend=gp.data.AvailableBackends.PYTORCH))
+    gp.compute_model(geo_model, 
+                     engine_config=gp.data.GemPyEngineConfig(backend=gp.data.AvailableBackends.PYTORCH),
+                     validate_serialization=False
+                     )
     return geo_model, xy_ravel
 
 

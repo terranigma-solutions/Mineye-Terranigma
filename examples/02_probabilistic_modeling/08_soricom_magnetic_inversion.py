@@ -38,9 +38,13 @@ during plotting and probability field generation.
 # ----------------
 
 import os
+from pathlib import Path
+import inspect
 import dotenv
 
 dotenv.load_dotenv()
+
+_HERE = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
 
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
 from mineye.GeoModel.model_one.visualization import plot_many_observed_vs_forward, probability_fields_for
@@ -197,8 +201,8 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: az.InferenceDat
 # -----------------------------------
 
 def _read_magnetics():
-    xyz_path = os.path.join(os.path.dirname(__file__), 'soricom_magnetic_xyz_adaptive.npy')
-    mag_path = os.path.join(os.path.dirname(__file__), 'soricom_magnetic_values_adaptive.npy')
+    xyz_path = _HERE / 'soricom_magnetic_xyz_adaptive.npy'
+    mag_path = _HERE / 'soricom_magnetic_values_adaptive.npy'
     xyz = np.load(xyz_path)
     mag = np.load(mag_path)
     
@@ -376,14 +380,10 @@ if RUN_SIMULATION:
     )
 
     data.extend(prior_inference_data)
-    data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_magnetic_soricom_z_1779986757.nc"))
+    data.to_netcdf(str(_HERE / "arviz_data_magnetic_soricom_z_1779986757.nc"))
 
 else:
-    from pathlib import Path
-    import inspect
-
-    current_dir = Path(inspect.getfile(inspect.currentframe())).parent.resolve()
-    data_path = current_dir / "arviz_data_magnetic_soricom_z.nc"
+    data_path = _HERE / "arviz_data_magnetic_soricom_z.nc"
 
     if not data_path.exists():
         raise FileNotFoundError(
