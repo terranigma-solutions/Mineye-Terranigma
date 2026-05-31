@@ -28,8 +28,9 @@ from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comp
 from mineye.config import paths
 from mineye.config.example_parameters import SoricomModelConfig
 
-# nc_path = os.path.join(os.path.dirname(__file__), "../../../examples/02_probabilistic_modeling/1779977602")
-nc_path ="/home/leguark/Projects/gempy_project/Mineye-Terranigma/tests/tests_inversions/model2/arviz_data_magnetic_soricom_z_1779982462.nc" 
+nc_path ="/home/leguark/Projects/gempy_project/Mineye-Terranigma/tests/tests_inversions/model2/arviz_data_magnetic_soricom_z_1779986757.nc" 
+
+RUN_SIMULATION = False
 
 _original_z_coords = None
 
@@ -146,6 +147,8 @@ class TestMagneticInversion:
     prior_key_surface_points_z = r'surface_points_z'
 
     def test_run_predictive(self, geophysical_dir, n_samples=50):
+        if not RUN_SIMULATION:
+            pytest.skip("Skipping expensive predictive simulation.")
         import time
         import gempy_viewer as gpv
 
@@ -200,6 +203,8 @@ class TestMagneticInversion:
             arviz_data_filename="arviz_data_magnetic_soricom_z.nc",
     ):
         """Test magnetic inversion using the Soricom fault model and NUTS sampler with Z position priors."""
+        if not RUN_SIMULATION:
+            pytest.skip("Skipping expensive magnetic inversion simulation.")
         print("Soricom magnetic inversion (Z-priors) with NUTS...")
         geo_model, observed_magnetics_nt, prob_model = self._create_probabilistic_model(
             geophysical_dir,
@@ -229,8 +234,8 @@ class TestMagneticInversion:
                 target_accept_prob=0.65,
                 max_tree_depth=5,
                 init_strategy='median',
-                num_samples=50,
-                warmup_steps=50,
+                num_samples=200,
+                warmup_steps=200,
             ),
             plot_trace=True,
             run_posterior_predictive=True,

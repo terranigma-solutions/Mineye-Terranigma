@@ -376,7 +376,7 @@ if RUN_SIMULATION:
     )
 
     data.extend(prior_inference_data)
-    data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_magnetic_soricom_z.nc"))
+    data.to_netcdf(os.path.join(os.path.dirname(__file__), "arviz_data_magnetic_soricom_z_1779986757.nc"))
 
 else:
     from pathlib import Path
@@ -466,6 +466,8 @@ topography_path = paths.get_soricom_dem_path()
 
 print("\nComputing prior probability fields...")
 original_z = geo_model.surface_points_copy.df['Z'].to_numpy(copy=True)
+geo_model = _create_soricom_geomodel()
+geo_model.interpolation_options.number_octree_levels = 5
 
 probability_fields_for(
     geo_model=geo_model,
