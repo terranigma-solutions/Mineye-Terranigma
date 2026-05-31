@@ -5,6 +5,7 @@ import torch
 from pyro.distributions import Distribution
 
 import gempy as gp
+from gempy_engine.core.backend_tensor import BackendTensor
 from gempy_engine.core.data.interpolation_input import InterpolationInput
 
 
@@ -140,17 +141,18 @@ def convert_orientation_to_pole_vector(
     torch.Size([2, 3])
     """
     # Convert to tensors if needed (preserves gradients if already tensors)
+    float_ = BackendTensor.dtype_obj
     if not isinstance(azimuth, torch.Tensor):
-        azimuth = torch.as_tensor(azimuth, dtype=torch.float64)
+        azimuth = torch.as_tensor(azimuth, dtype=float_)
     if not isinstance(dip, torch.Tensor):
-        dip = torch.as_tensor(dip, dtype=torch.float64)
+        dip = torch.as_tensor(dip, dtype=float_)
     if not isinstance(polarity, torch.Tensor):
-        polarity = torch.as_tensor(polarity, dtype=torch.float64)
+        polarity = torch.as_tensor(polarity, dtype=float_)
 
     # Ensure consistent dtype
-    azimuth = azimuth.to(dtype=torch.float64)
-    dip = dip.to(dtype=torch.float64)
-    polarity = polarity.to(dtype=torch.float64)
+    azimuth = azimuth.to(dtype=float_)
+    dip = dip.to(dtype=float_)
+    polarity = polarity.to(dtype=float_)
 
     # Convert degrees to radians
     azimuth_rad = torch.deg2rad(azimuth)
@@ -203,7 +205,8 @@ def compute_adp_from_gradients(
     - All operations are differentiable
     """
     # Calculate polarity (assumed to be 1 for all)
-    polarity = torch.ones_like(G_x)
+    from gempy_engine.core.backend_tensor import BackendTensor
+    polarity = torch.ones_like(G_x, dtype=BackendTensor.dtype_obj)
 
     # Calculate dip
     # Clamp G_z/polarity to [-1, 1] for numerical stability in arccos
@@ -211,19 +214,19 @@ def compute_adp_from_gradients(
     dip = torch.rad2deg(torch.acos(cos_dip))
 
     # Replace NaN with 0 (torch equivalent of np.nan_to_num)
-    dip = torch.where(torch.isnan(dip), torch.zeros_like(dip), dip)
+    dip = torch.where(torch.isnan(dip), torch.zeros_like(dip, dtype=BackendTensor.dtype_obj), dip)
 
     # Calculate azimuth
     azimuth = torch.rad2deg(torch.atan2(G_x / polarity, G_y / polarity))
 
     # Replace NaN with 0
-    azimuth = torch.where(torch.isnan(azimuth), torch.zeros_like(azimuth), azimuth)
+    azimuth = torch.where(torch.isnan(azimuth), torch.zeros_like(azimuth, dtype=BackendTensor.dtype_obj), azimuth)
 
     # Shift values from [-180, 0] to [180, 360]
     # Use torch.where to preserve gradients (instead of boolean indexing)
     azimuth = torch.where(azimuth < 0, azimuth + 360.0, azimuth)
 
     # Adjust azimuth where dip is nearly zero (azimuth is undefined)
-    azimuth = torch.where(dip < 0.001, torch.zeros_like(azimuth), azimuth)
+    azimuth = torch.where(dip < 0.001, torch.zeros_like(azimuth, dtype=BackendTensor.dtype_obj), azimuth)
 
     return azimuth, dip, polarity

@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from pyro import distributions as dist
+from torch.xpu import device
 
 import gempy as gp
 import gempy_probability as gpp
@@ -22,7 +23,7 @@ from gempy_probability.modules.plot.plot_posterior import default_red, default_b
 from mineye.GeoModel.geophysics import align_forward_to_observed
 from mineye.GeoModel.model_one.probabilistic_model import normalize, _modify_orientations
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import generate_multimagnetic_likelihood_hierarchical_per_station
-from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward
+from mineye.GeoModel.model_one.visualization import gempy_viz, plot_many_observed_vs_forward, _update_model_for_plotting
 from mineye.GeoModel.plotting.probabilistic_analysis import plot_geophysics_comparison
 from mineye.config import paths
 from mineye.config.example_parameters import SoricomModelConfig
@@ -66,19 +67,47 @@ class TestMagneticInversion:
     prior_key_susceptibility = r'susceptibility'
 
     def test_run_predictive(self, geophysical_dir, n_samples=50):
+        import time
+        import gempy_viewer as gpv
+
+        if False:
+            geo_model = _create_soricom_geomodel()
+            gp.compute_model(geo_model)
+            gpv.plot_3d(geo_model)
+        
         geo_model, observed_magnetics_nt, prob_model = self._create_probabilistic_model(
             geophysical_dir=geophysical_dir,
         )
 
         magnetic_observations_tensor = torch.tensor(observed_magnetics_nt)
+
+        start_time = time.time()
         prior_inference_data: az.InferenceData = gpp.run_predictive(
             prob_model=prob_model,
             geo_model=geo_model,
             y_obs_list=magnetic_observations_tensor,
-            n_samples=100,
-            # n_samples=2,
-            plot_trace=True,
+            n_samples=20,
+            plot_trace=True
         )
+        elapsed_time = time.time() - start_time
+        print(f"Prior predictive sampling completed in {elapsed_time:.2f} seconds ({elapsed_time / 60:.2f} minutes)")
+        
+        if False:
+            gp.set_active_grid(
+                grid=geo_model.grid,
+                grid_type=[geo_model.grid.GridTypes.OCTREE],
+                reset=True
+            )
+
+            geo_model.geophysics_input = None
+            draw = 15
+            _update_model_for_plotting(
+                geo_model=geo_model,
+                sample_value=(prior_inference_data[r'dips'].values[0, :][draw]),
+                sample_idx=draw
+            )
+            gp.compute_model(gempy_model=geo_model)
+            gpv.plot_3d(geo_model)
 
     def test_magnetic_inversion(
             self, geophysical_dir, n_samples=50,
@@ -131,7 +160,8 @@ class TestMagneticInversion:
         geo_model, xy_ravel = self._setup_magnetic_geomodel(magnetic_data)
 
         geo_model.interpolation_options.sigmoid_slope = 100
-
+        # import pykeops
+        # pykeops.config.verbose = True
         # Compute baseline forward magnetics
         baseline_fw_magnetics_np = self._baseline_magnetics(geo_model)
 
@@ -141,18 +171,19 @@ class TestMagneticInversion:
             method="align_to_reference",
             extrapolation_buffer=0.3,
         )
-
+        device= torch.device("cuda" if torch.cuda.is_available() and True else "cpu")
+        float_ = torch.float32
         # 3) Priors
         n_orientations = geo_model.orientations_copy.xyz.shape[0]
         model_priors = {
                 self.prior_key_dips          : dist.Normal(
-                    loc=torch.full((n_orientations,), 10.0, dtype=torch.float64),
-                    scale=torch.tensor(10.0, dtype=torch.float64),
+                    loc=torch.full((n_orientations,), 10.0, dtype=float_, device=device),
+                    scale=torch.tensor(10.0, dtype=float_, device=device),
                     validate_args=True,
                 ),
                 self.prior_key_susceptibility: dist.Normal(
-                    loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=torch.float64),
-                    scale=torch.tensor(0.03, dtype=torch.float64),
+                    loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=float_, device=device),
+                    scale=torch.tensor(0.03, dtype=float_, device=device),
                 ).to_event(1),
         }
 
@@ -374,4 +405,3 @@ class TestMagneticInversion:
                 xy_ravel=xy_ravel,
             )
 
-        # gempy_viz(geo_model, data)
