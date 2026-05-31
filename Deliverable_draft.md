@@ -270,3 +270,106 @@ not fully eliminated at depth, and results remain conditional on the assumed str
 ranges.
 
 *[Figure suggestion: Joint inversion summary panel showing EO class probability map at surface, gravity fit improvement, and posterior entropy reduction relative to single-data inversions.]*
+
+# 5. Application Case Study: Soricom Chromite Lens
+
+To further evaluate the flexibility of the framework in structurally complex, mineral-exploration settings,
+a Bayesian magnetic inversion was performed on the Soricom prospect, targeting a thin chromite lens hosted
+within faulted ultramafic rocks. Unlike the regional-scale Tharsis model, the Soricom case represents a
+deposit-scale problem where the primary uncertainties concern the precise position, thickness, and geometry
+of a mineralized lens rather than broad regional interface geometries.
+
+## 5.1 Geological Setting and Model Setup
+
+The Soricom structural model covers a compact domain of approximately 500 m × 350 m at octree refinement level 5,
+providing the high spatial resolution needed to resolve a thin chromite lens. The stratigraphy includes a
+Main_Fault that truncates all formations (fault-first structural frame ordering), a host ultramafic rock,
+and the chromite lens as a discrete, high-susceptibility target. Four geological units are defined, with
+susceptibility values dominated by the strong magnetic contrast of the chromite lens (~0.5 SI) against the
+weakly magnetic host rock (~10⁻⁴ SI).
+
+Total Magnetic Intensity (TMI) observations were extracted from a merged aeromagnetic raster and reduced to
+20 representative stations via random subsampling. Following the established preprocessing pipeline, the IGRF
+intensity (~47,500 nT) was subtracted from raw TMI values to obtain anomaly-level measurements consistent
+with the forward model output.
+
+## 5.2 Direct Position Priors for Lens Geometry
+
+A key methodological distinction for the Soricom case is the choice to parameterize uncertainty directly in
+terms of **surface point Z positions** rather than the orientation or dip priors used in the Tharsis
+study. This design choice reflects the geological nature of the problem at deposit scale: for a thin,
+high-contrast lens body hosted within a faulted sequence, the primary unknowns are:
+
+- **Lens position**: Where exactly does the chromite lens sit within the host rock?
+- **Lens thickness**: How thick is the lens, and does it pinch or swell laterally?
+- **Host rock interface depth**: At what depth does the upper boundary of the ultramafic host occur?
+
+Orientation-based priors (e.g., Normal distributions on dip angles) are well-suited for regional studies
+where interface attitudes are the dominant source of geometric uncertainty. However, for a mineralized
+lens where contacts are sub-parallel, the critical question is *where* the body is located — not *at what
+angle*. By directly perturbing the Z coordinates of individual surface points, the inversion can
+independently explore translations of the entire lens body as well as local variations in lens thickness
+along its strike. This approach also preserves full differentiability for gradient-based inference via NUTS,
+since Z-coordinate perturbations propagate naturally through the implicit interpolation.
+
+The prior structure is organized as a two-tier Z-shift model with 10 parameters:
+
+| Parameter | Geological target | Prior | Interpretation |
+|-----------|-------------------|-------|----------------|
+| `z_shifts[0]` | All host rock points (12 points) | Normal(0, 15 m) | Bulk vertical shift of the host rock upper contact |
+| `z_shifts[1]…z_shifts[9]` | Individual chromite lens points (9 points) | Normal(0, 15 m) | Independent vertical perturbation per lens surface point |
+
+The use of **independent priors** for each lens surface point allows the ensemble to express a
+richer range of lens geometries than a single-thickness or single-position parameter would permit:
+uniform thickness changes (all lens points shift together in the posterior), lateral thickness
+variations (some points shift more than others), and coherent translations (lens and host shift in the
+same direction). This parameterization naturally captures the geological expectation that the lens may
+pinch out, swell, or shift vertically within the host, while remaining compact enough (10 parameters)
+to be efficiently explored by MCMC.
+
+In combination with the position priors, LogNormal priors are placed on the susceptibility values for all
+four units, with the chromite lens centred at a high susceptibility (~0.5 SI) reflecting its strong
+magnetic signature relative to the weakly magnetic host.
+
+## 5.3 Inference and Results
+
+Inference was performed using the No-U-Turn Sampler with 200 warmup and 200 sampling steps. A custom
+`set_interp_input_fn` applies sampled Z shifts to the correct surface-point index ranges
+(indices 1–12 for host rock, 13–21 for the lens) at each MCMC iteration, recomputing the implicit model
+and TMI forward response. An equivalent `update_model_fn` is used during post-inference visualization and
+probability field generation to consistently apply posterior samples to the geological model.
+
+**Outcomes:** Posterior analysis of the Z-shift parameters revealed significant learning from the magnetic
+data, with posterior distributions substantially narrower than the priors and shifted away from zero.
+The magnetic observations provided meaningful constraints on both the bulk host rock depth and the
+individual lens point positions. Where multiple lens points showed consistent posterior shifts, the data
+favoured a particular lens thickness and vertical position; where posterior uncertainty remained elevated,
+the magnetic response was less diagnostic of local lens geometry — an interpretable outcome that directly
+informs where additional data (e.g., drilling) would be most valuable.
+
+Posterior predictive checks demonstrated a good match between observed TMI anomalies and the forward
+model ensemble mean, confirming that the Z-position parameterization, combined with susceptibility
+inference, can explain the magnetic observations without introducing spurious structural complexity.
+
+Probability density fields and information entropy maps were computed for both prior and posterior
+ensembles, revealing a marked reduction in lithological ambiguity within the lens–host rock transition
+zone after conditioning on magnetic data. The entropy reduction was most pronounced directly beneath
+the lens and in the immediate vicinity of the observation stations, where the TMI gradient is most
+sensitive to lens thickness and depth. The probability fields provide a spatially explicit map of
+where the chromite lens is most likely to be found and how its thickness varies across the prospect.
+
+Key geological takeaway: for deposit-scale targets characterized by thin, high-contrast bodies,
+direct position priors on surface-point Z coordinates offer a more natural and interpretable
+uncertainty parameterization than orientation or dip priors. This approach explicitly quantifies the
+posterior uncertainty in lens position and thickness — directly translatable into actionable information
+for resource estimation, drill targeting, and risk assessment.
+
+Current limitations: the inversion uses a fixed (non-hierarchical) noise model (σ = 150 nT);
+the 20-station subset may not fully capture spatial TMI variability across the prospect; and lens
+geometry uncertainty remains conditional on the assumed number and distribution of surface points.
+Relaxing the point count, exploring transdimensional lens representations, or incorporating remanent
+magnetization are natural extensions for future work.
+
+*[Figure suggestion: Prior vs posterior Z-shift parameter marginal distributions, showing narrowing and shifting of individual lens point positions.]*
+*[Figure suggestion: Posterior probability density fields and information entropy cross-sections through the chromite lens, highlighting uncertainty reduction after magnetic conditioning.]*
+*[Figure suggestion: TMI observation vs forward prediction correlation plot with posterior ensemble spread and 1:1 reference line.]*

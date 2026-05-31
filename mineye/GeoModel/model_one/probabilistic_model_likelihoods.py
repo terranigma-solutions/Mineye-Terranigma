@@ -112,6 +112,32 @@ def generate_multigravity_likelihood_hierarchical_per_station(norm_params):
     return likelihood_fn
 
 
+def generate_multimagnetic_likelihood_fixed_std(norm_params, sigma_value=150.0):
+    """
+    Fixed noise standard deviation likelihood for magnetic data.
+
+    This is the most stable option for initial inversion tuning. By fixing sigma,
+    we eliminate the noise parameter from the posterior geometry, making the
+    likelihood surface purely a function of the forward model parameters.
+
+    Parameters
+    ----------
+    norm_params : dict
+        Alignment parameters from normalize().
+    sigma_value : float
+        Fixed noise standard deviation in nT. Default 150.0.
+    """
+
+    def likelihood_fn(solutions: gp.data.Solutions) -> dist.Distribution:
+        simulated_magnetics = align_forward_to_observed(solutions.magnetics, norm_params)
+        pyro.deterministic(r'$\mu_{magnetics}$', simulated_magnetics.detach())
+        sigma = torch.tensor(sigma_value, dtype=torch.float64)
+        pyro.deterministic("sigma_stations", sigma.expand(simulated_magnetics.shape[0]))
+        return dist.Normal(simulated_magnetics, sigma).to_event(1)
+
+    return likelihood_fn
+
+
 def generate_multimagnetic_likelihood_hierarchical_per_station(norm_params):
     """
     Per-station hierarchical likelihood for magnetic data.
@@ -126,7 +152,7 @@ def generate_multimagnetic_likelihood_hierarchical_per_station(norm_params):
         mu_log_sigma = pyro.sample(
             "mu_log_sigma",
             dist.Normal(
-                torch.tensor(np.log(150.0), dtype=torch.float64),  # ~150 nT typical noise for magnetics
+                torch.tensor(np.log(20.0), dtype=torch.float64),  # ~20 nT typical noise for magnetics
                 torch.tensor(0.5, dtype=torch.float64)
             )
         )
@@ -146,7 +172,7 @@ def generate_multimagnetic_likelihood_hierarchical_per_station(norm_params):
             ).to_event(1)
         )
 
-        sigma_stations = torch.exp(log_sigma_stations)
+        sigma_stations = torch.clamp(torch.exp(log_sigma_stations), min=20.0)
         pyro.deterministic("sigma_stations", sigma_stations)
 
         return dist.Normal(simulated_magnetics, sigma_stations).to_event(1)

@@ -112,8 +112,13 @@ def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: arviz.Inference
 
 
 def compute_probability_density_fields(geo_model: gp.data.GeoModel, inference_data: xarray.Dataset,
-                                       n_samples=50) -> fields.OnlineProbability:
+                                       n_samples=50, var_name=r'dips',
+                                       update_model_fn=None) -> fields.OnlineProbability:
     from gempy.core.data.grid_modules import RegularGrid
+
+    if update_model_fn is None:
+        update_model_fn = _update_model_for_plotting
+
     geo_model.grid.dense_grid = RegularGrid(
         geo_model.grid.extent,
         np.array([50, 50, 50])
@@ -135,9 +140,9 @@ def compute_probability_density_fields(geo_model: gp.data.GeoModel, inference_da
     )
 
     for i in np.linspace(0, inference_data.draw.size - 1, n_samples, dtype=int):
-        _update_model_for_plotting(
+        update_model_fn(
             geo_model=geo_model,
-            sample_value=(inference_data[r'dips'].values[0, :][i]),
+            sample_value=(inference_data[var_name].values[0, :][i]),
             sample_idx=i
         )
         gp.compute_model(gempy_model=geo_model)
@@ -285,22 +290,21 @@ def generate_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, topo
         color = getattr(element, "color", None)
         return color if color is not None else next(default_colors)
 
-    element_styles = [
-            (
-                    getattr(element, "name", f"Lithology {idx + 1}"),
-                    element_color(element)
-            )
-            for idx, element in enumerate(elements)
-    ]
+    element_id_map: dict[int, tuple[str, str]] = {}
+    for element in elements:
+        element_id_map[element.id] = (
+            getattr(element, "name", f"Lithology {element.id}"),
+            element_color(element)
+        )
 
     topo_profile = topography_profile()
 
     lithology_ids = np.asarray(online_prob.unique_lithologies, dtype=int)
     lithology_names = []
     lithology_colors = []
-    for idx, lithology_id in enumerate(lithology_ids):
-        if idx < len(element_styles):
-            lithology_name, lithology_color = element_styles[idx]
+    for lithology_id in lithology_ids:
+        if lithology_id in element_id_map:
+            lithology_name, lithology_color = element_id_map[lithology_id]
         else:
             lithology_name, lithology_color = f"Lithology {lithology_id}", next(default_colors)
         lithology_names.append(lithology_name)
@@ -423,7 +427,8 @@ def generate_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, topo
 
 
 def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob,
-                                          output_filename="probability_fields_paper_pyvista.png"):
+                                          output_filename="probability_fields_paper_pyvista.png",
+                                          ve=4):
     import os
     from itertools import cycle
 
@@ -448,11 +453,14 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
     elements = list(getattr(geo_model.structural_frame, "structural_elements", []))
     default_colors = cycle(plt.get_cmap("tab20").colors)
     lithology_ids = np.asarray(online_prob.unique_lithologies, dtype=int)
+    element_id_map: dict[int, Any] = {}
+    for element in elements:
+        element_id_map[element.id] = element
     lithology_names = []
     lithology_colors = []
-    for idx, lithology_id in enumerate(lithology_ids):
-        element = elements[idx] if idx < len(elements) else None
-        lithology_names.append(getattr(element, "name", f"Lithology {lithology_id}"))
+    for lithology_id in lithology_ids:
+        element = element_id_map.get(lithology_id)
+        lithology_names.append(getattr(element, "name", f"Lithology {lithology_id}") if element is not None else f"Lithology {lithology_id}")
         color = getattr(element, "color", None) if element is not None else None
         lithology_colors.append(to_hex(color if color is not None else next(default_colors)))
 
@@ -525,10 +533,11 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                 model=geo_model,
                 show_scalar=False,
                 show_lith=True,
+                show_boundaries=False,
                 show_topography=True,
                 image=True,
                 show=False,
-                ve=4,
+                ve=ve,
                 kwargs_plot_structured_grid={
                         "opacity": opacity,
                 },
@@ -560,9 +569,10 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
                     show_scalar=True,
                     show_lith=False,
                     show_topography=True,
+                    show_boundaries=False,
                     image=True,
                     show=False,
-                    ve=4,
+                    ve=ve,
                     threshold_kwargs={'value': [0.05, 10], 'invert': False},
                     kwargs_plot_topography={
                             "opacity": 0.,
@@ -689,13 +699,17 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
         return output_filename
 
 
-def probability_fields_for(geo_model, inference_data, topography_path):
+def probability_fields_for(geo_model, inference_data, topography_path,
+                           var_name=r'dips', update_model_fn=None, ve=5,
+                           output_filename="probability_fields_paper.png",
+                           pyvista_filename="probability_fields_paper_pyvista.png"):
     import gempy_viewer as gpv
-    online_prob = setup_probability_fields(geo_model, inference_data, topography_path)
+    online_prob = setup_probability_fields(geo_model, inference_data, topography_path,
+                                          var_name=var_name, update_model_fn=update_model_fn)
 
     # 1. Generate the paper-quality, multi-panel summary figure
-    generate_paper_quality_figure(geo_model, online_prob, topography_path)
-    generate_pyvista_paper_quality_figure(geo_model, online_prob)
+    generate_paper_quality_figure(geo_model, online_prob, topography_path, output_filename=output_filename)
+    generate_pyvista_paper_quality_figure(geo_model, online_prob, ve=ve, output_filename=pyvista_filename)
 
     # 2. Original legacy plots (for compatibility/visual feedback)
     if True:
@@ -703,7 +717,7 @@ def probability_fields_for(geo_model, inference_data, topography_path):
             geo_model,
             override_regular_grid=online_prob.probability_field[0],
             show_data=True,
-            ve=5,
+            ve=ve,
             kwargs_lithology={
                     'cmap': 'viridis',
                     'norm': None
@@ -714,7 +728,7 @@ def probability_fields_for(geo_model, inference_data, topography_path):
             geo_model,
             override_regular_grid=online_prob.probability_field[1],
             show_data=True,
-            ve=5,
+            ve=ve,
             kwargs_lithology={
                     'cmap': 'viridis',
                     'norm': None
@@ -725,7 +739,7 @@ def probability_fields_for(geo_model, inference_data, topography_path):
             geo_model,
             override_regular_grid=online_prob.entropy,
             show_data=True,
-            ve=5,
+            ve=ve,
             kwargs_lithology={
                     'cmap': 'magma',
                     'norm': None
@@ -740,8 +754,9 @@ def probability_fields_for(geo_model, inference_data, topography_path):
         show_scalar=True,
         show_lith=False,
         show_topography=True,
+        show_boundaries=False,
         image=True,
-        ve=4,
+        ve=ve,
         threshold_kwargs={'value': [0.2, 0.9], 'invert': False},
         kwargs_pyvista_bounds={
                 'show_xlabels': False,
@@ -753,11 +768,14 @@ def probability_fields_for(geo_model, inference_data, topography_path):
     return online_prob
 
 
-def setup_probability_fields(geo_model, inference_data, topography_path):
+def setup_probability_fields(geo_model, inference_data, topography_path,
+                             var_name=r'dips', update_model_fn=None):
     online_prob = compute_probability_density_fields(
         geo_model,
         inference_data,
-        n_samples=5
+        n_samples=5,
+        var_name=var_name,
+        update_model_fn=update_model_fn,
     )
     import gempy as gp
 
