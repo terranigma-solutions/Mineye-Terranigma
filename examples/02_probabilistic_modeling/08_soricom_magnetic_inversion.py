@@ -46,8 +46,8 @@ import dotenv
 dotenv.load_dotenv()
 
 from gempy_probability.modules.plot.plot_posterior import default_red, default_blue
+from gempy_probability.modules.plot.plot_gempy import plot_gempy
 from mineye.GeoModel.model_one.visualization import (
-    gempy_viz,
     plot_many_observed_vs_forward,
     generate_gravity_uncertainty_plots,
     probability_fields_for
@@ -79,12 +79,85 @@ np.random.seed(1234)
 from mineye.config import paths
 from mineye.config.example_parameters import SoricomModelConfig
 from mineye.GeoModel.geophysics import align_forward_to_observed
-from mineye.GeoModel.model_one.probabilistic_model import normalize, set_magnetic_priors
+from mineye.GeoModel.model_one.probabilistic_model import normalize
 from mineye.GeoModel.model_one.probabilistic_model_likelihoods import (
-    generate_multimagnetic_likelihood_hierarchical_per_station,
+    generate_multimagnetic_likelihood_fixed_std,
 )
 from gempy_engine.modules.geophysics.magnetic_gradient import calculate_magnetic_gradient_tensor
 from gempy_engine.core.data.geophysics_input import MagneticsInput
+
+# --- Helper: Z-position update function (used by gempy_viz and probability fields) ---
+_original_z_coords = None
+
+
+def _update_model_for_plotting(geo_model: gp.data.GeoModel, sample_value: np.ndarray, sample_idx: int):
+    global _original_z_coords
+    if _original_z_coords is None:
+        _original_z_coords = geo_model.surface_points_copy.df['Z'].to_numpy(copy=True)
+
+    scale_z = geo_model.input_transform.scale[2]
+    shifts_m = sample_value / scale_z
+
+    new_z = _original_z_coords.copy()
+    # Point 0: Main_Fault (no change)
+    # Points 1-12: host_rock -> shifted by shifts_m[0] (layer wide)
+    new_z[1:13] = _original_z_coords[1:13] + shifts_m[0]
+    # Points 13-21: chromite lense -> shifted by shifts_m[1:] (independent)
+    new_z[13:22] = _original_z_coords[13:22] + shifts_m[1:]
+
+    gp.modify_surface_points(
+        geo_model=geo_model,
+        Z=new_z
+    )
+
+
+def gempy_viz(geo_model: gp.data.GeoModel, prior_inference_data: az.InferenceData,
+              n_samples=20, ve=3):
+    gp.set_active_grid(
+        grid=geo_model.grid,
+        grid_type=[geo_model.grid.GridTypes.OCTREE],
+        reset=True
+    )
+    geo_model.geophysics_input = None
+    gp.compute_model(gempy_model=geo_model)
+
+    p2d = gpv.plot_2d(
+        model=geo_model,
+        show_topography=False,
+        legend=False,
+        show_lith=False,
+        show_data=False,
+        show=False,
+        ve=ve
+    )
+
+    original_z = geo_model.surface_points_copy.df['Z'].to_numpy(copy=True)
+    global _original_z_coords
+    _original_z_coords = None
+
+    plot_gempy(
+        geo_model=geo_model,
+        n_samples=n_samples,
+        samples=(prior_inference_data.prior['surface_points_z'].values[0, :]),
+        update_model_fn=_update_model_for_plotting,
+        gempy_plot=p2d,
+    )
+
+    if hasattr(prior_inference_data, 'posterior'):
+        gp.modify_surface_points(geo_model=geo_model, Z=original_z)
+        _original_z_coords = None
+        n_surfaces = len(geo_model.structural_frame.elements_colors_contacts)
+        plot_gempy(
+            geo_model=geo_model,
+            n_samples=n_samples,
+            samples=(prior_inference_data.posterior['surface_points_z'].values[0, :]),
+            update_model_fn=_update_model_for_plotting,
+            gempy_plot=p2d,
+            contour_colors=[default_red] * n_surfaces,
+        )
+
+    return p2d
+
 
 # %%
 # Step 1: Load Preprocessed Magnetic Observations
@@ -126,6 +199,46 @@ print(f"\nMagnetic observations:")
 print(f"  Number of measurements: {len(observed_magnetics_nt)}")
 print(f"  Range: {observed_magnetics_nt.min():.1f} to {observed_magnetics_nt.max():.1f} nT")
 print(f"  Mean: {observed_magnetics_nt.mean():.1f} nT")
+
+# --- Prior keys ---
+prior_key_surface_points_z = r'surface_points_z'
+prior_key_susceptibility = r'susceptibility'
+
+# %%
+# **Z-Position Prior Setter**
+#
+# The ``_set_magnetic_priors`` function maps sampled parameter values onto the
+# GemPy model. It handles two parameter groups:
+#
+# 1. ``surface_points_z``: applies vertical shifts to surface points (meter units)
+# 2. ``susceptibility``: updates the magnetic susceptibility of each unit
+#
+# The host rock's 12 surface points share one shift (layer-wide movement),
+# while the chromite lens's 9 points each have independent shifts.
+
+
+def _set_magnetic_priors(samples: dict, geo_model: gp.data.GeoModel):
+    from gempy.modules.data_manipulation import interpolation_input_from_structural_frame
+    interp_input = interpolation_input_from_structural_frame(geo_model)
+
+    if prior_key_surface_points_z in samples:
+        shifts = samples[prior_key_surface_points_z]
+        coords = interp_input.surface_points.sp_coords.clone()
+
+        # Index 1:13 = 12 host_rock points → shifted by shifts[0] (layer wide)
+        coords[1:13, 2] = coords[1:13, 2] + shifts[0]
+        # Index 13:22 = 9 chromite lense points → shifted by shifts[1:] (independent)
+        coords[13:22, 2] = coords[13:22, 2] + shifts[1:]
+
+        interp_input.surface_points.sp_coords = coords
+
+    if prior_key_susceptibility in samples:
+        susceptibilities = samples[prior_key_susceptibility]
+        if geo_model.geophysics_input and geo_model.geophysics_input.magnetics_input:
+            geo_model.geophysics_input.magnetics_input.susceptibilities = susceptibilities
+
+    return interp_input
+
 
 # %%
 # Step 2: Setup Geomodel with Soricom Fault Configuration
@@ -185,10 +298,10 @@ gpv.plot_3d(
 #
 # **Susceptibility values** (initial guess, in SI units):
 #
-# - ``Main_Fault``: 0.0 (faults have no intrinsic susceptibility in this model)
-# - ``host_rock``: 0.05 (ultramafic host with moderate magnetite content)
-# - ``chromite_lense``: 0.001 (chromite has low magnetic susceptibility)
-# - ``basement``: 0.001 (low-susceptibility country rock)
+# - ``Main_Fault``: 0.0001 (near-zero)
+# - ``host_rock``: 0.0001 (ultramafic host, near-zero for inversion start)
+# - ``chromite_lense``: 0.5 (high-susceptibility target)
+# - ``basement``: 0.0001 (low-susceptibility country rock)
 #
 # **IGRF parameters** at Soricom (WGS 84 UTM zone 34N):
 # - Inclination: 57.0°
@@ -216,7 +329,7 @@ gradient_tensor_dict = calculate_magnetic_gradient_tensor(
 geo_model.geophysics_input = gp.data.GeophysicsInput(
     magnetics_input=MagneticsInput(
         mag_kernel=gradient_tensor_dict['tmi_kernel'],
-        susceptibilities=np.array([0.0, 0.05, 0.001, 0.001]),
+        susceptibilities=np.array([0.0001, 0.0001, 0.5, 0.0001]),
         igrf_params={
             "inclination": gradient_tensor_dict['inclination'],
             "declination": gradient_tensor_dict['declination'],
@@ -281,26 +394,28 @@ plot_geophysics_comparison(
 # Step 6: Define Prior Distributions
 # -----------------------------------
 #
-# **Susceptibility Priors** (SI units):
+# **Two Parameter Groups**
 #
-# Unlike the Tharsis model (2 units), the Soricom model has 4 units:
-# fault, host rock, chromite lens, and basement. The fault and basement have
-# near-zero susceptibility, while the host rock has moderate susceptibility
-# and the chromite lens is a low-susceptibility target within the host.
-
-n_orientations = geo_model.orientations_copy.xyz.shape[0]
-prior_key_dips = r'dips'
-prior_key_susceptibility = r'susceptibility'
+# 1. **Surface point Z shifts** (:math:`\Delta z`):
+#    - ``host_rock`` (12 surface points): one shared shift — layer-wide vertical movement
+#    - ``chromite_lense`` (9 surface points): 9 independent shifts per point
+#    - Main_Fault (1 point): fixed (no shift)
+#    - Total: **10 parameters** (1 layer-wide + 9 per-point)
+#    - Prior: :math:`\mathcal{N}(0, 15 \, \text{m})` in scaled coordinates
+#
+# 2. **Susceptibility** (SI units, LogNormal):
+#    - :math:`\log(\kappa) \sim \mathcal{N}(\mu, \sigma)` for each unit
+#    - Corresponds to ~0.0001 SI (fault/basement), ~0.0001 SI (host), ~0.5 SI (chromite)
 
 model_priors = {
-    prior_key_dips: dist.Normal(
-        loc=torch.full((n_orientations,), 10.0, dtype=torch.float64),
-        scale=torch.tensor(10.0, dtype=torch.float64),
+    prior_key_surface_points_z: dist.Normal(
+        loc=torch.tensor([0.0] * 10, dtype=torch.float64),
+        scale=torch.tensor([15.0] * 10, dtype=torch.float64) * geo_model.input_transform.scale[2],
         validate_args=True,
-    ),
-    prior_key_susceptibility: dist.Normal(
-        loc=torch.tensor([0.0, 0.05, 0.001, 0.001], dtype=torch.float64),
-        scale=torch.tensor(0.03, dtype=torch.float64),
+    ).to_event(1),
+    prior_key_susceptibility: dist.LogNormal(
+        loc=torch.tensor([-9.21, -9.21, -0.69, -9.21], dtype=torch.float64),
+        scale=torch.tensor([0.1, 0.1, 0.2, 0.1], dtype=torch.float64),
     ).to_event(1),
 }
 
@@ -325,15 +440,16 @@ post_forward_dets = {
 # Step 8: Define Likelihood Function
 # -----------------------------------
 #
-# Hierarchical likelihood with per-station noise. The global noise prior is
-# centered at 150 nT, appropriate for the observed anomaly scatter of ~152 nT.
+# Fixed-standard-deviation likelihood with :math:`\sigma = 150` nT. This is
+# approximately 2× the baseline residual standard deviation, giving NUTS room
+# to explore parameter space while still penalizing poor fits.
 
-likelihood_fn = generate_multimagnetic_likelihood_hierarchical_per_station(
+likelihood_fn = generate_multimagnetic_likelihood_fixed_std(
     norm_params=norm_params,
+    sigma_value=150.0,
 )
 
-print("Likelihood function created (hierarchical per-station)")
-print("  Global mean noise prior: ~150.0 nT")
+print("Likelihood function created (fixed std = 150 nT)")
 
 # %%
 # Step 9: Create Probabilistic Model
@@ -341,16 +457,16 @@ print("  Global mean noise prior: ~150.0 nT")
 
 prob_model: gpp.GemPyPyroModel = gpp.make_gempy_pyro_model(
     priors=model_priors,
-    set_interp_input_fn=set_magnetic_priors,
+    set_interp_input_fn=_set_magnetic_priors,
     likelihood_fn=likelihood_fn,
     obs_name="Magnetic Measurement (Soricom)",
 )
 
 print("Probabilistic model created")
 print("  Model components:")
-print("    - Priors: dips (orientations), susceptibility")
+print("    - Priors: surface points Z shifts, susceptibility")
 print("    - Forward model: GemPy geological interpolation + TMI")
-print("    - Likelihood: Hierarchical per-station noise")
+print("    - Likelihood: Fixed standard deviation (150 nT)")
 print("    - Deterministics: magnetic_response, mean_magnetics, max_magnetics")
 
 # %%
@@ -445,11 +561,13 @@ else:
 # Analysis: Parameter Posterior Statistics
 # -----------------------------------------
 
-posterior_dips = data.posterior['dips'].values
-print(f"\nPosterior dip statistics:")
-print(f"  Shape: {posterior_dips.shape}")
-print(f"  Mean: {posterior_dips.mean():.2f}°")
-print(f"  Std: {posterior_dips.std():.2f}°")
+posterior_z = data.posterior['surface_points_z'].values
+print(f"\nPosterior Z-shift statistics (host rock layer-wide):")
+print(f"  Mean: {posterior_z[:, :, 0].mean():.2f} m")
+print(f"  Std:  {posterior_z[:, :, 0].std():.2f} m")
+print(f"\nPosterior Z-shift statistics (chromite per-point, first 3):")
+for i in range(1, min(4, posterior_z.shape[-1])):
+    print(f"  Point {i}: mean={posterior_z[:, :, i].mean():.2f} m, std={posterior_z[:, :, i].std():.2f} m")
 
 posterior_suscept = data.posterior['susceptibility'].values
 print(f"\nPosterior susceptibility statistics:")
@@ -459,9 +577,9 @@ print(f"  Chromite    - Mean: {posterior_suscept[:, :, 2].mean():.4f} SI")
 print(f"  Basement    - Mean: {posterior_suscept[:, :, 3].mean():.4f} SI")
 
 if hasattr(data, 'prior'):
-    prior_dips = data.prior['dips'].values
-    uncertainty_reduction = (1 - posterior_dips.std() / prior_dips.std()) * 100
-    print(f"\nUncertainty reduction in dips: {uncertainty_reduction:.1f}%")
+    prior_z = data.prior['surface_points_z'].values
+    uncertainty_reduction = (1 - posterior_z.std() / prior_z.std()) * 100
+    print(f"\nUncertainty reduction in Z-positions: {uncertainty_reduction:.1f}%")
     prior_suscept = data.prior['susceptibility'].values
     suscept_uncertainty_reduction = (
         1 - posterior_suscept.std() / prior_suscept.std()
@@ -498,7 +616,7 @@ plot_many_observed_vs_forward(
 
 az.plot_density(
     data=[data, data.prior],
-    var_names=["dips", "susceptibility"],
+    var_names=["surface_points_z", "susceptibility"],
     filter_vars="like",
     hdi_prob=0.9999,
     shade=.2,
@@ -568,30 +686,33 @@ if hasattr(data, 'posterior_predictive') and r'$\mu_{magnetics}$' in data.poster
     )
 
 # %%
-# **Sigma Analysis: Outlier Detection**
+# **Residual Analysis**
 #
-# Hierarchical modeling automatically identifies stations with unusually high
-# noise, which may indicate localized geological complexity not captured by
-# the simple 4-unit model.
+# With a fixed-standard-deviation likelihood, we examine the residual
+# distribution directly. A well-calibrated model should produce residuals
+# that are roughly normally distributed with mean near zero.
 
-if "sigma_stations" in data.posterior_predictive:
-    posterior_sigmas = data.posterior_predictive["sigma_stations"].values
-    station_noise_mean = posterior_sigmas.mean(axis=(0, 1))
-    sigma_global_mean = station_noise_mean.mean()
-    problematic = np.where(station_noise_mean > 2 * sigma_global_mean)[0]
-    print(f"\nPotential outlier stations identified: {problematic}")
+posterior_predictive_values = data.posterior_predictive[
+    'Magnetic Measurement (Soricom)'
+].values
+residuals_all = posterior_predictive_values - observed_magnetics_nt[np.newaxis, np.newaxis, :]
+residuals_flat = residuals_all.reshape(-1)
 
-    az.plot_density(
-        data=[data, data.prior],
-        var_names=["sigma_stations"],
-        filter_vars="like",
-        hdi_prob=0.9999,
-        shade=.2,
-        data_labels=["Posterior", "Prior"],
-        colors=[default_red, default_blue],
-    )
-    plt.title("Per-Station Noise Distribution (Sigma) — Soricom Magnetics")
-    plt.show()
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+axes[0].hist(residuals_flat, bins=50, density=True, alpha=0.7, color=default_blue)
+axes[0].set_xlabel('Residual (nT)')
+axes[0].set_ylabel('Density')
+axes[0].set_title(f'Residual Distribution\nMean = {residuals_flat.mean():.1f} nT, Std = {residuals_flat.std():.1f} nT')
+
+station_rmse = np.sqrt((posterior_predictive_values.mean(axis=(0, 1)) - observed_magnetics_nt) ** 2)
+axes[1].bar(range(len(station_rmse)), station_rmse, color=default_red, alpha=0.7)
+axes[1].set_xlabel('Station index')
+axes[1].set_ylabel('RMSE (nT)')
+axes[1].set_title('Per-Station RMSE')
+axes[1].axhline(y=150, color='gray', linestyle='--', label='Likelihood σ = 150 nT')
+axes[1].legend()
+plt.tight_layout()
+plt.show()
 
 # %%
 # **Probability Density Fields and Information Entropy**
@@ -637,19 +758,34 @@ geo_model.structural_frame.fault_relations = SoricomModelConfig.FAULT_RELATIONS_
 # Prior Probability Fields
 print("\nComputing prior probability fields...")
 topography_path = paths.get_soricom_dem_path()
+
+# Cache Z for restore between prior and posterior
+original_z_prior = geo_model.surface_points_copy.df['Z'].to_numpy(copy=True)
+global _original_z_coords
+_original_z_coords = None
+
 probability_fields_for(
     geo_model=geo_model,
     inference_data=data.prior,
-    topography_path=topography_path
+    topography_path=topography_path,
+    var_name=prior_key_surface_points_z,
+    update_model_fn=_update_model_for_plotting,
+    ve=1,
 )
 
 # Posterior Probability Fields
 if hasattr(data, 'posterior'):
+    # Restore model Z so posterior OnlineProbability init uses baseline lithology
+    gp.modify_surface_points(geo_model=geo_model, Z=original_z_prior)
+    _original_z_coords = None
     print("\nComputing posterior probability fields...")
     probability_fields_for(
         geo_model=geo_model,
         inference_data=data.posterior,
-        topography_path=topography_path
+        topography_path=topography_path,
+        var_name=prior_key_surface_points_z,
+        update_model_fn=_update_model_for_plotting,
+        ve=1,
     )
 
 # %%
@@ -663,24 +799,32 @@ if hasattr(data, 'posterior'):
 #    match. Without this step, the likelihood is numerically flat and NUTS cannot
 #    move.
 #
-# 2. **Susceptibility prior width matters**: A prior scale of 0.03 (wider than
-#    the 0.01 used for Tharsis) allows the sampler to explore meaningful
-#    parameter space. Tight priors (< 0.01) can freeze the chain.
+# 2. **Z-position priors are geometrically intuitive**: Unlike dip priors (which
+#    rotate orientation vectors), shifting surface point Z-coordinates directly
+#    controls the depth of geological boundaries. This matches how geologists
+#    think about uncertainty — "the contact could be ±15 m deeper."
 #
-# 3. **Noise prior calibration**: The hierarchical noise prior should match the
-#    observed data scatter (~150 nT). A prior at 50 nT would force the model
-#    to explain structural variance as noise, creating a too-narrow posterior.
+# 3. **Layer-wide vs per-point shifting**: The host rock shares one Z-shift
+#    across all 12 surface points (rigid-body movement). The chromite lens uses
+#    independent per-point shifts (allowing lens shape variation).
 #
-# 4. **Fault geometry is constrained**: Despite magnetic data being primarily
-#    sensitive to susceptibility, the posterior dip distribution is narrower
-#    than the prior, showing the data provides geometric constraints.
+# 4. **Fixed-std likelihood works for well-characterized noise**: A single
+#    :math:`\sigma = 150` nT (approximately 2× the baseline residual std)
+#    lets NUTS explore parameters freely while producing good data fit.
 #
-# **Comparison with Gravity Inversion**
+# 5. **LogNormal susceptibility keeps values positive**: Susceptibility must be
+#    strictly positive (SI convention). The LogNormal prior enforces this
+#    naturally, unlike a Normal prior that could sample negative values.
 #
-# - Magnetic inversion shares the same Bayesian framework but uses TMI forward
-#   physics and susceptibility instead of density.
-# - The Soricom model has more units (4 vs 2) at a smaller spatial scale.
-# - Hierarchical likelihoods perform similarly for both data types.
+# **Comparison with Dip-Prior Approach** (see :ref:`gravity_inversion`)
+#
+# - **Z-priors**: Shift surface point coordinates → directly controls boundary
+#   geometry → simpler parameterization with clear physical units (meters)
+# - **Dip priors**: Modify orientation pole vectors → affects gradient field
+#   globally → useful when orientation uncertainty dominates
+# - Both approaches can be combined, but Z-priors are preferred for magnetic
+#   inversion where magnetic contrast is the primary signal and exact interface
+#   positions determine the anomaly shape.
 #
 # For theoretical background, see:
 # - :ref:`sphx_glr_02_probabilistic_modeling_04_gravity_inversion.py`
