@@ -489,5 +489,6 @@ if hasattr(data, 'posterior'):
         topography_path=topography_path,
         var_name=prior_key_surface_points_z,
         update_model_fn=_update_model_for_plotting,
+        pyvista_filename="probability_fields_paper_pyvista_soricom.png",
         ve=1,
     )

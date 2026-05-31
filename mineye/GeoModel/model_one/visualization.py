@@ -290,22 +290,21 @@ def generate_paper_quality_figure(geo_model: gp.data.GeoModel, online_prob, topo
         color = getattr(element, "color", None)
         return color if color is not None else next(default_colors)
 
-    element_styles = [
-            (
-                    getattr(element, "name", f"Lithology {idx + 1}"),
-                    element_color(element)
-            )
-            for idx, element in enumerate(elements)
-    ]
+    element_id_map: dict[int, tuple[str, str]] = {}
+    for element in elements:
+        element_id_map[element.id] = (
+            getattr(element, "name", f"Lithology {element.id}"),
+            element_color(element)
+        )
 
     topo_profile = topography_profile()
 
     lithology_ids = np.asarray(online_prob.unique_lithologies, dtype=int)
     lithology_names = []
     lithology_colors = []
-    for idx, lithology_id in enumerate(lithology_ids):
-        if idx < len(element_styles):
-            lithology_name, lithology_color = element_styles[idx]
+    for lithology_id in lithology_ids:
+        if lithology_id in element_id_map:
+            lithology_name, lithology_color = element_id_map[lithology_id]
         else:
             lithology_name, lithology_color = f"Lithology {lithology_id}", next(default_colors)
         lithology_names.append(lithology_name)
@@ -454,11 +453,14 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
     elements = list(getattr(geo_model.structural_frame, "structural_elements", []))
     default_colors = cycle(plt.get_cmap("tab20").colors)
     lithology_ids = np.asarray(online_prob.unique_lithologies, dtype=int)
+    element_id_map: dict[int, Any] = {}
+    for element in elements:
+        element_id_map[element.id] = element
     lithology_names = []
     lithology_colors = []
-    for idx, lithology_id in enumerate(lithology_ids):
-        element = elements[idx] if idx < len(elements) else None
-        lithology_names.append(getattr(element, "name", f"Lithology {lithology_id}"))
+    for lithology_id in lithology_ids:
+        element = element_id_map.get(lithology_id)
+        lithology_names.append(getattr(element, "name", f"Lithology {lithology_id}") if element is not None else f"Lithology {lithology_id}")
         color = getattr(element, "color", None) if element is not None else None
         lithology_colors.append(to_hex(color if color is not None else next(default_colors)))
 
@@ -698,14 +700,16 @@ def generate_pyvista_paper_quality_figure(geo_model: gp.data.GeoModel, online_pr
 
 
 def probability_fields_for(geo_model, inference_data, topography_path,
-                           var_name=r'dips', update_model_fn=None, ve=5):
+                           var_name=r'dips', update_model_fn=None, ve=5,
+                           output_filename="probability_fields_paper.png",
+                           pyvista_filename="probability_fields_paper_pyvista.png"):
     import gempy_viewer as gpv
     online_prob = setup_probability_fields(geo_model, inference_data, topography_path,
                                           var_name=var_name, update_model_fn=update_model_fn)
 
     # 1. Generate the paper-quality, multi-panel summary figure
-    generate_paper_quality_figure(geo_model, online_prob, topography_path)
-    generate_pyvista_paper_quality_figure(geo_model, online_prob, ve=ve)
+    generate_paper_quality_figure(geo_model, online_prob, topography_path, output_filename=output_filename)
+    generate_pyvista_paper_quality_figure(geo_model, online_prob, ve=ve, output_filename=pyvista_filename)
 
     # 2. Original legacy plots (for compatibility/visual feedback)
     if True:
