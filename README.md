@@ -25,3 +25,10 @@ If specific authors are listed in the dataset, they must also be cited according
 	•	Any accompanying metadata must be retained without alteration.
 
 	⚠️ Please note: Some IGME datasets may include additional, dataset-specific licensing terms. If applicable, those are respected and documented in this repository.
+
+
+# Funding
+
+<img src="docs/source/_static/logos/EN_FundedbytheEU_RGB_POS.png" alt="Funded by the European Union" width="400">
+
+This work was supported by the European Union's Horizon Europe Research and Innovation Programme through the project "MINEYE" (Grant Agreement No. 101138456). Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Health and Digital Executive Agency (HADEA). Neither the European Union nor the granting authority can be held responsible for them.
