@@ -210,3 +210,18 @@ Indices and Tables
 
 * :ref:`genindex`
 * :ref:`search`
+
+----
+
+Funding
+=======
+
+.. image:: _static/logos/EN_FundedbytheEU_RGB_POS.png
+   :alt: Funded by the European Union
+   :width: 400px
+
+This work was supported by the European Union's Horizon Europe Research and Innovation
+Programme through the project "MINEYE" (Grant Agreement No. 101138456). Views and opinions
+expressed are however those of the author(s) only and do not necessarily reflect those of
+the European Union or the European Health and Digital Executive Agency (HADEA). Neither the
+European Union nor the granting authority can be held responsible for them.
